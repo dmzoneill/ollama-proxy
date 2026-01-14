@@ -1,0 +1,110 @@
+# Thermal Monitoring Configuration
+
+thermal:
+  # Enable thermal monitoring
+  enabled: true
+
+  # Update interval for thermal readings
+  update_interval: "5s"
+
+  # Temperature thresholds (Celsius)
+  temperature:
+    warning: 70.0      # Start avoiding this backend
+    critical: 85.0     # Stop using this backend
+    shutdown: 95.0     # Emergency protection
+
+  # Fan speed thresholds (percentage 0-100)
+  fan:
+    quiet: 30          # Prefer in quiet mode (< 30%)
+    moderate: 60       # Normal operation
+    loud: 85           # Avoid if possible (> 85%)
+
+  # Cooling behavior
+  cooling:
+    cooldown_time: "2m"  # Wait before retrying hot backend
+    prefer_cool_when_idle: true  # Route to coolest when no urgency
+
+  # Quiet hours (prefer quiet backends)
+  quiet_hours:
+    enabled: true
+    start: "22:00"
+    end: "07:00"
+    max_fan_percent: 40  # Maximum fan speed during quiet hours
+
+# Backend-specific thermal overrides
+backend_thermal:
+  # NVIDIA GPU - runs hot under load
+  nvidia:
+    max_temp: 83.0       # NVIDIA spec: safe to 83°C
+    max_fan: 90          # Allow higher fan speeds
+    throttle_threshold: 80.0  # Start preferring alternatives
+
+  # Intel GPU - more conservative
+  igpu:
+    max_temp: 75.0       # Integrated, lower limit
+    max_fan: 70          # Share system fans
+    throttle_threshold: 70.0
+
+  # NPU - very cool, passive
+  npu:
+    max_temp: 65.0       # Low power, stays cool
+    max_fan: 0           # No dedicated fan
+    throttle_threshold: 60.0
+
+  # CPU - varies by model
+  cpu:
+    max_temp: 85.0       # Modern CPUs safe to 100°C, conservative
+    max_fan: 80
+    throttle_threshold: 80.0
+
+# Thermal-based routing policies
+thermal_routing:
+  # Automatically route to cooler backends when possible
+  auto_thermal_balance: true
+
+  # Penalty multiplier for temperature
+  # Higher = more aggressive avoidance of hot backends
+  temp_penalty_multiplier: 2.0
+
+  # Penalty multiplier for fan noise
+  fan_penalty_multiplier: 1.0
+
+  # Prefer silent backends during these conditions
+  prefer_silent:
+    - "quiet_hours"
+    - "low_system_load"
+    - "battery_saver_mode"
+
+# Alert thresholds
+alerts:
+  # Log warning when temperature exceeds
+  warn_temp: 75.0
+
+  # Log critical when temperature exceeds
+  critical_temp: 85.0
+
+  # Alert if any backend throttling
+  alert_on_throttle: true
+
+  # Alert if fan speed sustained above threshold
+  alert_sustained_fan:
+    threshold: 85
+    duration: "5m"
+
+# Hardware-specific monitoring tools
+monitoring_tools:
+  nvidia:
+    command: "nvidia-smi"
+    available: true
+
+  intel_gpu:
+    command: "intel_gpu_top"
+    available: false  # Set to true if installed
+
+  cpu:
+    command: "sensors"
+    available: true
+
+  fallback:
+    use_sysfs: true   # Read from /sys/class/thermal
+    use_hwmon: true   # Read from /sys/class/hwmon

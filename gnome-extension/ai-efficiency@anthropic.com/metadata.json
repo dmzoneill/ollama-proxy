@@ -1,0 +1,12 @@
+{
+  "name": "AI Efficiency Mode",
+  "description": "Control AI inference routing mode from Quick Settings",
+  "uuid": "ai-efficiency@anthropic.com",
+  "shell-version": [
+    "45",
+    "46"
+  ],
+  "version": 1,
+  "url": "https://github.com/anthropics/ollama-proxy",
+  "settings-schema": "org.gnome.shell.extensions.ai-efficiency"
+}

@@ -1,0 +1,105 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+    - api/gen
+
+linters:
+  enable:
+    - errcheck        # Check for unchecked errors
+    - gosimple        # Simplify code
+    - govet           # Reports suspicious constructs
+    - ineffassign     # Detects ineffectual assignments
+    - staticcheck     # Advanced static analysis
+    - unused          # Checks for unused code
+    - gofmt           # Check code formatting
+    - goimports       # Check import formatting
+    - misspell        # Check for misspelled words
+    - goconst         # Finds repeated strings that could be constants
+    - gocyclo         # Checks cyclomatic complexity
+    - revive          # General purpose linter
+    - exportloopref   # Checks for pointers to enclosing loop variables
+    - gosec           # Security issues
+    - bodyclose       # Checks HTTP response bodies are closed
+    - nilerr          # Finds nil error returns
+    - nolintlint      # Reports ill-formed or insufficient nolint directives
+    - rowserrcheck    # Checks SQL rows.Err is checked
+    - sqlclosecheck   # Checks SQL connections are closed
+    - unconvert       # Unnecessary type conversions
+    - unparam         # Reports unused function parameters
+    - wastedassign    # Finds wasted assignment statements
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+
+  gocyclo:
+    min-complexity: 15
+
+  misspell:
+    locale: US
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gosec:
+    excludes:
+      - G404  # Use of weak random number generator - OK for non-crypto use
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - gosec
+        - unparam
+
+    # Exclude known false positives
+    - text: "G304: Potential file inclusion"
+      linters:
+        - gosec
+
+    # Allow shadowing of 'err' variable
+    - text: "shadow: declaration of \"err\""
+      linters:
+        - govet
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true

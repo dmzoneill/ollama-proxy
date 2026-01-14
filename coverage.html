@@ -1,0 +1,1260 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>openai: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/daoneill/ollama-proxy/pkg/http/openai/adapter.go (95.9%)</option>
+				
+				<option value="file1">github.com/daoneill/ollama-proxy/pkg/http/openai/handlers.go (87.1%)</option>
+				
+				<option value="file2">github.com/daoneill/ollama-proxy/pkg/http/openai/headers.go (100.0%)</option>
+				
+				<option value="file3">github.com/daoneill/ollama-proxy/pkg/http/openai/pools.go (100.0%)</option>
+				
+				<option value="file4">github.com/daoneill/ollama-proxy/pkg/http/openai/streaming.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package openai
+
+import (
+        "crypto/rand"
+        "encoding/hex"
+        "fmt"
+        "strings"
+        "time"
+
+        "github.com/daoneill/ollama-proxy/pkg/backends"
+)
+
+// ConvertChatCompletionRequest converts OpenAI chat completion request to internal format
+func ConvertChatCompletionRequest(req *ChatCompletionRequest) *backends.GenerateRequest <span class="cov8" title="1">{
+        // Concatenate messages into a single prompt with role markers
+        prompt := buildPromptFromMessages(req.Messages)
+
+        // Build generation options
+        options := &amp;backends.GenerationOptions{}
+
+        if req.Temperature != nil </span><span class="cov8" title="1">{
+                options.Temperature = *req.Temperature
+        }</span>
+
+        <span class="cov8" title="1">if req.TopP != nil </span><span class="cov8" title="1">{
+                options.TopP = *req.TopP
+        }</span>
+
+        <span class="cov8" title="1">if req.MaxTokens != nil </span><span class="cov8" title="1">{
+                options.MaxTokens = *req.MaxTokens
+        }</span>
+
+        <span class="cov8" title="1">if len(req.Stop) &gt; 0 </span><span class="cov8" title="1">{
+                options.Stop = req.Stop
+        }</span>
+
+        <span class="cov8" title="1">return &amp;backends.GenerateRequest{
+                Prompt:  prompt,
+                Model:   req.Model,
+                Options: options,
+        }</span>
+}
+
+// ConvertCompletionRequest converts OpenAI completion request to internal format
+func ConvertCompletionRequest(req *CompletionRequest) *backends.GenerateRequest <span class="cov8" title="1">{
+        // Extract prompt (can be string or []string)
+        prompt := extractPrompt(req.Prompt)
+
+        // Build generation options
+        options := &amp;backends.GenerationOptions{}
+
+        if req.Temperature != nil </span><span class="cov8" title="1">{
+                options.Temperature = *req.Temperature
+        }</span>
+
+        <span class="cov8" title="1">if req.TopP != nil </span><span class="cov8" title="1">{
+                options.TopP = *req.TopP
+        }</span>
+
+        <span class="cov8" title="1">if req.MaxTokens != nil </span><span class="cov8" title="1">{
+                options.MaxTokens = *req.MaxTokens
+        }</span>
+
+        <span class="cov8" title="1">if len(req.Stop) &gt; 0 </span><span class="cov8" title="1">{
+                options.Stop = req.Stop
+        }</span>
+
+        <span class="cov8" title="1">return &amp;backends.GenerateRequest{
+                Prompt:  prompt,
+                Model:   req.Model,
+                Options: options,
+        }</span>
+}
+
+// ConvertEmbeddingRequest converts OpenAI embedding request to internal format
+func ConvertEmbeddingRequest(req *EmbeddingRequest) *backends.EmbedRequest <span class="cov8" title="1">{
+        // Extract text (can be string or []string, we use the first for now)
+        text := extractPrompt(req.Input)
+
+        return &amp;backends.EmbedRequest{
+                Text:  text,
+                Model: req.Model,
+        }
+}</span>
+
+// ConvertToOpenAIChatResponse converts internal response to OpenAI chat completion format
+func ConvertToOpenAIChatResponse(req *ChatCompletionRequest, resp *backends.GenerateResponse) *ChatCompletionResponse <span class="cov8" title="1">{
+        completionID := generateCompletionID("chatcmpl")
+        timestamp := time.Now().Unix()
+
+        // Estimate tokens (rough approximation)
+        promptTokens := estimateTokens(buildPromptFromMessages(req.Messages))
+        completionTokens := int32(0)
+        if resp.Stats != nil </span><span class="cov8" title="1">{
+                completionTokens = resp.Stats.TokensGenerated
+        }</span>
+        <span class="cov8" title="1">if completionTokens == 0 </span><span class="cov0" title="0">{
+                completionTokens = estimateTokens(resp.Response)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;ChatCompletionResponse{
+                ID:      completionID,
+                Object:  "chat.completion",
+                Created: timestamp,
+                Model:   req.Model,
+                Choices: []ChatCompletionChoice{
+                        {
+                                Index: 0,
+                                Message: ChatCompletionMessage{
+                                        Role:    "assistant",
+                                        Content: resp.Response,
+                                },
+                                FinishReason: "stop",
+                        },
+                },
+                Usage: ChatCompletionUsage{
+                        PromptTokens:     promptTokens,
+                        CompletionTokens: completionTokens,
+                        TotalTokens:      promptTokens + completionTokens,
+                },
+        }</span>
+}
+
+// ConvertToOpenAICompletionResponse converts internal response to OpenAI completion format
+func ConvertToOpenAICompletionResponse(req *CompletionRequest, resp *backends.GenerateResponse) *CompletionResponse <span class="cov8" title="1">{
+        completionID := generateCompletionID("cmpl")
+        timestamp := time.Now().Unix()
+
+        // Estimate tokens
+        promptTokens := estimateTokens(extractPrompt(req.Prompt))
+        completionTokens := int32(0)
+        if resp.Stats != nil </span><span class="cov8" title="1">{
+                completionTokens = resp.Stats.TokensGenerated
+        }</span>
+        <span class="cov8" title="1">if completionTokens == 0 </span><span class="cov0" title="0">{
+                completionTokens = estimateTokens(resp.Response)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;CompletionResponse{
+                ID:      completionID,
+                Object:  "text_completion",
+                Created: timestamp,
+                Model:   req.Model,
+                Choices: []CompletionChoice{
+                        {
+                                Text:         resp.Response,
+                                Index:        0,
+                                FinishReason: "stop",
+                        },
+                },
+                Usage: CompletionUsage{
+                        PromptTokens:     promptTokens,
+                        CompletionTokens: completionTokens,
+                        TotalTokens:      promptTokens + completionTokens,
+                },
+        }</span>
+}
+
+// ConvertToOpenAIEmbeddingResponse converts internal response to OpenAI embedding format
+func ConvertToOpenAIEmbeddingResponse(req *EmbeddingRequest, resp *backends.EmbedResponse) *EmbeddingResponse <span class="cov8" title="1">{
+        // Estimate tokens
+        promptTokens := estimateTokens(extractPrompt(req.Input))
+
+        return &amp;EmbeddingResponse{
+                Object: "list",
+                Data: []EmbeddingData{
+                        {
+                                Object:    "embedding",
+                                Index:     0,
+                                Embedding: resp.Embedding,
+                        },
+                },
+                Model: req.Model,
+                Usage: EmbeddingUsage{
+                        PromptTokens: promptTokens,
+                        TotalTokens:  promptTokens,
+                },
+        }
+}</span>
+
+// buildPromptFromMessages concatenates messages into a single prompt with role markers
+func buildPromptFromMessages(messages []ChatCompletionMessage) string <span class="cov8" title="1">{
+        var parts []string
+
+        for _, msg := range messages </span><span class="cov8" title="1">{
+                var prefix string
+                switch strings.ToLower(msg.Role) </span>{
+                case "system":<span class="cov8" title="1">
+                        prefix = "System"</span>
+                case "user":<span class="cov8" title="1">
+                        prefix = "User"</span>
+                case "assistant":<span class="cov8" title="1">
+                        prefix = "Assistant"</span>
+                default:<span class="cov0" title="0">
+                        prefix = msg.Role</span>
+                }
+
+                <span class="cov8" title="1">if msg.Content != "" </span><span class="cov8" title="1">{
+                        parts = append(parts, fmt.Sprintf("%s: %s", prefix, msg.Content))
+                }</span>
+        }
+
+        // Add assistant prompt at the end if the last message wasn't from assistant
+        <span class="cov8" title="1">if len(messages) &gt; 0 &amp;&amp; strings.ToLower(messages[len(messages)-1].Role) != "assistant" </span><span class="cov8" title="1">{
+                parts = append(parts, "Assistant:")
+        }</span>
+
+        <span class="cov8" title="1">return strings.Join(parts, "\n")</span>
+}
+
+// extractPrompt extracts string prompt from interface{} (can be string or []string)
+func extractPrompt(prompt interface{}) string <span class="cov8" title="1">{
+        switch v := prompt.(type) </span>{
+        case string:<span class="cov8" title="1">
+                return v</span>
+        case []string:<span class="cov8" title="1">
+                if len(v) &gt; 0 </span><span class="cov8" title="1">{
+                        return v[0] // Use first prompt
+                }</span>
+                <span class="cov8" title="1">return ""</span>
+        case []interface{}:<span class="cov8" title="1">
+                if len(v) &gt; 0 </span><span class="cov8" title="1">{
+                        if s, ok := v[0].(string); ok </span><span class="cov8" title="1">{
+                                return s
+                        }</span>
+                }
+                <span class="cov8" title="1">return ""</span>
+        default:<span class="cov8" title="1">
+                return fmt.Sprintf("%v", prompt)</span>
+        }
+}
+
+// generateCompletionID generates a unique completion ID
+func generateCompletionID(prefix string) string <span class="cov8" title="1">{
+        // Generate random bytes
+        b := make([]byte, 12)
+        rand.Read(b)
+
+        // Convert to hex
+        return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b))
+}</span>
+
+// estimateTokens provides a rough token count estimate
+// This is a simple approximation: ~4 characters per token on average
+func estimateTokens(text string) int32 <span class="cov8" title="1">{
+        if text == "" </span><span class="cov8" title="1">{
+                return 0
+        }</span>
+        // Rough approximation: divide character count by 4
+        <span class="cov8" title="1">return int32((len(text) + 3) / 4)</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package openai
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "time"
+
+        "github.com/daoneill/ollama-proxy/pkg/backends"
+        "github.com/daoneill/ollama-proxy/pkg/router"
+)
+
+// HandleChatCompletion handles /v1/chat/completions endpoint
+func HandleChatCompletion(r *router.Router) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, req *http.Request) </span><span class="cov8" title="1">{
+                // Only accept POST
+                if req.Method != http.MethodPost </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+                        return
+                }</span>
+
+                // Parse request body
+                <span class="cov8" title="1">var chatReq ChatCompletionRequest
+                if err := json.NewDecoder(req.Body).Decode(&amp;chatReq); err != nil </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Invalid request body", "invalid_request_error")
+                        return
+                }</span>
+
+                // Validate required fields
+                <span class="cov8" title="1">if chatReq.Model == "" </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Model is required", "invalid_request_error")
+                        return
+                }</span>
+                <span class="cov8" title="1">if len(chatReq.Messages) == 0 </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Messages are required", "invalid_request_error")
+                        return
+                }</span>
+
+                // Parse routing headers
+                <span class="cov8" title="1">annotations := ParseRoutingHeaders(req)
+
+                // Convert to internal format
+                internalReq := ConvertChatCompletionRequest(&amp;chatReq)
+
+                // Route request
+                decision, err := r.RouteRequest(req.Context(), annotations)
+                if err != nil </span><span class="cov0" title="0">{
+                        writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("Routing failed: %v", err), "service_unavailable")
+                        return
+                }</span>
+
+                // Check if backend supports the model
+                <span class="cov8" title="1">if !decision.Backend.SupportsModel(chatReq.Model) </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusNotFound, fmt.Sprintf("Model %s not available", chatReq.Model), "model_not_found")
+                        return
+                }</span>
+
+                // Handle streaming vs non-streaming
+                <span class="cov8" title="1">if chatReq.Stream </span><span class="cov8" title="1">{
+                        handleChatCompletionStreaming(w, req.Context(), decision, internalReq, &amp;chatReq)
+                }</span> else<span class="cov8" title="1"> {
+                        handleChatCompletionNonStreaming(w, req.Context(), decision, internalReq, &amp;chatReq)
+                }</span>
+        }
+}
+
+func handleChatCompletionNonStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) <span class="cov8" title="1">{
+        // Execute request
+        resp, err := decision.Backend.Generate(ctx, internalReq)
+        if err != nil </span><span class="cov8" title="1">{
+                writeError(w, http.StatusInternalServerError, fmt.Sprintf("Generation failed: %v", err), "internal_error")
+                return
+        }</span>
+
+        // Convert to OpenAI format
+        <span class="cov8" title="1">openaiResp := ConvertToOpenAIChatResponse(chatReq, resp)
+
+        // Write routing headers
+        WriteRoutingHeaders(w, decision)
+
+        // Write response
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode(openaiResp)</span>
+}
+
+func handleChatCompletionStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) <span class="cov8" title="1">{
+        // Check if backend supports streaming
+        if !decision.Backend.SupportsStream() </span><span class="cov8" title="1">{
+                writeError(w, http.StatusBadRequest, "Backend does not support streaming", "invalid_request_error")
+                return
+        }</span>
+
+        // Execute streaming request
+        <span class="cov8" title="1">reader, err := decision.Backend.GenerateStream(ctx, internalReq)
+        if err != nil </span><span class="cov8" title="1">{
+                writeError(w, http.StatusInternalServerError, fmt.Sprintf("Streaming failed: %v", err), "internal_error")
+                return
+        }</span>
+
+        // Write routing headers before streaming
+        <span class="cov0" title="0">WriteRoutingHeaders(w, decision)
+
+        // Generate completion ID
+        completionID := generateCompletionID("chatcmpl")
+
+        // Stream response
+        if err := StreamChatCompletion(w, reader, chatReq.Model, completionID); err != nil </span><span class="cov0" title="0">{
+                // Can't send error after streaming has started
+                // Just log it
+                fmt.Printf("Streaming error: %v\n", err)
+        }</span>
+}
+
+// HandleCompletion handles /v1/completions endpoint
+func HandleCompletion(r *router.Router) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, req *http.Request) </span><span class="cov8" title="1">{
+                // Only accept POST
+                if req.Method != http.MethodPost </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+                        return
+                }</span>
+
+                // Parse request body
+                <span class="cov8" title="1">var compReq CompletionRequest
+                if err := json.NewDecoder(req.Body).Decode(&amp;compReq); err != nil </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Invalid request body", "invalid_request_error")
+                        return
+                }</span>
+
+                // Validate required fields
+                <span class="cov8" title="1">if compReq.Model == "" </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Model is required", "invalid_request_error")
+                        return
+                }</span>
+                <span class="cov8" title="1">if compReq.Prompt == nil </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Prompt is required", "invalid_request_error")
+                        return
+                }</span>
+
+                // Parse routing headers
+                <span class="cov8" title="1">annotations := ParseRoutingHeaders(req)
+
+                // Convert to internal format
+                internalReq := ConvertCompletionRequest(&amp;compReq)
+
+                // Route request
+                decision, err := r.RouteRequest(req.Context(), annotations)
+                if err != nil </span><span class="cov0" title="0">{
+                        writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("Routing failed: %v", err), "service_unavailable")
+                        return
+                }</span>
+
+                // Check if backend supports the model
+                <span class="cov8" title="1">if !decision.Backend.SupportsModel(compReq.Model) </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusNotFound, fmt.Sprintf("Model %s not available", compReq.Model), "model_not_found")
+                        return
+                }</span>
+
+                // Handle streaming vs non-streaming
+                <span class="cov8" title="1">if compReq.Stream </span><span class="cov8" title="1">{
+                        handleCompletionStreaming(w, req.Context(), decision, internalReq, &amp;compReq)
+                }</span> else<span class="cov8" title="1"> {
+                        handleCompletionNonStreaming(w, req.Context(), decision, internalReq, &amp;compReq)
+                }</span>
+        }
+}
+
+func handleCompletionNonStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) <span class="cov8" title="1">{
+        // Execute request
+        resp, err := decision.Backend.Generate(ctx, internalReq)
+        if err != nil </span><span class="cov8" title="1">{
+                writeError(w, http.StatusInternalServerError, fmt.Sprintf("Generation failed: %v", err), "internal_error")
+                return
+        }</span>
+
+        // Convert to OpenAI format
+        <span class="cov8" title="1">openaiResp := ConvertToOpenAICompletionResponse(compReq, resp)
+
+        // Write routing headers
+        WriteRoutingHeaders(w, decision)
+
+        // Write response
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode(openaiResp)</span>
+}
+
+func handleCompletionStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) <span class="cov8" title="1">{
+        // Check if backend supports streaming
+        if !decision.Backend.SupportsStream() </span><span class="cov8" title="1">{
+                writeError(w, http.StatusBadRequest, "Backend does not support streaming", "invalid_request_error")
+                return
+        }</span>
+
+        // Execute streaming request
+        <span class="cov8" title="1">reader, err := decision.Backend.GenerateStream(ctx, internalReq)
+        if err != nil </span><span class="cov8" title="1">{
+                writeError(w, http.StatusInternalServerError, fmt.Sprintf("Streaming failed: %v", err), "internal_error")
+                return
+        }</span>
+
+        // Write routing headers before streaming
+        <span class="cov0" title="0">WriteRoutingHeaders(w, decision)
+
+        // Generate completion ID
+        completionID := generateCompletionID("cmpl")
+
+        // Stream response
+        if err := StreamCompletion(w, reader, compReq.Model, completionID); err != nil </span><span class="cov0" title="0">{
+                // Can't send error after streaming has started
+                fmt.Printf("Streaming error: %v\n", err)
+        }</span>
+}
+
+// HandleEmbedding handles /v1/embeddings endpoint
+func HandleEmbedding(r *router.Router) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, req *http.Request) </span><span class="cov8" title="1">{
+                // Only accept POST
+                if req.Method != http.MethodPost </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+                        return
+                }</span>
+
+                // Parse request body
+                <span class="cov8" title="1">var embedReq EmbeddingRequest
+                if err := json.NewDecoder(req.Body).Decode(&amp;embedReq); err != nil </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Invalid request body", "invalid_request_error")
+                        return
+                }</span>
+
+                // Validate required fields
+                <span class="cov8" title="1">if embedReq.Model == "" </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Model is required", "invalid_request_error")
+                        return
+                }</span>
+                <span class="cov8" title="1">if embedReq.Input == nil </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusBadRequest, "Input is required", "invalid_request_error")
+                        return
+                }</span>
+
+                // Parse routing headers
+                <span class="cov8" title="1">annotations := ParseRoutingHeaders(req)
+
+                // Convert to internal format
+                internalReq := ConvertEmbeddingRequest(&amp;embedReq)
+
+                // Route request
+                decision, err := r.RouteRequest(req.Context(), annotations)
+                if err != nil </span><span class="cov0" title="0">{
+                        writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("Routing failed: %v", err), "service_unavailable")
+                        return
+                }</span>
+
+                // Check if backend supports embeddings
+                <span class="cov8" title="1">if !decision.Backend.SupportsEmbed() </span><span class="cov0" title="0">{
+                        writeError(w, http.StatusBadRequest, "Backend does not support embeddings", "invalid_request_error")
+                        return
+                }</span>
+
+                // Check if backend supports the model
+                <span class="cov8" title="1">if !decision.Backend.SupportsModel(embedReq.Model) </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusNotFound, fmt.Sprintf("Model %s not available", embedReq.Model), "model_not_found")
+                        return
+                }</span>
+
+                // Execute request
+                <span class="cov8" title="1">resp, err := decision.Backend.Embed(req.Context(), internalReq)
+                if err != nil </span><span class="cov0" title="0">{
+                        writeError(w, http.StatusInternalServerError, fmt.Sprintf("Embedding failed: %v", err), "internal_error")
+                        return
+                }</span>
+
+                // Convert to OpenAI format
+                <span class="cov8" title="1">openaiResp := ConvertToOpenAIEmbeddingResponse(&amp;embedReq, resp)
+
+                // Write routing headers
+                WriteRoutingHeaders(w, decision)
+
+                // Write response
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusOK)
+                json.NewEncoder(w).Encode(openaiResp)</span>
+        }
+}
+
+// HandleModels handles /v1/models endpoint
+func HandleModels(r *router.Router) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, req *http.Request) </span><span class="cov8" title="1">{
+                // Only accept GET
+                if req.Method != http.MethodGet </span><span class="cov8" title="1">{
+                        writeError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+                        return
+                }</span>
+
+                // Get all backends
+                <span class="cov8" title="1">backends := r.ListBackends()
+
+                // Collect all models from all backends
+                modelsMap := make(map[string]bool)
+                for _, backend := range backends </span><span class="cov8" title="1">{
+                        if !backend.IsHealthy() </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+
+                        <span class="cov8" title="1">models, err := backend.ListModels(req.Context())
+                        if err != nil </span><span class="cov0" title="0">{
+                                // Skip backends that fail to list models
+                                continue</span>
+                        }
+
+                        <span class="cov8" title="1">for _, model := range models </span><span class="cov8" title="1">{
+                                modelsMap[model] = true
+                        }</span>
+
+                        // Also add preferred models
+                        <span class="cov8" title="1">for _, model := range backend.GetPreferredModels() </span><span class="cov8" title="1">{
+                                modelsMap[model] = true
+                        }</span>
+                }
+
+                // Convert to model list
+                <span class="cov8" title="1">var modelsList []Model
+                timestamp := time.Now().Unix()
+
+                for modelID := range modelsMap </span><span class="cov8" title="1">{
+                        modelsList = append(modelsList, Model{
+                                ID:      modelID,
+                                Object:  "model",
+                                Created: timestamp,
+                                OwnedBy: "ollama-proxy",
+                        })
+                }</span>
+
+                // Build response
+                <span class="cov8" title="1">response := ModelsResponse{
+                        Object: "list",
+                        Data:   modelsList,
+                }
+
+                // Write response
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusOK)
+                json.NewEncoder(w).Encode(response)</span>
+        }
+}
+
+// writeError writes an OpenAI-compatible error response
+func writeError(w http.ResponseWriter, statusCode int, message string, errorType string) <span class="cov8" title="1">{
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(statusCode)
+
+        errorResp := ErrorResponse{
+                Error: ErrorDetail{
+                        Message: message,
+                        Type:    errorType,
+                        Code:    errorType,
+                },
+        }
+
+        json.NewEncoder(w).Encode(errorResp)
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package openai
+
+import (
+        "fmt"
+        "net/http"
+        "strconv"
+        "strings"
+
+        "github.com/daoneill/ollama-proxy/pkg/backends"
+        "github.com/daoneill/ollama-proxy/pkg/router"
+)
+
+// ParseRoutingHeaders extracts routing annotations from HTTP request headers
+func ParseRoutingHeaders(r *http.Request) *backends.Annotations <span class="cov8" title="1">{
+        annotations := &amp;backends.Annotations{
+                Custom: make(map[string]string),
+        }
+
+        // X-Target-Backend: Explicit backend selection (e.g., "ollama-nvidia", "ollama-npu")
+        if target := r.Header.Get("X-Target-Backend"); target != "" </span><span class="cov8" title="1">{
+                annotations.Target = target
+        }</span>
+
+        // X-Latency-Critical: Route to fastest backend (true/false)
+        <span class="cov8" title="1">if latency := r.Header.Get("X-Latency-Critical"); latency != "" </span><span class="cov8" title="1">{
+                annotations.LatencyCritical = parseBool(latency)
+        }</span>
+
+        // X-Power-Efficient: Route to lowest power backend (true/false)
+        <span class="cov8" title="1">if power := r.Header.Get("X-Power-Efficient"); power != "" </span><span class="cov8" title="1">{
+                annotations.PreferPowerEfficiency = parseBool(power)
+        }</span>
+
+        // X-Max-Latency-Ms: Maximum acceptable latency constraint (integer)
+        <span class="cov8" title="1">if maxLatency := r.Header.Get("X-Max-Latency-Ms"); maxLatency != "" </span><span class="cov8" title="1">{
+                if val, err := strconv.Atoi(maxLatency); err == nil </span><span class="cov8" title="1">{
+                        annotations.MaxLatencyMs = int32(val)
+                }</span>
+        }
+
+        // X-Max-Power-Watts: Maximum power budget constraint (integer)
+        <span class="cov8" title="1">if maxPower := r.Header.Get("X-Max-Power-Watts"); maxPower != "" </span><span class="cov8" title="1">{
+                if val, err := strconv.Atoi(maxPower); err == nil </span><span class="cov8" title="1">{
+                        annotations.MaxPowerWatts = int32(val)
+                }</span>
+        }
+
+        // X-Cache-Enabled: Enable response caching (true/false)
+        <span class="cov8" title="1">if cache := r.Header.Get("X-Cache-Enabled"); cache != "" </span><span class="cov8" title="1">{
+                annotations.CacheEnabled = parseBool(cache)
+        }</span>
+
+        // X-Media-Type: Media type hint for routing (text, code, image, audio, realtime, auto)
+        <span class="cov8" title="1">if mediaType := r.Header.Get("X-Media-Type"); mediaType != "" </span><span class="cov8" title="1">{
+                // Map string to backends.MediaType enum
+                switch strings.ToLower(mediaType) </span>{
+                case "text":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeText</span>
+                case "code":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeCode</span>
+                case "image":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeImage</span>
+                case "audio":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeAudio</span>
+                case "realtime":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeRealtime</span>
+                case "auto":<span class="cov8" title="1">
+                        annotations.MediaType = backends.MediaTypeAuto</span>
+                }
+        }
+
+        // X-Priority: Explicit priority level (best-effort, normal, high, critical)
+        <span class="cov8" title="1">if priority := r.Header.Get("X-Priority"); priority != "" </span><span class="cov8" title="1">{
+                switch strings.ToLower(priority) </span>{
+                case "best-effort", "low":<span class="cov8" title="1">
+                        annotations.Priority = backends.PriorityBestEffort</span>
+                case "normal":<span class="cov8" title="1">
+                        annotations.Priority = backends.PriorityNormal</span>
+                case "high":<span class="cov8" title="1">
+                        annotations.Priority = backends.PriorityHigh</span>
+                case "critical", "realtime":<span class="cov8" title="1">
+                        annotations.Priority = backends.PriorityCritical</span>
+                }
+        } else<span class="cov8" title="1"> {
+                // Auto-set priority based on other headers
+                if annotations.LatencyCritical || annotations.MediaType == backends.MediaTypeRealtime </span><span class="cov8" title="1">{
+                        annotations.Priority = backends.PriorityCritical
+                }</span> else<span class="cov8" title="1"> if annotations.MediaType == backends.MediaTypeAudio </span><span class="cov8" title="1">{
+                        annotations.Priority = backends.PriorityHigh
+                }</span> else<span class="cov8" title="1"> {
+                        annotations.Priority = backends.PriorityNormal
+                }</span>
+        }
+
+        // X-Request-ID: Request tracking ID
+        <span class="cov8" title="1">if requestID := r.Header.Get("X-Request-ID"); requestID != "" </span><span class="cov8" title="1">{
+                annotations.RequestID = requestID
+        }</span>
+
+        // X-Deadline-Ms: Absolute deadline in Unix milliseconds
+        <span class="cov8" title="1">if deadline := r.Header.Get("X-Deadline-Ms"); deadline != "" </span><span class="cov8" title="1">{
+                if val, err := strconv.ParseInt(deadline, 10, 64); err == nil </span><span class="cov8" title="1">{
+                        annotations.DeadlineMs = val
+                }</span>
+        }
+
+        // X-Custom-*: Custom annotations (e.g., X-Custom-Priority: high)
+        <span class="cov8" title="1">for key, values := range r.Header </span><span class="cov8" title="1">{
+                if strings.HasPrefix(key, "X-Custom-") &amp;&amp; len(values) &gt; 0 </span><span class="cov8" title="1">{
+                        customKey := strings.TrimPrefix(key, "X-Custom-")
+                        annotations.Custom[customKey] = values[0]
+                }</span>
+        }
+
+        <span class="cov8" title="1">return annotations</span>
+}
+
+// WriteRoutingHeaders writes routing metadata to HTTP response headers
+func WriteRoutingHeaders(w http.ResponseWriter, decision *router.RoutingDecision) <span class="cov8" title="1">{
+        if decision == nil </span><span class="cov8" title="1">{
+                return
+        }</span>
+
+        // X-Backend-Used: Which backend processed the request
+        <span class="cov8" title="1">if decision.Backend != nil </span><span class="cov8" title="1">{
+                w.Header().Set("X-Backend-Used", decision.Backend.ID())
+        }</span>
+
+        // X-Routing-Reason: Why this backend was selected
+        <span class="cov8" title="1">if decision.Reason != "" </span><span class="cov8" title="1">{
+                w.Header().Set("X-Routing-Reason", decision.Reason)
+        }</span>
+
+        // X-Estimated-Power-Watts: Estimated power consumption
+        <span class="cov8" title="1">if decision.EstimatedPowerW &gt; 0 </span><span class="cov8" title="1">{
+                w.Header().Set("X-Estimated-Power-Watts", fmt.Sprintf("%.1f", decision.EstimatedPowerW))
+        }</span>
+
+        // X-Estimated-Latency-Ms: Estimated latency
+        <span class="cov8" title="1">if decision.EstimatedLatencyMs &gt; 0 </span><span class="cov8" title="1">{
+                w.Header().Set("X-Estimated-Latency-Ms", fmt.Sprintf("%d", decision.EstimatedLatencyMs))
+        }</span>
+
+        // X-Alternatives: Alternative backends that could handle this request
+        <span class="cov8" title="1">if len(decision.Alternatives) &gt; 0 </span><span class="cov8" title="1">{
+                w.Header().Set("X-Alternatives", strings.Join(decision.Alternatives, ","))
+        }</span>
+}
+
+// parseBool converts string to bool, accepting various formats
+func parseBool(s string) bool <span class="cov8" title="1">{
+        s = strings.ToLower(strings.TrimSpace(s))
+        return s == "true" || s == "1" || s == "yes" || s == "on"
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package openai
+
+import (
+        "bytes"
+        "sync"
+)
+
+// Pool for ChatCompletionChunk structs
+var chatChunkPool = sync.Pool{
+        New: func() interface{} <span class="cov8" title="1">{
+                return &amp;ChatCompletionChunk{
+                        Choices: make([]ChatCompletionChunkChoice, 1),
+                }
+        }</span>,
+}
+
+// getChatChunk gets a chunk from pool
+func getChatChunk() *ChatCompletionChunk <span class="cov8" title="1">{
+        chunk := chatChunkPool.Get().(*ChatCompletionChunk)
+        // Reset fields to default state
+        chunk.ID = ""
+        chunk.Object = "chat.completion.chunk"
+        chunk.Created = 0
+        chunk.Model = ""
+        if len(chunk.Choices) &gt; 0 </span><span class="cov8" title="1">{
+                chunk.Choices[0] = ChatCompletionChunkChoice{
+                        Index:        0,
+                        Delta:        ChatCompletionChunkDelta{},
+                        FinishReason: nil,
+                }
+        }</span>
+        <span class="cov8" title="1">return chunk</span>
+}
+
+// putChatChunk returns chunk to pool
+func putChatChunk(chunk *ChatCompletionChunk) <span class="cov8" title="1">{
+        // Don't return to pool if it has grown too large
+        if len(chunk.Choices) &gt; 10 </span><span class="cov8" title="1">{
+                return
+        }</span>
+        <span class="cov8" title="1">chatChunkPool.Put(chunk)</span>
+}
+
+// Pool for CompletionChunk structs
+var completionChunkPool = sync.Pool{
+        New: func() interface{} <span class="cov8" title="1">{
+                return &amp;CompletionChunk{
+                        Choices: make([]CompletionChunkChoice, 1),
+                }
+        }</span>,
+}
+
+// getCompletionChunk gets a chunk from pool
+func getCompletionChunk() *CompletionChunk <span class="cov8" title="1">{
+        chunk := completionChunkPool.Get().(*CompletionChunk)
+        // Reset fields to default state
+        chunk.ID = ""
+        chunk.Object = "text_completion.chunk"
+        chunk.Created = 0
+        chunk.Model = ""
+        if len(chunk.Choices) &gt; 0 </span><span class="cov8" title="1">{
+                chunk.Choices[0] = CompletionChunkChoice{
+                        Index:        0,
+                        Text:         "",
+                        FinishReason: nil,
+                }
+        }</span>
+        <span class="cov8" title="1">return chunk</span>
+}
+
+// putCompletionChunk returns chunk to pool
+func putCompletionChunk(chunk *CompletionChunk) <span class="cov8" title="1">{
+        // Don't return to pool if it has grown too large
+        if len(chunk.Choices) &gt; 10 </span><span class="cov8" title="1">{
+                return
+        }</span>
+        <span class="cov8" title="1">completionChunkPool.Put(chunk)</span>
+}
+
+// Pool for SSE frame buffers
+var sseBufferPool = sync.Pool{
+        New: func() interface{} <span class="cov8" title="1">{
+                buf := bytes.NewBuffer(make([]byte, 0, 2048)) // Pre-allocate 2KB
+                return buf
+        }</span>,
+}
+
+// getSSEBuffer gets a buffer from pool
+func getSSEBuffer() *bytes.Buffer <span class="cov8" title="1">{
+        return sseBufferPool.Get().(*bytes.Buffer)
+}</span>
+
+// putSSEBuffer returns buffer to pool
+func putSSEBuffer(buf *bytes.Buffer) <span class="cov8" title="1">{
+        // Reset capacity if grown too large (don't keep huge buffers)
+        if buf.Cap() &gt; 16384 </span><span class="cov8" title="1">{
+                return
+        }</span>
+        <span class="cov8" title="1">buf.Reset() // Reset length to 0
+        sseBufferPool.Put(buf)</span>
+}
+
+// Pool for JSON byte slices
+var jsonBytesPool = sync.Pool{
+        New: func() interface{} <span class="cov8" title="1">{
+                b := make([]byte, 0, 1024) // Pre-allocate 1KB
+                return &amp;b
+        }</span>,
+}
+
+// getJSONBytes gets a byte slice from pool
+func getJSONBytes() *[]byte <span class="cov8" title="1">{
+        return jsonBytesPool.Get().(*[]byte)
+}</span>
+
+// putJSONBytes returns byte slice to pool
+func putJSONBytes(b *[]byte) <span class="cov8" title="1">{
+        // Don't return to pool if it has grown too large
+        if cap(*b) &gt; 8192 </span><span class="cov8" title="1">{
+                return
+        }</span>
+        <span class="cov8" title="1">*b = (*b)[:0] // Reset length
+        jsonBytesPool.Put(b)</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package openai
+
+import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "time"
+
+        "github.com/daoneill/ollama-proxy/pkg/backends"
+)
+
+// StreamChatCompletion streams a chat completion response in OpenAI SSE format
+func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, model string, completionID string) error <span class="cov0" title="0">{
+        defer reader.Close()
+
+        // Set SSE headers
+        w.Header().Set("Content-Type", "text/event-stream")
+        w.Header().Set("Cache-Control", "no-cache")
+        w.Header().Set("Connection", "keep-alive")
+        w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+        // Flush headers immediately
+        if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                flusher.Flush()
+        }</span>
+
+        <span class="cov0" title="0">timestamp := time.Now().Unix()
+        index := 0
+
+        // Channel for backpressure control
+        writeChan := make(chan []byte, 10) // Buffer 10 chunks
+        errChan := make(chan error, 1)
+        done := make(chan struct{})
+
+        // Writer goroutine with timeout protection
+        go func() </span><span class="cov0" title="0">{
+                defer close(done)
+                for data := range writeChan </span><span class="cov0" title="0">{
+                        // Write with timeout protection (detect slow clients)
+                        written := make(chan bool, 1)
+                        go func() </span><span class="cov0" title="0">{
+                                fmt.Fprintf(w, "data: %s\n\n", string(data))
+                                if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                                        flusher.Flush()
+                                }</span>
+                                <span class="cov0" title="0">written &lt;- true</span>
+                        }()
+
+                        <span class="cov0" title="0">select </span>{
+                        case &lt;-written:<span class="cov0" title="0"></span>
+                                // Write successful
+                        case &lt;-time.After(10 * time.Second):<span class="cov0" title="0">
+                                // Client too slow
+                                errChan &lt;- fmt.Errorf("client write timeout - slow consumer")
+                                return</span>
+                        }
+                }
+        }()
+
+        // Reader loop
+        <span class="cov0" title="0">for </span><span class="cov0" title="0">{
+                chunk, err := reader.Recv()
+                if err != nil </span><span class="cov0" title="0">{
+                        close(writeChan)
+                        &lt;-done // Wait for writer to finish
+
+                        // Check if it's a normal EOF or an error
+                        if err.Error() != "EOF" </span><span class="cov0" title="0">{
+                                // Send error event to client
+                                errorEvent := map[string]interface{}{
+                                        "error": map[string]interface{}{
+                                                "message": err.Error(),
+                                                "type":    "stream_error",
+                                                "code":    "backend_error",
+                                        },
+                                }
+                                errorJSON, _ := json.Marshal(errorEvent)
+                                fmt.Fprintf(w, "event: error\ndata: %s\n\n", string(errorJSON))
+                                if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                                        flusher.Flush()
+                                }</span>
+                                <span class="cov0" title="0">return err</span>
+                        }
+                        <span class="cov0" title="0">break</span>
+                }
+
+                // Get chunk from pool
+                <span class="cov0" title="0">openaiChunk := getChatChunk()
+
+                // Populate chunk fields
+                openaiChunk.ID = completionID
+                openaiChunk.Object = "chat.completion.chunk"
+                openaiChunk.Created = timestamp
+                openaiChunk.Model = model
+
+                if chunk.Done </span><span class="cov0" title="0">{
+                        // Final chunk with finish_reason
+                        finishReason := "stop"
+                        openaiChunk.Choices[0].Index = 0
+                        openaiChunk.Choices[0].Delta.Content = chunk.Token
+                        openaiChunk.Choices[0].FinishReason = &amp;finishReason
+                }</span> else<span class="cov0" title="0"> {
+                        // Regular chunk
+                        openaiChunk.Choices[0].Index = 0
+                        openaiChunk.Choices[0].Delta.Content = chunk.Token
+                        openaiChunk.Choices[0].FinishReason = nil
+                }</span>
+
+                // Marshal to JSON
+                <span class="cov0" title="0">data, err := json.Marshal(openaiChunk)
+                if err != nil </span><span class="cov0" title="0">{
+                        putChatChunk(openaiChunk) // Return to pool
+                        close(writeChan)
+                        &lt;-done
+                        return fmt.Errorf("failed to marshal chunk: %w", err)
+                }</span>
+
+                // Return chunk to pool
+                <span class="cov0" title="0">putChatChunk(openaiChunk)
+
+                // Send to writer with backpressure (blocking)
+                select </span>{
+                case writeChan &lt;- data:<span class="cov0" title="0"></span>
+                        // Sent successfully
+                case err := &lt;-errChan:<span class="cov0" title="0">
+                        // Writer encountered error (slow client)
+                        close(writeChan)
+                        &lt;-done
+                        return err</span>
+                case &lt;-time.After(5 * time.Second):<span class="cov0" title="0">
+                        // Backpressure timeout - client can't keep up
+                        close(writeChan)
+                        &lt;-done
+                        return fmt.Errorf("backpressure timeout - client too slow")</span>
+                }
+
+                <span class="cov0" title="0">index++
+
+                // Exit if this was the final chunk
+                if chunk.Done </span><span class="cov0" title="0">{
+                        break</span>
+                }
+        }
+
+        // Close write channel and wait for writer to finish
+        <span class="cov0" title="0">close(writeChan)
+        &lt;-done
+
+        // Check for writer errors
+        select </span>{
+        case err := &lt;-errChan:<span class="cov0" title="0">
+                return err</span>
+        default:<span class="cov0" title="0"></span>
+                // No error
+        }
+
+        // Send [DONE] message
+        <span class="cov0" title="0">fmt.Fprintf(w, "data: [DONE]\n\n")
+
+        // Final flush
+        if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                flusher.Flush()
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// StreamCompletion streams a completion response in OpenAI SSE format
+func StreamCompletion(w http.ResponseWriter, reader backends.StreamReader, model string, completionID string) error <span class="cov0" title="0">{
+        defer reader.Close()
+
+        // Set SSE headers
+        w.Header().Set("Content-Type", "text/event-stream")
+        w.Header().Set("Cache-Control", "no-cache")
+        w.Header().Set("Connection", "keep-alive")
+
+        // Flush headers immediately
+        if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                flusher.Flush()
+        }</span>
+
+        <span class="cov0" title="0">timestamp := time.Now().Unix()
+        index := 0
+
+        for </span><span class="cov0" title="0">{
+                chunk, err := reader.Recv()
+                if err != nil </span><span class="cov0" title="0">{
+                        // End of stream
+                        break</span>
+                }
+
+                // Get chunk from pool
+                <span class="cov0" title="0">openaiChunk := getCompletionChunk()
+
+                // Populate chunk fields
+                openaiChunk.ID = completionID
+                openaiChunk.Object = "text_completion.chunk"
+                openaiChunk.Created = timestamp
+                openaiChunk.Model = model
+
+                if chunk.Done </span><span class="cov0" title="0">{
+                        // Final chunk with finish_reason
+                        finishReason := "stop"
+                        openaiChunk.Choices[0].Text = chunk.Token
+                        openaiChunk.Choices[0].Index = 0
+                        openaiChunk.Choices[0].FinishReason = &amp;finishReason
+                }</span> else<span class="cov0" title="0"> {
+                        // Regular chunk
+                        openaiChunk.Choices[0].Text = chunk.Token
+                        openaiChunk.Choices[0].Index = 0
+                        openaiChunk.Choices[0].FinishReason = nil
+                }</span>
+
+                // Marshal to JSON
+                <span class="cov0" title="0">data, err := json.Marshal(openaiChunk)
+                if err != nil </span><span class="cov0" title="0">{
+                        putCompletionChunk(openaiChunk) // Return to pool
+                        return fmt.Errorf("failed to marshal chunk: %w", err)
+                }</span>
+
+                // Write SSE formatted data
+                <span class="cov0" title="0">fmt.Fprintf(w, "data: %s\n\n", string(data))
+
+                // Flush the data immediately
+                if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                        flusher.Flush()
+                }</span>
+
+                // Return chunk to pool
+                <span class="cov0" title="0">putCompletionChunk(openaiChunk)
+
+                index++
+
+                // Exit if this was the final chunk
+                if chunk.Done </span><span class="cov0" title="0">{
+                        break</span>
+                }
+        }
+
+        // Send [DONE] message
+        <span class="cov0" title="0">fmt.Fprintf(w, "data: [DONE]\n\n")
+
+        // Final flush
+        if flusher, ok := w.(http.Flusher); ok </span><span class="cov0" title="0">{
+                flusher.Flush()
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -1,0 +1,33 @@
+[Unit]
+Description=Ollama Proxy - AI Inference Router with Virtual Devices
+Documentation=https://github.com/daoneill/ollama-proxy
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/ollama-proxy --config /etc/ollama-proxy/config.yaml
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="PULSE_SERVER=unix:/run/user/1000/pulse/native"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/1000"
+WorkingDirectory=/var/lib/ollama-proxy
+
+# Resource limits
+MemoryLimit=4G
+CPUQuota=80%
+
+# Security settings
+NoNewPrivileges=false
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ollama-proxy
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,338 @@
+# Pipeline Configuration Examples
+# Defines multi-stage processing workflows with forwarding and chaining
+
+pipelines:
+  # ============================================================
+  # Voice Assistant Pipeline
+  # ============================================================
+  # Voice → Text (NPU) → Process (iGPU/GPU) → Text → Voice (NPU)
+  - id: "voice-assistant"
+    name: "Voice Assistant"
+    description: "Full voice interaction pipeline optimized for battery life"
+
+    stages:
+      - id: "voice-to-text"
+        type: "audio_to_text"
+        description: "Speech recognition on NPU (low power, low latency)"
+        preferred_hardware: "npu"
+        model: "whisper-tiny"
+
+        forwarding_policy:
+          enable_confidence_check: true
+          min_confidence: 0.7
+          max_retries: 2
+          escalation_path:
+            - "ollama-npu"    # Try NPU first (3W)
+            - "ollama-intel"  # Fallback to iGPU if confidence low
+
+      - id: "process-text"
+        type: "text_generation"
+        description: "LLM processing on iGPU with GPU escalation"
+        preferred_hardware: "igpu"
+        model: "llama3:7b"
+
+        forwarding_policy:
+          enable_confidence_check: true
+          min_confidence: 0.8
+          max_retries: 2
+          escalation_path:
+            - "ollama-intel"   # Start with iGPU (12W)
+            - "ollama-nvidia"  # Escalate to GPU if needed (55W)
+
+          enable_thermal_check: true
+          max_temperature: 85.0
+          max_fan_percent: 85
+
+      - id: "text-to-voice"
+        type: "text_to_audio"
+        description: "Text-to-speech on NPU (low power)"
+        preferred_hardware: "npu"
+        model: "piper-tts"
+
+        forwarding_policy:
+          enable_confidence_check: false  # TTS is deterministic
+
+    options:
+      enable_streaming: true
+      preserve_context: true
+      continue_on_error: false
+      collect_metrics: true
+
+  # ============================================================
+  # Adaptive Text Generation
+  # ============================================================
+  # Confidence-based escalation: NPU → iGPU → GPU
+  - id: "adaptive-text"
+    name: "Adaptive Text Generation"
+    description: "Start cheap (NPU), automatically escalate if quality insufficient"
+
+    stages:
+      - id: "generate-text"
+        type: "text_generation"
+        description: "Auto-escalating text generation"
+        preferred_hardware: "npu"
+        model: "qwen2.5:0.5b"
+
+        forwarding_policy:
+          enable_confidence_check: true
+          min_confidence: 0.75
+          max_retries: 3
+          escalation_path:
+            - "ollama-npu"     # 3W - Try first
+            - "ollama-intel"   # 12W - Better quality
+            - "ollama-nvidia"  # 55W - Best quality
+
+          enable_thermal_check: true
+          max_temperature: 85.0
+
+    options:
+      enable_streaming: false
+      collect_metrics: true
+
+  # ============================================================
+  # Code Generation with Review
+  # ============================================================
+  # Draft on iGPU → Review on GPU if quality low
+  - id: "code-generation"
+    name: "Code Generation with Review"
+    description: "Generate code draft, escalate to review if quality threshold not met"
+
+    stages:
+      - id: "draft-code"
+        type: "text_generation"
+        description: "Generate initial code draft on iGPU"
+        preferred_hardware: "igpu"
+        model: "deepseek-coder:6.7b"
+
+        forwarding_policy:
+          enable_quality_check: true
+          quality_threshold: 0.8
+
+      - id: "review-code"
+        type: "text_generation"
+        description: "Review and refine code on GPU (only if draft quality low)"
+        preferred_hardware: "nvidia"
+        model: "llama3:70b"
+
+        input_transform:
+          template: "Review and improve this code:\n\n{{ .PreviousOutput }}"
+
+    options:
+      enable_streaming: false
+      preserve_context: true
+      collect_metrics: true
+
+  # ============================================================
+  # Thermal Failover Pipeline
+  # ============================================================
+  # Long generation with mid-stream backend switching
+  - id: "thermal-failover"
+    name: "Long Generation with Thermal Protection"
+    description: "Generate long documents, switch backends if overheating"
+
+    stages:
+      - id: "long-generation"
+        type: "text_generation"
+        description: "Long document generation with thermal monitoring"
+        preferred_hardware: "nvidia"
+        model: "llama3:70b"
+
+        forwarding_policy:
+          enable_thermal_check: true
+          max_temperature: 87.0
+          max_fan_percent: 85
+
+          escalation_path:
+            - "ollama-nvidia"  # Start with best quality
+            - "ollama-intel"   # Switch to iGPU if overheating
+            - "ollama-cpu"     # Final fallback to CPU
+
+          enable_streaming_failover: true  # Switch mid-generation
+
+    options:
+      enable_streaming: true
+      preserve_context: true  # Critical: preserve tokens when switching
+      continue_on_error: false
+      collect_metrics: true
+
+  # ============================================================
+  # RAG Pipeline with Embeddings
+  # ============================================================
+  # Embedding (NPU) → Retrieve → Generate (GPU)
+  - id: "rag-pipeline"
+    name: "RAG with Embeddings"
+    description: "Retrieval-Augmented Generation with multi-stage processing"
+
+    stages:
+      - id: "generate-embedding"
+        type: "embedding"
+        description: "Generate query embedding on NPU (fast, low power)"
+        preferred_hardware: "npu"
+        model: "nomic-embed-text"
+
+      - id: "retrieve-context"
+        type: "custom"
+        description: "Retrieve relevant context from vector DB"
+        # Custom stage - handled by application code
+
+      - id: "generate-answer"
+        type: "text_generation"
+        description: "Generate answer with retrieved context on GPU"
+        preferred_hardware: "nvidia"
+        model: "llama3:70b"
+
+        input_transform:
+          template: |
+            Context:
+            {{ .Context }}
+
+            Question: {{ .Query }}
+
+            Answer:
+
+    options:
+      enable_streaming: true
+      preserve_context: true
+      collect_metrics: true
+
+  # ============================================================
+  # Speculative Execution
+  # ============================================================
+  # Generate N candidates on NPU, pick best on GPU
+  - id: "speculative-execution"
+    name: "Speculative Execution"
+    description: "NPU generates multiple candidates, GPU selects best"
+
+    stages:
+      - id: "generate-candidates"
+        type: "text_generation"
+        description: "Generate 5 solution candidates on NPU (parallel)"
+        preferred_hardware: "npu"
+        model: "qwen2.5:0.5b"
+
+        parallel_count: 5  # Generate 5 candidates in parallel
+
+      - id: "select-best"
+        type: "text_generation"
+        description: "Evaluate all candidates and select best"
+        preferred_hardware: "nvidia"
+        model: "llama3:70b"
+
+        input_transform:
+          template: |
+            Evaluate these solutions and select the best:
+
+            {% for candidate in candidates %}
+            Solution {{ loop.index }}:
+            {{ candidate }}
+
+            {% endfor %}
+
+    options:
+      parallel_stages: true
+      enable_streaming: false
+      collect_metrics: true
+
+  # ============================================================
+  # Power Budget Aware
+  # ============================================================
+  # Adapt to battery state - avoid GPU on battery
+  - id: "budget-aware"
+    name: "Power Budget Aware"
+    description: "Respect power budgets based on battery state"
+
+    stages:
+      - id: "generate-text"
+        type: "text_generation"
+        description: "Generate text within power budget"
+        model: "llama3:7b"
+
+        forwarding_policy:
+          enable_confidence_check: true
+          min_confidence: 0.75
+          max_retries: 2
+
+          escalation_path:
+            - "ollama-npu"    # 3W - Always try first on battery
+            - "ollama-intel"  # 12W - Acceptable on battery
+            # Skip NVIDIA (55W) on battery
+
+          enable_power_budget: true
+          max_power_watts: 15  # Only when on battery
+
+    options:
+      enable_streaming: true
+      collect_metrics: true
+
+      # Dynamic power budget based on battery
+      battery_rules:
+        - battery_percent: 0-20
+          max_power_watts: 5   # Ultra conservative
+        - battery_percent: 21-50
+          max_power_watts: 15  # Conservative
+        - battery_percent: 51-100
+          max_power_watts: 30  # Normal
+
+  # ============================================================
+  # Realtime Audio Processing
+  # ============================================================
+  # Optimized for low latency voice interactions
+  - id: "realtime-audio"
+    name: "Realtime Audio Processing"
+    description: "Ultra-low latency for voice interactions"
+
+    stages:
+      - id: "voice-to-text"
+        type: "audio_to_text"
+        preferred_hardware: "npu"
+        model: "whisper-tiny"
+
+        # No forwarding - keep on NPU for consistency
+        forwarding_policy:
+          enable_confidence_check: false
+
+      - id: "quick-response"
+        type: "text_generation"
+        preferred_hardware: "npu"
+        model: "qwen2.5:0.5b"
+
+        # Prioritize latency over quality
+        forwarding_policy:
+          enable_latency_check: true
+          max_latency_ms: 500  # Must respond in 500ms
+
+      - id: "text-to-voice"
+        type: "text_to_audio"
+        preferred_hardware: "npu"
+        model: "piper-tts"
+
+    options:
+      enable_streaming: true
+      preserve_context: true
+      latency_critical: true  # Global flag for entire pipeline
+
+# ============================================================
+# Pipeline Groups
+# ============================================================
+# Organize pipelines by use case
+groups:
+  - name: "Voice Interactions"
+    pipelines:
+      - "voice-assistant"
+      - "realtime-audio"
+
+  - name: "Text Generation"
+    pipelines:
+      - "adaptive-text"
+      - "code-generation"
+
+  - name: "Advanced"
+    pipelines:
+      - "rag-pipeline"
+      - "speculative-execution"
+      - "thermal-failover"
+
+  - name: "Power Optimized"
+    pipelines:
+      - "budget-aware"
+      - "realtime-audio"

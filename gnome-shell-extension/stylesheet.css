@@ -1,0 +1,61 @@
+/* stylesheet.css
+ *
+ * Ollama Proxy Extension Styles
+ */
+
+/* Indicator icon */
+.ollama-proxy-indicator-icon {
+    padding: 0 4px;
+}
+
+/* Mode menu items */
+.ollama-proxy-mode-item {
+    font-size: 10pt;
+}
+
+/* Section labels (bold) */
+.ollama-proxy-section-label {
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Status items (non-interactive) */
+.ollama-proxy-status-item {
+    color: #ccc;
+    font-size: 9pt;
+}
+
+/* Backend status colors */
+.ollama-proxy-backend-healthy {
+    color: #2ecc71;
+}
+
+.ollama-proxy-backend-unhealthy {
+    color: #e74c3c;
+}
+
+/* Temperature warnings */
+.ollama-proxy-temp-normal {
+    color: #2ecc71;
+}
+
+.ollama-proxy-temp-warning {
+    color: #f39c12;
+}
+
+.ollama-proxy-temp-critical {
+    color: #e74c3c;
+}
+
+/* Battery status */
+.ollama-proxy-battery-charging {
+    color: #2ecc71;
+}
+
+.ollama-proxy-battery-low {
+    color: #f39c12;
+}
+
+.ollama-proxy-battery-critical {
+    color: #e74c3c;
+}

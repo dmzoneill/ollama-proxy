@@ -1,0 +1,18 @@
+[Unit]
+Description=Ollama Proxy - AI Inference Router
+Documentation=https://github.com/daoneill/ollama-proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ollama-proxy
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+# Resource limits (optional)
+MemoryLimit=2G
+CPUQuota=50%
+
+[Install]
+WantedBy=default.target

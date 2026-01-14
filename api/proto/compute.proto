@@ -1,0 +1,416 @@
+syntax = "proto3";
+
+package compute.v1;
+
+option go_package = "github.com/daoneill/ollama-proxy/api/gen/go/compute/v1;computev1";
+
+// ComputeService provides unified interface for inference across multiple backends
+service ComputeService {
+  // Generate performs text generation with routing based on annotations
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+
+  // GenerateStream performs streaming text generation
+  rpc GenerateStream(GenerateRequest) returns (stream GenerateStreamResponse);
+
+  // Embed generates embeddings (routes to appropriate backend)
+  rpc Embed(EmbedRequest) returns (EmbedResponse);
+
+  // ListBackends returns available backends and their status
+  rpc ListBackends(ListBackendsRequest) returns (ListBackendsResponse);
+
+  // HealthCheck checks proxy and backend health
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // ExecutePipeline executes a multi-stage processing pipeline
+  rpc ExecutePipeline(ExecutePipelineRequest) returns (ExecutePipelineResponse);
+
+  // ExecutePipelineStream executes a pipeline with streaming output
+  rpc ExecutePipelineStream(ExecutePipelineRequest) returns (stream PipelineStreamResponse);
+}
+
+// GenerateRequest with routing annotations
+message GenerateRequest {
+  // Required: The prompt text
+  string prompt = 1;
+
+  // Optional: Specific model to use (e.g., "llama3:7b")
+  string model = 2;
+
+  // Routing Annotations
+  JobAnnotations annotations = 3;
+
+  // Generation options
+  GenerationOptions options = 4;
+}
+
+// JobAnnotations control routing behavior
+message JobAnnotations {
+  // Hardware target preference
+  // Values: "npu", "igpu", "nvidia", "cpu", "auto", "openai"
+  string target = 1;
+
+  // Latency requirement
+  bool latency_critical = 2;
+
+  // Power efficiency preference (useful for battery operation)
+  bool prefer_power_efficiency = 3;
+
+  // Enable response caching
+  bool cache_enabled = 4;
+
+  // Maximum acceptable latency in milliseconds
+  int32 max_latency_ms = 5;
+
+  // Maximum power budget in watts
+  int32 max_power_watts = 6;
+
+  // Additional custom annotations
+  map<string, string> custom = 7;
+}
+
+// GenerationOptions for inference
+message GenerationOptions {
+  // Maximum tokens to generate
+  int32 max_tokens = 1;
+
+  // Temperature (0.0 to 2.0)
+  float temperature = 2;
+
+  // Top-p sampling
+  float top_p = 3;
+
+  // Top-k sampling
+  int32 top_k = 4;
+
+  // Stop sequences
+  repeated string stop = 5;
+
+  // Context length
+  int32 context_length = 6;
+}
+
+// GenerateResponse
+message GenerateResponse {
+  // Generated text
+  string response = 1;
+
+  // Backend that processed the request
+  string backend_used = 2;
+
+  // Routing metadata
+  RoutingMetadata routing = 3;
+
+  // Generation statistics
+  GenerationStats stats = 4;
+
+  // Whether response came from cache
+  bool from_cache = 5;
+}
+
+// GenerateStreamResponse for streaming
+message GenerateStreamResponse {
+  // Token or chunk of text
+  string token = 1;
+
+  // Whether this is the final message
+  bool done = 2;
+
+  // Backend used (sent in first message)
+  string backend_used = 3;
+
+  // Stats (sent in final message)
+  GenerationStats stats = 4;
+}
+
+// RoutingMetadata explains routing decision
+message RoutingMetadata {
+  // Selected backend
+  string backend = 1;
+
+  // Reason for selection
+  string reason = 2;
+
+  // Estimated power consumption (watts)
+  float estimated_power_watts = 3;
+
+  // Estimated latency (milliseconds)
+  int32 estimated_latency_ms = 4;
+
+  // Alternative backends that could have handled this
+  repeated string alternatives = 5;
+}
+
+// GenerationStats
+message GenerationStats {
+  // Time to first token (ms)
+  int32 time_to_first_token_ms = 1;
+
+  // Total generation time (ms)
+  int32 total_time_ms = 2;
+
+  // Tokens generated
+  int32 tokens_generated = 3;
+
+  // Tokens per second
+  float tokens_per_second = 4;
+
+  // Energy consumed (watt-hours)
+  float energy_wh = 5;
+}
+
+// EmbedRequest
+message EmbedRequest {
+  // Text to embed
+  string text = 1;
+
+  // Model for embeddings
+  string model = 2;
+
+  // Routing annotations
+  JobAnnotations annotations = 3;
+}
+
+// EmbedResponse
+message EmbedResponse {
+  // Embedding vector
+  repeated float embedding = 1;
+
+  // Backend used
+  string backend_used = 2;
+
+  // Routing metadata
+  RoutingMetadata routing = 3;
+}
+
+// ListBackendsRequest
+message ListBackendsRequest {
+  // Optional: filter by type
+  string type_filter = 1;
+}
+
+// ListBackendsResponse
+message ListBackendsResponse {
+  repeated BackendInfo backends = 1;
+}
+
+// BackendInfo
+message BackendInfo {
+  // Unique identifier
+  string id = 1;
+
+  // Type: "ollama", "openai", "vectordb", etc.
+  string type = 2;
+
+  // Human-readable name
+  string name = 3;
+
+  // Hardware: "npu", "igpu", "nvidia", "cpu", "cloud"
+  string hardware = 4;
+
+  // Current status
+  BackendStatus status = 5;
+
+  // Capabilities
+  BackendCapabilities capabilities = 6;
+
+  // Current metrics
+  BackendMetrics metrics = 7;
+}
+
+// BackendStatus
+message BackendStatus {
+  // healthy, degraded, unhealthy, offline
+  string state = 1;
+
+  // Human-readable status message
+  string message = 2;
+
+  // Last health check timestamp
+  int64 last_check_unix = 3;
+}
+
+// BackendCapabilities
+message BackendCapabilities {
+  // Supports text generation
+  bool generate = 1;
+
+  // Supports embeddings
+  bool embed = 2;
+
+  // Supports streaming
+  bool stream = 3;
+
+  // Available models
+  repeated string models = 4;
+
+  // Maximum context length
+  int32 max_context = 5;
+}
+
+// BackendMetrics
+message BackendMetrics {
+  // Average latency (ms)
+  int32 avg_latency_ms = 1;
+
+  // Requests per minute
+  int32 requests_per_minute = 2;
+
+  // Error rate (0.0 to 1.0)
+  float error_rate = 3;
+
+  // Current power draw (watts)
+  float power_watts = 4;
+
+  // Models currently loaded in memory
+  repeated string loaded_models = 5;
+}
+
+// HealthCheckRequest
+message HealthCheckRequest {}
+
+// HealthCheckResponse
+message HealthCheckResponse {
+  // Overall health status
+  string status = 1;
+
+  // Individual backend health
+  map<string, string> backend_health = 2;
+
+  // Timestamp
+  int64 timestamp_unix = 3;
+}
+
+// ExecutePipelineRequest
+message ExecutePipelineRequest {
+  // Pipeline ID (from config) or inline pipeline definition
+  string pipeline_id = 1;
+
+  // Input data (flexible JSON)
+  map<string, string> input = 2;
+
+  // Override pipeline options
+  PipelineOptions options = 3;
+
+  // Annotations for routing
+  JobAnnotations annotations = 4;
+}
+
+// PipelineOptions
+message PipelineOptions {
+  // Enable streaming output
+  bool enable_streaming = 1;
+
+  // Preserve context between stages
+  bool preserve_context = 2;
+
+  // Continue on error
+  bool continue_on_error = 3;
+
+  // Collect detailed metrics
+  bool collect_metrics = 4;
+
+  // Timeout per stage (milliseconds)
+  int32 stage_timeout_ms = 5;
+}
+
+// ExecutePipelineResponse
+message ExecutePipelineResponse {
+  // Pipeline ID
+  string pipeline_id = 1;
+
+  // Success status
+  bool success = 2;
+
+  // Final output (flexible JSON)
+  map<string, string> final_output = 3;
+
+  // Stage results
+  repeated StageResult stage_results = 4;
+
+  // Total execution time
+  int32 total_time_ms = 5;
+
+  // Total energy consumed
+  float total_energy_wh = 6;
+
+  // Error message (if failed)
+  string error = 7;
+}
+
+// StageResult
+message StageResult {
+  // Stage ID
+  string stage_id = 1;
+
+  // Backend used
+  string backend = 2;
+
+  // Success status
+  bool success = 3;
+
+  // Stage output (flexible)
+  string output = 4;
+
+  // Stage metadata
+  StageMetadata metadata = 5;
+
+  // Error message (if failed)
+  string error = 6;
+}
+
+// StageMetadata
+message StageMetadata {
+  // Start timestamp
+  int64 start_time_unix = 1;
+
+  // End timestamp
+  int64 end_time_unix = 2;
+
+  // Duration in milliseconds
+  int64 duration_ms = 3;
+
+  // Model used
+  string model = 4;
+
+  // Tokens in
+  int32 tokens_in = 5;
+
+  // Tokens out
+  int32 tokens_out = 6;
+
+  // Confidence score (if applicable)
+  float confidence = 7;
+
+  // Temperature
+  float temperature = 8;
+
+  // Fan speed
+  int32 fan_speed = 9;
+
+  // Whether forwarding occurred
+  bool forwarded = 10;
+
+  // Forwarding reason
+  string forward_reason = 11;
+
+  // Attempt count
+  int32 attempt_count = 12;
+}
+
+// PipelineStreamResponse
+message PipelineStreamResponse {
+  // Stage ID currently executing
+  string stage_id = 1;
+
+  // Partial output from current stage
+  string partial_output = 2;
+
+  // Whether pipeline is complete
+  bool done = 3;
+
+  // Stage result (sent when stage completes)
+  StageResult stage_result = 4;
+
+  // Final result (sent when pipeline completes)
+  ExecutePipelineResponse final_result = 5;
+}

@@ -1,0 +1,204 @@
+# Ollama Compute Proxy - Mixed Backends Configuration
+# Combines local Ollama instances + cloud API backends
+
+server:
+  grpc_port: 50051
+  http_port: 8080
+  host: "0.0.0.0"
+
+# Backend configurations - LOCAL + CLOUD
+backends:
+  # ============================================================
+  # LOCAL OLLAMA BACKENDS (Free, Power-Aware)
+  # ============================================================
+
+  # Ollama NPU instance (ultra-low power)
+  - id: "ollama-npu"
+    type: "ollama"
+    name: "Ollama NPU (Intel Neural Processor)"
+    hardware: "npu"
+    enabled: true
+    endpoint: "http://localhost:11434"
+    characteristics:
+      power_watts: 3.0
+      avg_latency_ms: 800
+      max_tokens_per_second: 10
+      priority: 5  # Medium priority (free, efficient)
+    model_capability:
+      max_model_size_gb: 2
+      supported_model_patterns:
+        - "*:0.5b"
+        - "*:1.5b"
+      preferred_models:
+        - "qwen2.5:0.5b"
+        - "qwen2.5:1.5b"
+
+  # Ollama Intel GPU instance (balanced)
+  - id: "ollama-igpu"
+    type: "ollama"
+    name: "Ollama Intel Arc GPU"
+    hardware: "igpu"
+    enabled: true
+    endpoint: "http://localhost:11435"
+    characteristics:
+      power_watts: 12.0
+      avg_latency_ms: 350
+      max_tokens_per_second: 22
+      priority: 7  # Higher priority (free, balanced)
+    model_capability:
+      max_model_size_gb: 8
+      supported_model_patterns:
+        - "*:7b"
+      preferred_models:
+        - "llama3:7b"
+        - "mistral:7b"
+
+  # Ollama NVIDIA GPU instance (high performance)
+  - id: "ollama-nvidia"
+    type: "ollama"
+    name: "Ollama NVIDIA RTX 4060"
+    hardware: "nvidia"
+    enabled: true
+    endpoint: "http://localhost:11436"
+    characteristics:
+      power_watts: 55.0
+      avg_latency_ms: 150
+      max_tokens_per_second: 65
+      priority: 9  # Highest local priority (free, powerful)
+    model_capability:
+      max_model_size_gb: 24
+      supported_model_patterns:
+        - "*"
+      preferred_models:
+        - "llama3:70b"
+        - "llama3:7b"
+
+  # ============================================================
+  # CLOUD API BACKENDS (Paid, Always Available)
+  # ============================================================
+
+  # OpenAI GPT-4 (high quality, paid)
+  - id: "openai-gpt4"
+    type: "openai"
+    name: "OpenAI GPT-4 Turbo"
+    hardware: "cloud"
+    enabled: true
+    api_key_env: "OPENAI_API_KEY"  # Read from environment
+    # endpoint: "https://api.openai.com/v1"  # Optional: custom endpoint
+
+    characteristics:
+      power_watts: 0  # Cloud service (no local power consumption)
+      avg_latency_ms: 500
+      max_tokens_per_second: 50
+      priority: 6  # Lower than local (costs money)
+
+    model_capability:
+      supported_model_patterns:
+        - "gpt-*"
+        - "o1-*"
+      preferred_models:
+        - "gpt-4-turbo"
+        - "gpt-4"
+        - "gpt-3.5-turbo"
+
+  # Anthropic Claude (excellent for code, paid)
+  - id: "anthropic-claude"
+    type: "anthropic"
+    name: "Anthropic Claude 3.5 Sonnet"
+    hardware: "cloud"
+    enabled: true
+    api_key_env: "ANTHROPIC_API_KEY"
+    # endpoint: "https://api.anthropic.com/v1"  # Optional
+
+    characteristics:
+      power_watts: 0
+      avg_latency_ms: 600
+      max_tokens_per_second: 45
+      priority: 8  # High priority for code tasks
+
+    model_capability:
+      supported_model_patterns:
+        - "claude-*"
+      preferred_models:
+        - "claude-3-5-sonnet-20241022"  # Best for code
+        - "claude-3-opus-20240229"      # Best overall
+        - "claude-3-5-haiku-20241022"   # Fast & cheap
+
+# Routing rules
+routing:
+  default_backend: "ollama-igpu"  # Default to local Intel GPU
+  power_aware: true
+  fallback_strategy: "next_best"
+  auto_optimize_latency: true
+
+# Thermal monitoring (only affects local backends)
+thermal:
+  enabled: true
+  update_interval: "5s"
+  temperature:
+    warning: 70.0
+    critical: 85.0
+    shutdown: 95.0
+  fan:
+    quiet: 30
+    moderate: 60
+    loud: 85
+
+# AI Efficiency modes
+efficiency:
+  enabled: true
+  default_mode: "Balanced"
+  dbus_enabled: true
+
+# Caching
+cache:
+  enabled: true
+  type: "memory"
+  ttl_seconds: 3600
+  max_size_mb: 1024
+
+# Monitoring
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  log_level: "info"
+
+# Health checks
+health:
+  enabled: true
+  interval_seconds: 30
+  timeout_seconds: 5
+  unhealthy_threshold: 3
+
+# ============================================================
+# ROUTING BEHAVIOR WITH THIS CONFIG
+# ============================================================
+#
+# Priority order (highest to lowest):
+# 1. ollama-nvidia (9) - Free, powerful local
+# 2. anthropic-claude (8) - Paid, excellent for code
+# 3. ollama-igpu (7) - Free, balanced local
+# 4. openai-gpt4 (6) - Paid, high quality
+# 5. ollama-npu (5) - Free, ultra-efficient
+#
+# Model routing examples:
+# - "llama3:70b" → ollama-nvidia (only one that supports it locally)
+# - "llama3:7b" → ollama-igpu (balanced, free)
+# - "gpt-4" → openai-gpt4 (only backend for GPT)
+# - "claude-3-5-sonnet" → anthropic-claude (only backend for Claude)
+# - "qwen2.5:0.5b" + realtime → ollama-npu (optimized for realtime)
+#
+# Power-aware routing (Efficiency mode):
+# - Performance mode: Prefers ollama-nvidia
+# - Balanced mode: Prefers ollama-igpu
+# - Efficiency mode: Prefers ollama-npu, blocks NVIDIA if > 15W
+# - Quiet mode: Prefers ollama-npu, blocks NVIDIA if fan > 40%
+#
+# Cost optimization:
+# - Simple queries → Local (free)
+# - Complex queries → Local if possible, cloud if needed
+# - Cloud APIs used only when:
+#   1. Requested model unavailable locally (gpt-4, claude)
+#   2. Local backend unavailable/unhealthy
+#   3. Higher priority + model available
+# ============================================================

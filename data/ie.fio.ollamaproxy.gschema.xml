@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="ie.fio.ollamaproxy" path="/ie/fio/ollamaproxy/">
+
+    <!-- Efficiency Mode Settings -->
+    <key name="default-mode" type="s">
+      <default>"Balanced"</default>
+      <summary>Default efficiency mode</summary>
+      <description>Mode to use on startup: Performance, Balanced, Efficiency, Quiet, Auto, UltraEfficiency</description>
+    </key>
+
+    <key name="remember-last-mode" type="b">
+      <default>true</default>
+      <summary>Remember last used mode</summary>
+      <description>If enabled, the proxy will remember and restore the last used efficiency mode on startup</description>
+    </key>
+
+    <key name="last-mode" type="s">
+      <default>"Balanced"</default>
+      <summary>Last used mode</summary>
+      <description>The last efficiency mode that was active before shutdown</description>
+    </key>
+
+    <!-- Auto Mode Preferences -->
+    <key name="auto-quiet-hours-enabled" type="b">
+      <default>true</default>
+      <summary>Enable quiet hours for Auto mode</summary>
+      <description>When enabled, Auto mode will switch to Quiet mode during configured quiet hours</description>
+    </key>
+
+    <key name="auto-quiet-hours-start" type="i">
+      <default>22</default>
+      <summary>Quiet hours start (hour 0-23)</summary>
+      <description>Hour when quiet hours begin (0-23, 24-hour format)</description>
+    </key>
+
+    <key name="auto-quiet-hours-end" type="i">
+      <default>7</default>
+      <summary>Quiet hours end (hour 0-23)</summary>
+      <description>Hour when quiet hours end (0-23, 24-hour format)</description>
+    </key>
+
+    <!-- Service Settings -->
+    <key name="autostart-enabled" type="b">
+      <default>true</default>
+      <summary>Start proxy on login</summary>
+      <description>Automatically start the Ollama Proxy when logging in to GNOME</description>
+    </key>
+
+    <key name="dbus-enabled" type="b">
+      <default>true</default>
+      <summary>Enable D-Bus interface</summary>
+      <description>Enable D-Bus API for desktop integration and external control</description>
+    </key>
+
+    <!-- Notification Preferences -->
+    <key name="notify-on-mode-change" type="b">
+      <default>true</default>
+      <summary>Show notification when mode changes</summary>
+      <description>Display a desktop notification when efficiency mode changes</description>
+    </key>
+
+    <key name="notify-on-backend-failure" type="b">
+      <default>true</default>
+      <summary>Show notification when backend fails</summary>
+      <description>Display a desktop notification when a backend becomes unhealthy</description>
+    </key>
+
+    <key name="notify-on-thermal-throttle" type="b">
+      <default>false</default>
+      <summary>Show notification when thermal throttling</summary>
+      <description>Display a desktop notification when thermal throttling is activated</description>
+    </key>
+
+    <!-- Display Settings -->
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Show top bar indicator</summary>
+      <description>Display the Ollama Proxy indicator in the GNOME Shell top bar</description>
+    </key>
+
+    <key name="indicator-show-mode" type="b">
+      <default>true</default>
+      <summary>Show current mode in indicator</summary>
+      <description>Display the current efficiency mode name in the top bar indicator</description>
+    </key>
+
+    <key name="indicator-show-backend-count" type="b">
+      <default>false</default>
+      <summary>Show backend count in indicator</summary>
+      <description>Display the number of healthy backends in the top bar indicator</description>
+    </key>
+
+  </schema>
+</schemalist>

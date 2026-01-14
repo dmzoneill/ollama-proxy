@@ -1,0 +1,9 @@
+{
+  "uuid": "ollamaproxy@anthropic.com",
+  "name": "Ollama Proxy Indicator",
+  "description": "Monitor and control Ollama Proxy efficiency modes and backend status",
+  "version": 1,
+  "shell-version": ["45", "46"],
+  "url": "https://github.com/daoneill/ollama-proxy",
+  "settings-schema": "ie.fio.ollamaproxy"
+}

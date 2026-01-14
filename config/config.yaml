@@ -1,0 +1,278 @@
+# Ollama Compute Proxy Configuration
+
+server:
+  grpc_port: 50051
+  http_port: 8080
+  host: "0.0.0.0"
+
+  # API Authentication (disabled by default for development)
+  auth:
+    enabled: false
+    api_keys:
+      # Example API key configuration (uncomment and customize for production)
+      # "sk-your-api-key-here":
+      #   name: "Production Client"
+      #   permissions: ["*"]  # "*" grants all permissions
+      #   enabled: true
+      # "sk-readonly-key":
+      #   name: "Read-Only Client"
+      #   permissions: ["read"]
+      #   enabled: true
+
+  # Rate Limiting (disabled by default for development)
+  rate_limit:
+    enabled: false
+    rate: 10.0   # requests per second per IP
+    burst: 20    # burst size (max requests in short time)
+
+# Backend configurations
+backends:
+  # Ollama NPU instance (ultra-low power)
+  - id: "ollama-npu"
+    type: "ollama"
+    name: "Ollama NPU (Intel Neural Processor)"
+    hardware: "npu"
+    enabled: true
+    endpoint: "http://localhost:11434"
+    characteristics:
+      power_watts: 3.0
+      avg_latency_ms: 800
+      max_tokens_per_second: 10
+      priority: 1  # Lower priority (use when power-critical)
+    model_capability:
+      max_model_size_gb: 2  # Can only handle tiny models
+      supported_model_patterns:
+        - "*:0.5b"      # Any 0.5B model
+        - "*:1.5b"      # Any 1.5B model
+        - "qwen2.5:*"   # Qwen models optimized for NPU
+        - "tinyllama:*" # TinyLlama models
+      preferred_models:
+        - "qwen2.5:0.5b"   # Best for NPU
+        - "qwen2.5:1.5b"
+        - "tinyllama:1b"
+      excluded_patterns:
+        - "*:7b"    # Too large
+        - "*:70b"   # Way too large
+        - "*:*70b*" # Any 70B variant
+
+  # Ollama Intel GPU instance (balanced)
+  - id: "ollama-igpu"
+    type: "ollama"
+    name: "Ollama Intel Arc GPU"
+    hardware: "igpu"
+    enabled: true
+    endpoint: "http://localhost:11435"
+    characteristics:
+      power_watts: 12.0
+      avg_latency_ms: 350
+      max_tokens_per_second: 22
+      priority: 5  # Medium priority (balanced)
+    model_capability:
+      max_model_size_gb: 8  # Can handle small to medium models
+      supported_model_patterns:
+        - "*:0.5b"
+        - "*:1.5b"
+        - "*:3b"
+        - "*:7b"      # Best size for Intel GPU
+        - "llama3:7b"
+        - "mistral:7b"
+      preferred_models:
+        - "llama3:7b"     # Sweet spot for Intel GPU
+        - "mistral:7b"
+        - "qwen2.5:7b"
+      excluded_patterns:
+        - "*:70b"       # Too large
+        - "*:*70b*"
+
+  # Ollama NVIDIA GPU instance (high performance)
+  - id: "ollama-nvidia"
+    type: "ollama"
+    name: "Ollama NVIDIA RTX 4060"
+    hardware: "nvidia"
+    enabled: true
+    endpoint: "http://localhost:11436"
+    characteristics:
+      power_watts: 55.0
+      avg_latency_ms: 150
+      max_tokens_per_second: 65
+      priority: 10  # High priority (performance)
+    model_capability:
+      max_model_size_gb: 24  # RTX 4060 has 8GB VRAM, but can page to system RAM
+      supported_model_patterns:
+        - "*"  # NVIDIA can run anything
+      preferred_models:
+        - "llama3:70b"      # Large models best on NVIDIA
+        - "mixtral:8x7b"
+        - "llama3:7b"       # Also runs smaller models well
+      excluded_patterns: []  # No exclusions
+
+  # Ollama CPU instance (fallback)
+  - id: "ollama-cpu"
+    type: "ollama"
+    name: "Ollama CPU"
+    hardware: "cpu"
+    enabled: true
+    endpoint: "http://localhost:11437"
+    characteristics:
+      power_watts: 28.0
+      avg_latency_ms: 1200
+      max_tokens_per_second: 6
+      priority: 2  # Low priority (fallback only)
+    model_capability:
+      max_model_size_gb: 16  # Limited by RAM
+      supported_model_patterns:
+        - "*:0.5b"
+        - "*:1.5b"
+        - "*:3b"
+        - "*:7b"
+      preferred_models:
+        - "qwen2.5:1.5b"  # CPU works best with small models
+        - "llama3:7b"     # Can run but slow
+      excluded_patterns:
+        - "*:70b"     # Too large for CPU
+        - "*:*70b*"
+
+  # Example: OpenAI backend (commented out)
+  # - id: "openai"
+  #   type: "openai"
+  #   name: "OpenAI API"
+  #   hardware: "cloud"
+  #   enabled: false
+  #   api_key_env: "OPENAI_API_KEY"
+  #   characteristics:
+  #     power_watts: 0  # Cloud service
+  #     avg_latency_ms: 500
+  #     max_tokens_per_second: 50
+  #     priority: 8
+
+# Routing rules
+routing:
+  # Default backend when no annotations specified
+  default_backend: "ollama-igpu"
+
+  # Power-aware routing (consider battery state)
+  power_aware: true
+
+  # Fallback strategy: "next_best" or "fail"
+  fallback_strategy: "next_best"
+
+  # Auto-select fastest backend for latency-critical requests
+  auto_optimize_latency: true
+
+  # Classification model for complexity detection (runs on NPU)
+  classifier_backend: "ollama-npu"
+
+# Caching configuration
+cache:
+  enabled: true
+  type: "memory"  # "memory" or "redis"
+  ttl_seconds: 3600
+  max_size_mb: 1024
+
+  # Cache key includes these fields
+  key_includes:
+    - prompt
+    - model
+    - temperature
+    - top_p
+
+# Monitoring
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  log_level: "info"  # debug, info, warn, error
+  trace_requests: true
+
+# Health checks
+health:
+  enabled: true
+  interval_seconds: 30
+  timeout_seconds: 5
+  unhealthy_threshold: 3  # Mark unhealthy after N failures
+
+# Thermal monitoring
+thermal:
+  enabled: true
+  update_interval: "5s"
+
+  temperature:
+    warning: 70.0      # Start avoiding backends above this temp
+    critical: 85.0     # Exclude backends above this temp
+    shutdown: 95.0     # Emergency protection
+
+  fan:
+    quiet: 30          # Quiet threshold (%)
+    moderate: 60       # Normal operation (%)
+    loud: 85           # Loud threshold (%)
+
+# AI Efficiency modes
+efficiency:
+  enabled: true
+  default_mode: "Balanced"  # Performance, Balanced, Efficiency, Quiet, Auto, UltraEfficiency
+  dbus_enabled: true        # Enable GNOME integration
+
+# Device management (cameras, microphones, etc.)
+devices:
+  enabled: true             # Enable device registration system
+  auto_discover: true       # Auto-detect devices via udev hotplug events
+
+# Virtual device configuration (for Chrome device picker)
+virtual_devices:
+  enabled: true
+
+  audio:
+    enabled: true
+    auto_detect_system: true  # Auto-detect PulseAudio vs Pipewire
+    allow_fallback: true      # Don't fail startup if audio unavailable
+
+    microphone:
+      enabled: true
+      sample_rate: 16000  # 16kHz for speech recognition
+      channels: 1         # Mono
+      format: "s16le"     # 16-bit signed little-endian PCM
+
+    speaker:
+      enabled: true
+      sample_rate: 22050  # 22kHz for TTS output
+      channels: 2         # Stereo
+      format: "s16le"
+
+    processing:
+      noise_cancellation: true
+      transcription_model: "whisper-tiny"
+      tts_model: "piper-tts-fast"
+
+  video:
+    enabled: true
+
+    camera:
+      enabled: true
+      width: 640
+      height: 480
+      fps: 30
+      format: "yuyv"
+      device_numbers: [20, 21, 22, 23]  # /dev/videoN for each backend
+
+      processing:
+        background_blur: false
+        background_replacement: false
+        face_detection: false
+
+  # Per-backend model configuration
+  backend_models:
+    ollama-npu:
+      stt: "whisper-tiny"
+      llm: "qwen2.5:0.5b"
+      tts: "piper-tts-fast"
+    ollama-igpu:
+      stt: "whisper-base"
+      llm: "llama3:7b"
+      tts: "piper-tts"
+    ollama-nvidia:
+      stt: "whisper-medium"
+      llm: "llama3:70b"
+      tts: "bark-tts"
+    ollama-cpu:
+      stt: "whisper-tiny"
+      llm: "llama3:7b"
+      tts: "piper-tts-fast"

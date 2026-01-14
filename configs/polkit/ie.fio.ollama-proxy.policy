@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+
+<!--
+  Policy definitions for ollama-proxy device management.
+
+  This file defines Polkit actions for device registration and access control.
+  Install to: /usr/share/polkit-1/actions/ie.fio.ollama-proxy.policy
+-->
+
+<policyconfig>
+  <vendor>FIO Ireland</vendor>
+  <vendor_url>https://fio.ie</vendor_url>
+  <icon_name>audio-input-microphone</icon_name>
+
+  <!-- Register a device with the system -->
+  <action id="ie.fio.ollama-proxy.device.register">
+    <description>Register a device with ollama-proxy</description>
+    <message>Authentication is required to register a device</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/ollama-proxy</annotate>
+  </action>
+
+  <!-- Unregister a device from the system -->
+  <action id="ie.fio.ollama-proxy.device.unregister">
+    <description>Unregister a device from ollama-proxy</description>
+    <message>Authentication is required to unregister a device</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <!-- Access a camera device -->
+  <action id="ie.fio.ollama-proxy.device.access.camera">
+    <description>Access camera device</description>
+    <message>Authentication is required to access the camera</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Access a microphone device -->
+  <action id="ie.fio.ollama-proxy.device.access.microphone">
+    <description>Access microphone device</description>
+    <message>Authentication is required to access the microphone</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Access a screen capture device -->
+  <action id="ie.fio.ollama-proxy.device.access.screen">
+    <description>Access screen capture</description>
+    <message>Authentication is required to capture the screen</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Access a speaker device -->
+  <action id="ie.fio.ollama-proxy.device.access.speaker">
+    <description>Access speaker device</description>
+    <message>Authentication is required to access the speaker</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Access keyboard input -->
+  <action id="ie.fio.ollama-proxy.device.access.keyboard">
+    <description>Access keyboard input</description>
+    <message>Authentication is required to access keyboard input</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Access mouse input -->
+  <action id="ie.fio.ollama-proxy.device.access.mouse">
+    <description>Access mouse input</description>
+    <message>Authentication is required to access mouse input</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.imply">ie.fio.ollama-proxy.device.access</annotate>
+  </action>
+
+  <!-- Generic device access (implied by specific actions) -->
+  <action id="ie.fio.ollama-proxy.device.access">
+    <description>Access a device</description>
+    <message>Authentication is required to access devices</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

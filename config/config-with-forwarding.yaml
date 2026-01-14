@@ -1,0 +1,195 @@
+# Configuration with Confidence-Based Forwarding Enabled
+
+backends:
+  # NPU Backend - Lowest power, smallest models
+  - id: "ollama-npu"
+    type: "ollama"
+    name: "Ollama on NPU"
+    endpoint: "http://localhost:11434"
+    hardware: "npu"
+
+    characteristics:
+      power_watts: 3.0
+      avg_latency_ms: 800
+      priority: 1  # Highest priority (try first)
+
+    model_capability:
+      max_model_size_gb: 2
+      supported_model_patterns:
+        - "*:0.5b"
+        - "*:1.5b"
+        - "qwen2.5:*"
+        - "whisper-tiny"
+      preferred_models:
+        - "qwen2.5:0.5b"
+        - "qwen2.5:1.5b"
+      excluded_patterns:
+        - "*:7b"
+        - "*:70b"
+
+  # Intel GPU Backend - Medium power, medium models
+  - id: "ollama-intel"
+    type: "ollama"
+    name: "Ollama on Intel Arc GPU"
+    endpoint: "http://localhost:11435"
+    hardware: "igpu"
+
+    characteristics:
+      power_watts: 12.0
+      avg_latency_ms: 1200
+      priority: 5  # Medium priority
+
+    model_capability:
+      max_model_size_gb: 8
+      supported_model_patterns:
+        - "*:7b"
+        - "*:6.7b"
+        - "deepseek-coder:*"
+        - "llama3:7b"
+      preferred_models:
+        - "llama3:7b"
+        - "deepseek-coder:6.7b"
+      excluded_patterns:
+        - "*:70b"
+        - "*:405b"
+
+  # NVIDIA GPU Backend - High power, large models
+  - id: "ollama-nvidia"
+    type: "ollama"
+    name: "Ollama on NVIDIA GPU"
+    endpoint: "http://localhost:11436"
+    hardware: "nvidia"
+
+    characteristics:
+      power_watts: 55.0
+      avg_latency_ms: 2000
+      priority: 10  # Try last (most powerful)
+
+    model_capability:
+      max_model_size_gb: 24
+      supported_model_patterns:
+        - "*"  # Supports all models
+      preferred_models:
+        - "llama3:70b"
+        - "codellama:70b"
+
+  # CPU Backend - Fallback
+  - id: "ollama-cpu"
+    type: "ollama"
+    name: "Ollama on CPU"
+    endpoint: "http://localhost:11437"
+    hardware: "cpu"
+
+    characteristics:
+      power_watts: 28.0
+      avg_latency_ms: 5000
+      priority: 3
+
+    model_capability:
+      max_model_size_gb: 16
+      supported_model_patterns:
+        - "*:7b"
+        - "*:0.5b"
+        - "*:1.5b"
+
+# Routing configuration
+routing:
+  algorithm: "smart"
+
+  # Confidence-based forwarding settings
+  forwarding:
+    enabled: true
+    min_confidence: 0.75  # Require 75% confidence minimum
+    max_retries: 3        # Try up to 3 backends
+
+    # Explicit escalation path (optional - will auto-generate if not specified)
+    escalation_path:
+      - "ollama-npu"      # Try NPU first (3W)
+      - "ollama-intel"    # Escalate to iGPU (12W)
+      - "ollama-nvidia"   # Escalate to GPU (55W)
+      - "ollama-cpu"      # Final fallback (28W)
+
+    # Thermal integration
+    respect_thermal_limits: true  # Skip backends that are overheating
+
+    # Fallback behavior
+    return_best_attempt: true  # If no backend meets threshold, return best attempt
+
+  # Confidence estimation settings
+  confidence:
+    min_length_chars: 50
+    max_length_chars: 2000
+    length_weight: 0.3    # Weight of length-based scoring
+    pattern_weight: 0.5   # Weight of pattern-based scoring (uncertainty detection)
+    model_weight: 0.2     # Weight of model-specific heuristics
+
+# Thermal monitoring (existing)
+thermal:
+  enabled: true
+  update_interval: 5s
+
+  backends:
+    - backend_id: "ollama-nvidia"
+      type: "nvidia"
+      temp_warning: 70.0
+      temp_critical: 85.0
+      temp_shutdown: 95.0
+      fan_quiet: 30
+      fan_moderate: 60
+      fan_loud: 85
+
+    - backend_id: "ollama-intel"
+      type: "intel_gpu"
+      temp_warning: 65.0
+      temp_critical: 80.0
+      temp_shutdown: 90.0
+
+# Efficiency modes (existing)
+efficiency:
+  enabled: true
+  default_mode: "Balanced"
+  dbus_enabled: true
+
+  modes:
+    Performance:
+      max_power_watts: 100
+      max_fan_percent: 100
+      prefer_quality: true
+
+    Balanced:
+      max_power_watts: 50
+      max_fan_percent: 80
+      prefer_quality: false
+
+    Efficiency:
+      max_power_watts: 15
+      max_fan_percent: 60
+      prefer_quality: false
+
+    Quiet:
+      max_power_watts: 20
+      max_fan_percent: 40
+      prefer_quality: false
+
+    Auto:
+      adaptive: true
+
+    UltraEfficiency:
+      max_power_watts: 5
+      max_fan_percent: 30
+      prefer_quality: false
+
+# Server configuration
+server:
+  grpc:
+    enabled: true
+    port: 50051
+
+  http:
+    enabled: true
+    port: 8080
+
+# Logging
+logging:
+  level: "info"
+  format: "json"

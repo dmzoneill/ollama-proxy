@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+package device.v1;
+
+option go_package = "github.com/daoneill/ollama-proxy/api/gen/device/v1;devicev1";
+
+// DeviceService provides device registration and access management
+service DeviceService {
+  // RegisterDevice registers a new device with the system
+  rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+
+  // UnregisterDevice removes a device from the system
+  rpc UnregisterDevice(UnregisterDeviceRequest) returns (UnregisterDeviceResponse);
+
+  // ListDevices returns all registered devices, optionally filtered by type
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+
+  // GetDevice returns details about a specific device
+  rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse);
+
+  // RequestDeviceAccess requests access to a device
+  rpc RequestDeviceAccess(RequestDeviceAccessRequest) returns (RequestDeviceAccessResponse);
+
+  // ReleaseDeviceAccess releases access to a device
+  rpc ReleaseDeviceAccess(ReleaseDeviceAccessRequest) returns (ReleaseDeviceAccessResponse);
+
+  // SubscribeToDevice streams data from a device (server streaming)
+  rpc SubscribeToDevice(SubscribeToDeviceRequest) returns (stream DeviceDataFrame);
+
+  // DeviceChannel establishes bidirectional streaming for device control and data
+  rpc DeviceChannel(stream DeviceCommand) returns (stream DeviceDataFrame);
+
+  // WatchDevices streams device state changes (add, remove, state change)
+  rpc WatchDevices(WatchDevicesRequest) returns (stream DeviceEvent);
+}
+
+// Device types
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  DEVICE_TYPE_MICROPHONE = 1;
+  DEVICE_TYPE_CAMERA = 2;
+  DEVICE_TYPE_SCREEN = 3;
+  DEVICE_TYPE_SPEAKER = 4;
+  DEVICE_TYPE_KEYBOARD = 5;
+  DEVICE_TYPE_MOUSE = 6;
+}
+
+// Device states
+enum DeviceState {
+  DEVICE_STATE_UNSPECIFIED = 0;
+  DEVICE_STATE_AVAILABLE = 1;
+  DEVICE_STATE_IN_USE = 2;
+  DEVICE_STATE_ERROR = 3;
+  DEVICE_STATE_OFFLINE = 4;
+}
+
+// Device information
+message Device {
+  string id = 1;
+  DeviceType type = 2;
+  string name = 3;
+  string path = 4;
+  DeviceState state = 5;
+  map<string, string> capabilities = 6;
+  int64 registered_at = 7;  // Unix timestamp in nanoseconds
+  int64 last_used_at = 8;   // Unix timestamp in nanoseconds
+}
+
+// RegisterDevice request
+message RegisterDeviceRequest {
+  DeviceType type = 1;
+  string path = 2;
+  string name = 3;
+  map<string, string> capabilities = 4;
+}
+
+// RegisterDevice response
+message RegisterDeviceResponse {
+  string device_id = 1;
+}
+
+// UnregisterDevice request
+message UnregisterDeviceRequest {
+  string device_id = 1;
+}
+
+// UnregisterDevice response
+message UnregisterDeviceResponse {
+  bool success = 1;
+}
+
+// ListDevices request
+message ListDevicesRequest {
+  // Optional filter by device type (empty = all types)
+  DeviceType filter_type = 1;
+}
+
+// ListDevices response
+message ListDevicesResponse {
+  repeated Device devices = 1;
+}
+
+// GetDevice request
+message GetDeviceRequest {
+  string device_id = 1;
+}
+
+// GetDevice response
+message GetDeviceResponse {
+  Device device = 1;
+}
+
+// RequestDeviceAccess request
+message RequestDeviceAccessRequest {
+  string device_id = 1;
+  string client_id = 2;
+}
+
+// RequestDeviceAccess response
+message RequestDeviceAccessResponse {
+  string grant_id = 1;
+  string shm_path = 2;
+  string uds_path = 3;
+}
+
+// ReleaseDeviceAccess request
+message ReleaseDeviceAccessRequest {
+  string device_id = 1;
+  string client_id = 2;
+}
+
+// ReleaseDeviceAccess response
+message ReleaseDeviceAccessResponse {
+  bool success = 1;
+}
+
+// SubscribeToDevice request
+message SubscribeToDeviceRequest {
+  string device_id = 1;
+  string client_id = 2;
+
+  // Stream configuration
+  StreamConfig config = 3;
+}
+
+// Stream configuration
+message StreamConfig {
+  // Frame format (e.g., "YUYV", "MJPEG", "H264" for video; "S16_LE", "FLOAT" for audio)
+  string format = 1;
+
+  // Resolution for video (e.g., "1920x1080")
+  string resolution = 2;
+
+  // Frame rate for video (e.g., 30, 60)
+  int32 frame_rate = 3;
+
+  // Sample rate for audio (e.g., 48000)
+  int32 sample_rate = 4;
+
+  // Channels for audio (e.g., 1, 2)
+  int32 channels = 5;
+}
+
+// Device data frame
+message DeviceDataFrame {
+  // Frame sequence number
+  uint64 sequence = 1;
+
+  // Timestamp when frame was captured (Unix nanoseconds)
+  int64 timestamp = 2;
+
+  // Frame data (can be empty if using shared memory)
+  bytes data = 3;
+
+  // Shared memory offset (if using SHM for zero-copy)
+  uint64 shm_offset = 4;
+
+  // Frame size in bytes
+  uint32 size = 5;
+
+  // Frame metadata
+  map<string, string> metadata = 6;
+}
+
+// Device command (for bidirectional streaming)
+message DeviceCommand {
+  // Command type
+  CommandType type = 1;
+
+  // Command parameters
+  map<string, string> parameters = 2;
+}
+
+// Command types
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  COMMAND_TYPE_START = 1;
+  COMMAND_TYPE_STOP = 2;
+  COMMAND_TYPE_PAUSE = 3;
+  COMMAND_TYPE_RESUME = 4;
+  COMMAND_TYPE_SET_PARAMETER = 5;
+  COMMAND_TYPE_GET_PARAMETER = 6;
+}
+
+// WatchDevices request
+message WatchDevicesRequest {
+  // Optional filter by device type
+  DeviceType filter_type = 1;
+}
+
+// Device event (for watching device changes)
+message DeviceEvent {
+  // Event type
+  EventType type = 1;
+
+  // Device information
+  Device device = 2;
+
+  // Old state (for state change events)
+  DeviceState old_state = 3;
+
+  // Timestamp of event (Unix nanoseconds)
+  int64 timestamp = 4;
+}
+
+// Event types
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_DEVICE_ADDED = 1;
+  EVENT_TYPE_DEVICE_REMOVED = 2;
+  EVENT_TYPE_DEVICE_STATE_CHANGED = 3;
+}

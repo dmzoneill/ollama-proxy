@@ -1,0 +1,3 @@
+# Allow daoneill to load/unload v4l2loopback module without password
+# Install to /etc/sudoers.d/ollama-proxy
+daoneill ALL=(root) NOPASSWD: /usr/sbin/modprobe v4l2loopback *, /usr/sbin/modprobe -r v4l2loopback

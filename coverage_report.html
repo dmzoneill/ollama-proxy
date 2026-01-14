@@ -1,0 +1,740 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>efficiency: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/daoneill/ollama-proxy/pkg/efficiency/dbus_service.go (9.7%)</option>
+				
+				<option value="file1">github.com/daoneill/ollama-proxy/pkg/efficiency/modes.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package efficiency
+
+import (
+        "fmt"
+        "log"
+
+        "github.com/godbus/dbus/v5"
+        "github.com/godbus/dbus/v5/introspect"
+        "github.com/godbus/dbus/v5/prop"
+)
+
+const (
+        dbusInterface = "com.anthropic.OllamaProxy.Efficiency"
+        dbusPath      = "/com/anthropic/OllamaProxy/Efficiency"
+)
+
+// DBusService exposes efficiency mode control via D-Bus
+type DBusService struct {
+        conn    *dbus.Conn
+        manager *EfficiencyManager
+        props   *prop.Properties
+}
+
+// NewDBusService creates a D-Bus service for mode control
+func NewDBusService(manager *EfficiencyManager) (*DBusService, error) <span class="cov8" title="1">{
+        conn, err := dbus.ConnectSystemBus()
+        if err != nil </span><span class="cov0" title="0">{
+                // Try session bus if system bus fails
+                conn, err = dbus.ConnectSessionBus()
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to connect to D-Bus: %w", err)
+                }</span>
+        }
+
+        <span class="cov8" title="1">svc := &amp;DBusService{
+                conn:    conn,
+                manager: manager,
+        }
+
+        return svc, nil</span>
+}
+
+// Start registers the D-Bus service
+func (ds *DBusService) Start() error <span class="cov0" title="0">{
+        // Request name
+        reply, err := ds.conn.RequestName(dbusInterface,
+                dbus.NameFlagDoNotQueue)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to request D-Bus name: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if reply != dbus.RequestNameReplyPrimaryOwner </span><span class="cov0" title="0">{
+                return fmt.Errorf("name already taken")
+        }</span>
+
+        // Export methods
+        <span class="cov0" title="0">err = ds.conn.Export(ds, dbusPath, dbusInterface)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to export D-Bus object: %w", err)
+        }</span>
+
+        // Export introspection
+        <span class="cov0" title="0">intro := introspect.NewIntrospectable(&amp;introspect.Node{
+                Name: dbusPath,
+                Interfaces: []introspect.Interface{
+                        {
+                                Name: dbusInterface,
+                                Methods: []introspect.Method{
+                                        {
+                                                Name: "SetMode",
+                                                Args: []introspect.Arg{
+                                                        {Name: "mode", Type: "s", Direction: "in"},
+                                                },
+                                        },
+                                        {
+                                                Name: "GetMode",
+                                                Args: []introspect.Arg{
+                                                        {Name: "mode", Type: "s", Direction: "out"},
+                                                },
+                                        },
+                                        {
+                                                Name: "GetEffectiveMode",
+                                                Args: []introspect.Arg{
+                                                        {Name: "mode", Type: "s", Direction: "out"},
+                                                },
+                                        },
+                                        {
+                                                Name: "ListModes",
+                                                Args: []introspect.Arg{
+                                                        {Name: "modes", Type: "as", Direction: "out"},
+                                                },
+                                        },
+                                        {
+                                                Name: "GetModeInfo",
+                                                Args: []introspect.Arg{
+                                                        {Name: "mode", Type: "s", Direction: "in"},
+                                                        {Name: "info", Type: "a{sv}", Direction: "out"},
+                                                },
+                                        },
+                                },
+                                Signals: []introspect.Signal{
+                                        {
+                                                Name: "ModeChanged",
+                                                Args: []introspect.Arg{
+                                                        {Name: "oldMode", Type: "s"},
+                                                        {Name: "newMode", Type: "s"},
+                                                },
+                                        },
+                                },
+                                Properties: []introspect.Property{
+                                        {
+                                                Name:   "CurrentMode",
+                                                Type:   "s",
+                                                Access: "readwrite",
+                                        },
+                                        {
+                                                Name:   "EffectiveMode",
+                                                Type:   "s",
+                                                Access: "read",
+                                        },
+                                },
+                        },
+                },
+        })
+
+        err = ds.conn.Export(intro, dbusPath, "org.freedesktop.DBus.Introspectable")
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to export introspection: %w", err)
+        }</span>
+
+        // Setup properties
+        <span class="cov0" title="0">ds.props, _ = prop.Export(ds.conn, dbusPath, ds.makePropertyMap())
+
+        log.Printf("D-Bus service started at %s", dbusInterface)
+        return nil</span>
+}
+
+// SetMode changes the efficiency mode (D-Bus method)
+func (ds *DBusService) SetMode(mode string) *dbus.Error <span class="cov0" title="0">{
+        oldMode := ds.manager.GetMode()
+
+        var newMode EfficiencyMode
+        switch mode </span>{
+        case "Performance":<span class="cov0" title="0">
+                newMode = ModePerformance</span>
+        case "Balanced":<span class="cov0" title="0">
+                newMode = ModeBalanced</span>
+        case "Efficiency":<span class="cov0" title="0">
+                newMode = ModeEfficiency</span>
+        case "Quiet":<span class="cov0" title="0">
+                newMode = ModeQuiet</span>
+        case "Auto":<span class="cov0" title="0">
+                newMode = ModeAuto</span>
+        case "UltraEfficiency":<span class="cov0" title="0">
+                newMode = ModeUltraEfficiency</span>
+        default:<span class="cov0" title="0">
+                return dbus.MakeFailedError(fmt.Errorf("unknown mode: %s", mode))</span>
+        }
+
+        <span class="cov0" title="0">ds.manager.SetMode(newMode)
+
+        // Emit signal
+        ds.conn.Emit(dbusPath, dbusInterface+".ModeChanged",
+                oldMode.String(), newMode.String())
+
+        // Update property
+        ds.props.SetMust(dbusInterface, "CurrentMode", newMode.String())
+
+        log.Printf("Mode changed: %s → %s", oldMode.String(), newMode.String())
+
+        return nil</span>
+}
+
+// GetMode returns current mode (D-Bus method)
+func (ds *DBusService) GetMode() (string, *dbus.Error) <span class="cov0" title="0">{
+        mode := ds.manager.GetMode()
+        return mode.String(), nil
+}</span>
+
+// GetEffectiveMode returns effective mode (D-Bus method)
+func (ds *DBusService) GetEffectiveMode() (string, *dbus.Error) <span class="cov0" title="0">{
+        mode := ds.manager.GetEffectiveMode()
+        return mode.String(), nil
+}</span>
+
+// ListModes returns all available modes (D-Bus method)
+func (ds *DBusService) ListModes() ([]string, *dbus.Error) <span class="cov0" title="0">{
+        modes := AllModes()
+        names := make([]string, len(modes))
+        for i, m := range modes </span><span class="cov0" title="0">{
+                names[i] = m.String()
+        }</span>
+        <span class="cov0" title="0">return names, nil</span>
+}
+
+// GetModeInfo returns information about a mode (D-Bus method)
+func (ds *DBusService) GetModeInfo(modeName string) (map[string]dbus.Variant, *dbus.Error) <span class="cov0" title="0">{
+        var mode EfficiencyMode
+
+        switch modeName </span>{
+        case "Performance":<span class="cov0" title="0">
+                mode = ModePerformance</span>
+        case "Balanced":<span class="cov0" title="0">
+                mode = ModeBalanced</span>
+        case "Efficiency":<span class="cov0" title="0">
+                mode = ModeEfficiency</span>
+        case "Quiet":<span class="cov0" title="0">
+                mode = ModeQuiet</span>
+        case "Auto":<span class="cov0" title="0">
+                mode = ModeAuto</span>
+        case "UltraEfficiency":<span class="cov0" title="0">
+                mode = ModeUltraEfficiency</span>
+        default:<span class="cov0" title="0">
+                return nil, dbus.MakeFailedError(fmt.Errorf("unknown mode: %s", modeName))</span>
+        }
+
+        <span class="cov0" title="0">config := GetModeConfig(mode)
+
+        info := map[string]dbus.Variant{
+                "name":        dbus.MakeVariant(mode.String()),
+                "description": dbus.MakeVariant(config.Description),
+                "icon":        dbus.MakeVariant(config.Icon),
+                "maxPower":    dbus.MakeVariant(config.MaxPowerWatts),
+                "maxFan":      dbus.MakeVariant(config.MaxFanPercent),
+                "maxTemp":     dbus.MakeVariant(config.MaxTempCelsius),
+        }
+
+        return info, nil</span>
+}
+
+// makePropertyMap creates property map for D-Bus
+func (ds *DBusService) makePropertyMap() map[string]map[string]*prop.Prop <span class="cov0" title="0">{
+        return map[string]map[string]*prop.Prop{
+                dbusInterface: {
+                        "CurrentMode": {
+                                Value:    ds.manager.GetMode().String(),
+                                Writable: true,
+                                Emit:     prop.EmitTrue,
+                                Callback: func(c *prop.Change) *dbus.Error </span><span class="cov0" title="0">{
+                                        return ds.SetMode(c.Value.(string))
+                                }</span>,
+                        },
+                        "EffectiveMode": {
+                                Value:    ds.manager.GetEffectiveMode().String(),
+                                Writable: false,
+                                Emit:     prop.EmitTrue,
+                        },
+                },
+        }
+}
+
+// Stop stops the D-Bus service
+func (ds *DBusService) Stop() <span class="cov8" title="1">{
+        if ds.conn != nil </span><span class="cov8" title="1">{
+                ds.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package efficiency
+
+import (
+        "fmt"
+        "sync"
+
+        "github.com/daoneill/ollama-proxy/pkg/backends"
+)
+
+// EfficiencyMode defines AI inference behavior profile
+type EfficiencyMode int
+
+const (
+        // ModePerformance - Maximum speed, ignore power/thermal
+        ModePerformance EfficiencyMode = iota
+
+        // ModeBalanced - Smart routing based on complexity
+        ModeBalanced
+
+        // ModeEfficiency - Minimize power consumption
+        ModeEfficiency
+
+        // ModeQuiet - Minimize fan noise
+        ModeQuiet
+
+        // ModeAuto - Automatic based on battery, thermal, time
+        ModeAuto
+
+        // ModeUltraEfficiency - Maximum battery life (NPU only when possible)
+        ModeUltraEfficiency
+)
+
+// String returns mode name
+func (m EfficiencyMode) String() string <span class="cov8" title="1">{
+        switch m </span>{
+        case ModePerformance:<span class="cov8" title="1">
+                return "Performance"</span>
+        case ModeBalanced:<span class="cov8" title="1">
+                return "Balanced"</span>
+        case ModeEfficiency:<span class="cov8" title="1">
+                return "Efficiency"</span>
+        case ModeQuiet:<span class="cov8" title="1">
+                return "Quiet"</span>
+        case ModeAuto:<span class="cov8" title="1">
+                return "Auto"</span>
+        case ModeUltraEfficiency:<span class="cov8" title="1">
+                return "Ultra Efficiency"</span>
+        default:<span class="cov8" title="1">
+                return "Unknown"</span>
+        }
+}
+
+// ModeConfig defines behavior for each mode
+type ModeConfig struct {
+        // Preferred backends in priority order
+        PreferredBackends []string
+
+        // Maximum power draw (watts)
+        MaxPowerWatts int
+
+        // Maximum fan speed (percentage)
+        MaxFanPercent int
+
+        // Maximum temperature (Celsius)
+        MaxTempCelsius float64
+
+        // Allow overriding user's critical flag
+        OverrideCriticalFlag bool
+
+        // Throttle latency-critical requests
+        ThrottleLatencyCritical bool
+
+        // Prefer classification to save power
+        UseClassification bool
+
+        // Description for UI
+        Description string
+
+        // Icon name for UI
+        Icon string
+}
+
+// GetModeConfig returns configuration for a mode
+func GetModeConfig(mode EfficiencyMode) *ModeConfig <span class="cov8" title="1">{
+        configs := map[EfficiencyMode]*ModeConfig{
+                ModePerformance: {
+                        PreferredBackends:       []string{"ollama-nvidia", "ollama-igpu", "ollama-npu"},
+                        MaxPowerWatts:           999,
+                        MaxFanPercent:           100,
+                        MaxTempCelsius:          90.0,
+                        OverrideCriticalFlag:    false,
+                        ThrottleLatencyCritical: false,
+                        UseClassification:       false,
+                        Description:             "Maximum speed. Always use fastest backend available.",
+                        Icon:                    "🚀",
+                },
+
+                ModeBalanced: {
+                        PreferredBackends:       []string{"ollama-igpu", "ollama-nvidia", "ollama-npu"},
+                        MaxPowerWatts:           60,
+                        MaxFanPercent:           80,
+                        MaxTempCelsius:          85.0,
+                        OverrideCriticalFlag:    true,
+                        ThrottleLatencyCritical: false,
+                        UseClassification:       true,
+                        Description:             "Smart routing based on task complexity. Good balance of speed and efficiency.",
+                        Icon:                    "⚖️",
+                },
+
+                ModeEfficiency: {
+                        PreferredBackends:       []string{"ollama-npu", "ollama-igpu", "ollama-nvidia"},
+                        MaxPowerWatts:           15,
+                        MaxFanPercent:           60,
+                        MaxTempCelsius:          75.0,
+                        OverrideCriticalFlag:    true,
+                        ThrottleLatencyCritical: true,
+                        UseClassification:       true,
+                        Description:             "Minimize power consumption. Prefer NPU and Intel GPU.",
+                        Icon:                    "🔋",
+                },
+
+                ModeQuiet: {
+                        PreferredBackends:       []string{"ollama-npu", "ollama-igpu"},
+                        MaxPowerWatts:           15,
+                        MaxFanPercent:           40,
+                        MaxTempCelsius:          70.0,
+                        OverrideCriticalFlag:    true,
+                        ThrottleLatencyCritical: true,
+                        UseClassification:       true,
+                        Description:             "Minimize fan noise. Use silent backends only.",
+                        Icon:                    "🔇",
+                },
+
+                ModeAuto: {
+                        PreferredBackends:       []string{"ollama-igpu", "ollama-npu", "ollama-nvidia"},
+                        MaxPowerWatts:           0, // Determined automatically
+                        MaxFanPercent:           0, // Determined automatically
+                        MaxTempCelsius:          85.0,
+                        OverrideCriticalFlag:    true,
+                        ThrottleLatencyCritical: false,
+                        UseClassification:       true,
+                        Description:             "Automatically adjust based on battery, temperature, and time of day.",
+                        Icon:                    "🤖",
+                },
+
+                ModeUltraEfficiency: {
+                        PreferredBackends:       []string{"ollama-npu"},
+                        MaxPowerWatts:           5,
+                        MaxFanPercent:           30,
+                        MaxTempCelsius:          65.0,
+                        OverrideCriticalFlag:    true,
+                        ThrottleLatencyCritical: true,
+                        UseClassification:       true,
+                        Description:             "Maximum battery life. NPU only, accept slower responses.",
+                        Icon:                    "🪫",
+                },
+        }
+
+        if cfg, ok := configs[mode]; ok </span><span class="cov8" title="1">{
+                return cfg
+        }</span>
+
+        <span class="cov8" title="1">return configs[ModeBalanced]</span> // Default
+}
+
+// EfficiencyManager manages efficiency mode
+type EfficiencyManager struct {
+        mu   sync.RWMutex
+        mode EfficiencyMode
+
+        // System state for Auto mode
+        batteryPercent int
+        onBattery      bool
+        avgTemp        float64
+        avgFanSpeed    int
+        quietHours     bool
+}
+
+// NewEfficiencyManager creates manager with default mode
+func NewEfficiencyManager(defaultMode EfficiencyMode) *EfficiencyManager <span class="cov8" title="1">{
+        return &amp;EfficiencyManager{
+                mode: defaultMode,
+        }
+}</span>
+
+// SetMode changes efficiency mode
+func (em *EfficiencyManager) SetMode(mode EfficiencyMode) <span class="cov8" title="1">{
+        em.mu.Lock()
+        defer em.mu.Unlock()
+        em.mode = mode
+}</span>
+
+// GetMode returns current mode
+func (em *EfficiencyManager) GetMode() EfficiencyMode <span class="cov8" title="1">{
+        em.mu.RLock()
+        defer em.mu.RUnlock()
+        return em.mode
+}</span>
+
+// GetEffectiveMode returns the actual mode to use (resolves Auto)
+func (em *EfficiencyManager) GetEffectiveMode() EfficiencyMode <span class="cov8" title="1">{
+        em.mu.RLock()
+        defer em.mu.RUnlock()
+
+        if em.mode != ModeAuto </span><span class="cov8" title="1">{
+                return em.mode
+        }</span>
+
+        // Auto mode - determine based on system state
+        <span class="cov8" title="1">return em.determineAutoMode()</span>
+}
+
+// determineAutoMode intelligently selects mode based on conditions
+func (em *EfficiencyManager) determineAutoMode() EfficiencyMode <span class="cov8" title="1">{
+        // Critical battery - Ultra Efficiency
+        if em.onBattery &amp;&amp; em.batteryPercent &lt; 20 </span><span class="cov8" title="1">{
+                return ModeUltraEfficiency
+        }</span>
+
+        // Low battery - Efficiency
+        <span class="cov8" title="1">if em.onBattery &amp;&amp; em.batteryPercent &lt; 50 </span><span class="cov8" title="1">{
+                return ModeEfficiency
+        }</span>
+
+        // Quiet hours - Quiet mode
+        <span class="cov8" title="1">if em.quietHours </span><span class="cov8" title="1">{
+                return ModeQuiet
+        }</span>
+
+        // High temperatures - Efficiency (cool down)
+        <span class="cov8" title="1">if em.avgTemp &gt; 75.0 </span><span class="cov8" title="1">{
+                return ModeEfficiency
+        }</span>
+
+        // Loud fans - Quiet mode
+        <span class="cov8" title="1">if em.avgFanSpeed &gt; 70 </span><span class="cov8" title="1">{
+                return ModeQuiet
+        }</span>
+
+        // Battery but good level - Balanced
+        <span class="cov8" title="1">if em.onBattery </span><span class="cov8" title="1">{
+                return ModeBalanced
+        }</span>
+
+        // AC power, cool, quiet - Performance allowed
+        <span class="cov8" title="1">return ModePerformance</span>
+}
+
+// UpdateSystemState updates state for Auto mode decisions
+func (em *EfficiencyManager) UpdateSystemState(
+        batteryPercent int,
+        onBattery bool,
+        avgTemp float64,
+        avgFanSpeed int,
+        quietHours bool,
+) <span class="cov8" title="1">{
+        em.mu.Lock()
+        defer em.mu.Unlock()
+
+        em.batteryPercent = batteryPercent
+        em.onBattery = onBattery
+        em.avgTemp = avgTemp
+        em.avgFanSpeed = avgFanSpeed
+        em.quietHours = quietHours
+}</span>
+
+// ApplyModeToAnnotations modifies annotations based on current mode
+func (em *EfficiencyManager) ApplyModeToAnnotations(annotations *backends.Annotations) <span class="cov8" title="1">{
+        effectiveMode := em.GetEffectiveMode()
+        config := GetModeConfig(effectiveMode)
+
+        // Set power limit
+        if config.MaxPowerWatts &gt; 0 &amp;&amp; config.MaxPowerWatts &lt; 999 </span><span class="cov8" title="1">{
+                if annotations.MaxPowerWatts == 0 || annotations.MaxPowerWatts &gt; int32(config.MaxPowerWatts) </span><span class="cov8" title="1">{
+                        annotations.MaxPowerWatts = int32(config.MaxPowerWatts)
+                }</span>
+        }
+
+        // Override critical flag if configured
+        <span class="cov8" title="1">if config.OverrideCriticalFlag &amp;&amp; annotations.LatencyCritical </span>{<span class="cov8" title="1">
+                // Mode will determine if we respect this
+                // Actually throttled in router
+        }</span>
+
+        // Apply efficiency preference
+        <span class="cov8" title="1">switch effectiveMode </span>{
+        case ModeEfficiency, ModeUltraEfficiency:<span class="cov8" title="1">
+                annotations.PreferPowerEfficiency = true
+                annotations.LatencyCritical = false</span>
+
+        case ModeQuiet:<span class="cov8" title="1">
+                annotations.PreferPowerEfficiency = true
+                annotations.LatencyCritical = false</span>
+                // Quiet mode handled by thermal routing
+
+        case ModePerformance:<span class="cov8" title="1"></span>
+                // Performance mode - respect user's critical flag
+                // No modifications needed
+
+        case ModeBalanced:<span class="cov8" title="1"></span>
+                // Let smart routing decide
+        }
+}
+
+// ShouldUseBackend checks if backend is allowed in current mode
+func (em *EfficiencyManager) ShouldUseBackend(backendID string, temp float64, fanSpeed int) bool <span class="cov8" title="1">{
+        effectiveMode := em.GetEffectiveMode()
+        config := GetModeConfig(effectiveMode)
+
+        // Check temperature limit
+        if temp &gt; config.MaxTempCelsius </span><span class="cov8" title="1">{
+                return false
+        }</span>
+
+        // Check fan speed limit
+        <span class="cov8" title="1">if fanSpeed &gt; config.MaxFanPercent </span><span class="cov8" title="1">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">return true</span>
+}
+
+// GetPreferredBackends returns backend preference for current mode
+func (em *EfficiencyManager) GetPreferredBackends() []string <span class="cov8" title="1">{
+        effectiveMode := em.GetEffectiveMode()
+        config := GetModeConfig(effectiveMode)
+        return config.PreferredBackends
+}</span>
+
+// GetModeDescription returns human-readable mode info
+func (em *EfficiencyManager) GetModeDescription() string <span class="cov8" title="1">{
+        mode := em.GetMode()
+        effectiveMode := em.GetEffectiveMode()
+        config := GetModeConfig(effectiveMode)
+
+        if mode == ModeAuto </span><span class="cov8" title="1">{
+                return fmt.Sprintf("Auto (%s): %s", effectiveMode.String(), config.Description)
+        }</span>
+
+        <span class="cov8" title="1">return fmt.Sprintf("%s: %s", mode.String(), config.Description)</span>
+}
+
+// SystemState represents current system state
+type SystemState struct {
+        BatteryPercent int
+        OnBattery      bool
+        AvgTemp        float64
+        AvgFanSpeed    int
+        QuietHours     bool
+}
+
+// GetSystemState returns current system state
+func (em *EfficiencyManager) GetSystemState() SystemState <span class="cov8" title="1">{
+        em.mu.RLock()
+        defer em.mu.RUnlock()
+
+        return SystemState{
+                BatteryPercent: em.batteryPercent,
+                OnBattery:      em.onBattery,
+                AvgTemp:        em.avgTemp,
+                AvgFanSpeed:    em.avgFanSpeed,
+                QuietHours:     em.quietHours,
+        }
+}</span>
+
+// AllModes returns all available modes for UI
+func AllModes() []EfficiencyMode <span class="cov8" title="1">{
+        return []EfficiencyMode{
+                ModePerformance,
+                ModeBalanced,
+                ModeEfficiency,
+                ModeQuiet,
+                ModeAuto,
+                ModeUltraEfficiency,
+        }
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

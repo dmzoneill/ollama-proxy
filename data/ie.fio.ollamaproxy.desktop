@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ollama Proxy
+GenericName=AI Inference Proxy
+Comment=Multi-backend AI inference proxy with power-aware routing
+Icon=ollama-proxy
+Exec=ollama-proxy
+Terminal=false
+Categories=System;Monitor;
+Keywords=AI;inference;proxy;ollama;efficiency;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5
