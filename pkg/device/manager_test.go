@@ -50,6 +50,7 @@ func TestDeviceManager_RegisterDevice(t *testing.T) {
 		"/dev/snd/pcmC0D0c",
 		"Test Microphone",
 		caps,
+		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
 
 	if dbusErr != nil {
@@ -96,6 +97,7 @@ func TestDeviceManager_UnregisterDevice(t *testing.T) {
 		"/dev/video0",
 		"Test Camera",
 		map[string]dbus.Variant{},
+		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
 
 	// Unregister it

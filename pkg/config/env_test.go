@@ -122,6 +122,12 @@ func TestApplyEnvOverrides_BackendEndpoint(t *testing.T) {
 		Hardware string `yaml:"hardware"`
 		Enabled  bool   `yaml:"enabled"`
 		Endpoint string `yaml:"endpoint"`
+
+		// OpenVINO-specific fields
+		Device    string `yaml:"device"`     // "CPU", "GPU", "NPU" for OpenVINO backends
+		ModelPath string `yaml:"model_path"` // Path to OpenVINO model directory
+		ModelName string `yaml:"model_name"` // Model name/identifier
+
 		Characteristics struct {
 			PowerWatts         float64 `yaml:"power_watts"`
 			AvgLatencyMs       int32   `yaml:"avg_latency_ms"`
