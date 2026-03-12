@@ -140,9 +140,9 @@ func TestDeviceManager_ListDevices(t *testing.T) {
 	defer dm.Stop()
 
 	// Register multiple devices
-	dm.RegisterDevice("microphone", "/dev/snd/pcmC0D0c", "Mic 1", nil)
-	dm.RegisterDevice("microphone", "/dev/snd/pcmC1D0c", "Mic 2", nil)
-	dm.RegisterDevice("camera", "/dev/video0", "Camera 1", nil)
+	dm.RegisterDevice("microphone", "/dev/snd/pcmC0D0c", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	dm.RegisterDevice("microphone", "/dev/snd/pcmC1D0c", "Mic 2", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	dm.RegisterDevice("camera", "/dev/video0", "Camera 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	// List all devices
 	allDevices, dbusErr := dm.ListDevices("")
@@ -191,6 +191,7 @@ func TestDeviceManager_GetDevice(t *testing.T) {
 		map[string]dbus.Variant{
 			"sample_rate": dbus.MakeVariant(44100),
 		},
+		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
 
 	// Get device
@@ -242,10 +243,11 @@ func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 		"/dev/snd/pcmC0D0c",
 		"Test Mic",
 		nil,
+		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
 
 	// Request access
-	grantID, shmPath, udsPath, dbusErr := dm.RequestDeviceAccess(deviceID, "test-client")
+	grantID, shmPath, udsPath, dbusErr := dm.RequestDeviceAccess(deviceID, "test-client", dbus.Sender("ie.fio.OllamaProxy.System"))
 	if dbusErr != nil {
 		t.Fatalf("RequestDeviceAccess failed: %v", dbusErr)
 	}
@@ -289,7 +291,7 @@ func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 	}
 	defer dm.Stop()
 
-	_, _, _, dbusErr := dm.RequestDeviceAccess("nonexistent", "client")
+	_, _, _, dbusErr := dm.RequestDeviceAccess("nonexistent", "client", dbus.Sender("ie.fio.OllamaProxy.System"))
 	if dbusErr == nil {
 		t.Error("Expected error when requesting access to non-existent device")
 	}
@@ -304,8 +306,8 @@ func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 	defer dm.Stop()
 
 	// Register device and request access
-	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil)
-	grantID, _, _, _ := dm.RequestDeviceAccess(deviceID, "test-client")
+	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	grantID, _, _, _ := dm.RequestDeviceAccess(deviceID, "test-client", dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	// Release access
 	dbusErr := dm.ReleaseDeviceAccess(deviceID, "test-client")
@@ -367,6 +369,7 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 				"/dev/null",
 				"Concurrent Mic",
 				nil,
+				dbus.Sender("ie.fio.OllamaProxy.System"),
 			)
 		}(i)
 	}
@@ -401,9 +404,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Register 3 devices
-	id1, _ := dm.RegisterDevice("microphone", "/dev/null", "Mic 1", nil)
-	id2, _ := dm.RegisterDevice("camera", "/dev/null", "Cam 1", nil)
-	_, _ = dm.RegisterDevice("speaker", "/dev/null", "Speaker 1", nil)
+	id1, _ := dm.RegisterDevice("microphone", "/dev/null", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	id2, _ := dm.RegisterDevice("camera", "/dev/null", "Cam 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	_, _ = dm.RegisterDevice("speaker", "/dev/null", "Speaker 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	if dm.getTotalDevices() != 3 {
 		t.Errorf("Expected 3 total devices, got %d", dm.getTotalDevices())
@@ -414,7 +417,7 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Request access to one device
-	dm.RequestDeviceAccess(id1, "client")
+	dm.RequestDeviceAccess(id1, "client", dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	if dm.getAvailableDevices() != 2 {
 		t.Errorf("Expected 2 available devices after access grant, got %d",
@@ -447,7 +450,7 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 	defer dm.Stop()
 
 	// Register device (should be Available)
-	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil)
+	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	dm.mu.RLock()
 	device := dm.devices[deviceID]
@@ -458,7 +461,7 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 	}
 
 	// Request access (should transition to InUse)
-	dm.RequestDeviceAccess(deviceID, "client1")
+	dm.RequestDeviceAccess(deviceID, "client1", dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	if device.GetState() != DeviceStateInUse {
 		t.Errorf("Device should be InUse after access request, got %s", device.GetState())
@@ -481,12 +484,12 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 	defer dm.Stop()
 
 	// Register device
-	deviceID, _ := dm.RegisterDevice("microphone", "/dev/null", "Shared Mic", nil)
+	deviceID, _ := dm.RegisterDevice("microphone", "/dev/null", "Shared Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	// Multiple clients request access
-	_, _, _, err1 := dm.RequestDeviceAccess(deviceID, "client1")
-	_, _, _, err2 := dm.RequestDeviceAccess(deviceID, "client2")
-	_, _, _, err3 := dm.RequestDeviceAccess(deviceID, "client3")
+	_, _, _, err1 := dm.RequestDeviceAccess(deviceID, "client1", dbus.Sender("ie.fio.OllamaProxy.System"))
+	_, _, _, err2 := dm.RequestDeviceAccess(deviceID, "client2", dbus.Sender("ie.fio.OllamaProxy.System"))
+	_, _, _, err3 := dm.RequestDeviceAccess(deviceID, "client3", dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	if err1 != nil || err2 != nil || err3 != nil {
 		t.Error("All clients should be able to request access")
@@ -527,8 +530,8 @@ func TestDeviceManager_Stop(t *testing.T) {
 	}
 
 	// Register some devices
-	dm.RegisterDevice("microphone", "/dev/null", "Mic", nil)
-	dm.RegisterDevice("camera", "/dev/null", "Cam", nil)
+	dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	dm.RegisterDevice("camera", "/dev/null", "Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 
 	// Stop should not error
 	if err := dm.Stop(); err != nil {
@@ -562,7 +565,7 @@ func BenchmarkDeviceManager_RegisterDevice(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		dm.RegisterDevice("microphone", "/dev/null", "Bench Mic", caps)
+		dm.RegisterDevice("microphone", "/dev/null", "Bench Mic", caps, dbus.Sender("ie.fio.OllamaProxy.System"))
 	}
 
 	// Target: <2ms per registration
@@ -579,7 +582,7 @@ func BenchmarkDeviceManager_RequestAccess(b *testing.B) {
 	// Pre-register devices
 	deviceIDs := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
-		id, _ := dm.RegisterDevice("camera", "/dev/null", "Bench Cam", nil)
+		id, _ := dm.RegisterDevice("camera", "/dev/null", "Bench Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 		deviceIDs[i] = id
 	}
 
@@ -587,7 +590,7 @@ func BenchmarkDeviceManager_RequestAccess(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		dm.RequestDeviceAccess(deviceIDs[i], "bench-client")
+		dm.RequestDeviceAccess(deviceIDs[i], "bench-client", dbus.Sender("ie.fio.OllamaProxy.System"))
 	}
 
 	// Target: <2ms per access request
@@ -603,7 +606,7 @@ func BenchmarkDeviceManager_ListDevices(b *testing.B) {
 
 	// Register 100 devices
 	for i := 0; i < 100; i++ {
-		dm.RegisterDevice("microphone", "/dev/null", "Mic", nil)
+		dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
 	}
 
 	b.ResetTimer()
