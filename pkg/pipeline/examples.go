@@ -116,7 +116,10 @@ func CodeGenerationPipeline() *Pipeline {
 				PreferredHardware: "nvidia",
 				Model:            "llama3:70b",
 				InputTransform: func(input interface{}) (interface{}, error) {
-					code := input.(string)
+					code, ok := input.(string)
+					if !ok {
+						return nil, fmt.Errorf("expected string input")
+					}
 					return "Review and improve this code:\n\n" + code, nil
 				},
 			},
@@ -183,7 +186,10 @@ func MultiModalRAGPipeline() *Pipeline {
 				Description:      "Retrieve relevant context from vector DB",
 				InputTransform: func(input interface{}) (interface{}, error) {
 					// TODO: Vector DB lookup
-					embedding := input.([]float64)
+					embedding, ok := input.([]float64)
+					if !ok {
+						return nil, fmt.Errorf("expected []float64 input")
+					}
 					context := retrieveContext(embedding) // Placeholder
 					return context, nil
 				},
@@ -195,7 +201,10 @@ func MultiModalRAGPipeline() *Pipeline {
 				PreferredHardware: "nvidia",
 				Model:            "llama3:70b",
 				InputTransform: func(input interface{}) (interface{}, error) {
-					context := input.(string)
+					context, ok := input.(string)
+					if !ok {
+						return nil, fmt.Errorf("expected string input")
+					}
 					return "Context:\n" + context + "\n\nQuestion: [user query]", nil
 				},
 			},

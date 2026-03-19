@@ -123,16 +123,22 @@ func listModes(obj dbus.BusObject) {
 
 	for _, mode := range modes {
 		var info map[string]dbus.Variant
-		obj.Call(dbusInterface+".GetModeInfo", 0, mode).Store(&info)
+		if err := obj.Call(dbusInterface+".GetModeInfo", 0, mode).Store(&info); err != nil {
+			continue
+		}
 
 		icon := "  "
 		if iconVar, ok := info["icon"]; ok {
-			icon = iconVar.Value().(string)
+			if iconStr, ok := iconVar.Value().(string); ok {
+				icon = iconStr
+			}
 		}
 
 		desc := ""
 		if descVar, ok := info["description"]; ok {
-			desc = descVar.Value().(string)
+			if descStr, ok := descVar.Value().(string); ok {
+				desc = descStr
+			}
 		}
 
 		fmt.Printf("%s %-20s %s\n", icon, mode, desc)
@@ -149,19 +155,29 @@ func getModeInfo(obj dbus.BusObject, mode string) {
 
 	fmt.Printf("Mode: %s\n", mode)
 	if iconVar, ok := info["icon"]; ok {
-		fmt.Printf("Icon: %s\n", iconVar.Value().(string))
+		if iconStr, ok := iconVar.Value().(string); ok {
+			fmt.Printf("Icon: %s\n", iconStr)
+		}
 	}
 	if descVar, ok := info["description"]; ok {
-		fmt.Printf("Description: %s\n", descVar.Value().(string))
+		if descStr, ok := descVar.Value().(string); ok {
+			fmt.Printf("Description: %s\n", descStr)
+		}
 	}
 	if powerVar, ok := info["maxPower"]; ok {
-		fmt.Printf("Max Power: %dW\n", powerVar.Value().(int))
+		if powerInt, ok := powerVar.Value().(int); ok {
+			fmt.Printf("Max Power: %dW\n", powerInt)
+		}
 	}
 	if fanVar, ok := info["maxFan"]; ok {
-		fmt.Printf("Max Fan: %d%%\n", fanVar.Value().(int))
+		if fanInt, ok := fanVar.Value().(int); ok {
+			fmt.Printf("Max Fan: %d%%\n", fanInt)
+		}
 	}
 	if tempVar, ok := info["maxTemp"]; ok {
-		fmt.Printf("Max Temp: %.1f°C\n", tempVar.Value().(float64))
+		if tempFloat, ok := tempVar.Value().(float64); ok {
+			fmt.Printf("Max Temp: %.1f°C\n", tempFloat)
+		}
 	}
 }
 
@@ -189,23 +205,23 @@ func showStatus(obj dbus.BusObject) {
 
 	// Get info about effective mode
 	var info map[string]dbus.Variant
-	obj.Call(dbusInterface+".GetModeInfo", 0, effectiveMode).Store(&info)
-
-	if descVar, ok := info["description"]; ok {
-		fmt.Printf("\n%s\n", descVar.Value().(string))
-	}
-
-	if powerVar, ok := info["maxPower"]; ok {
-		maxPower := powerVar.Value().(int)
-		if maxPower < 999 {
-			fmt.Printf("\nLimits:\n")
-			fmt.Printf("  Max Power: %dW\n", maxPower)
+	if err := obj.Call(dbusInterface+".GetModeInfo", 0, effectiveMode).Store(&info); err == nil {
+		if descVar, ok := info["description"]; ok {
+			if descStr, ok := descVar.Value().(string); ok {
+				fmt.Printf("\n%s\n", descStr)
+			}
 		}
-	}
-	if fanVar, ok := info["maxFan"]; ok {
-		maxFan := fanVar.Value().(int)
-		if maxFan < 100 {
-			fmt.Printf("  Max Fan:   %d%%\n", maxFan)
+
+		if powerVar, ok := info["maxPower"]; ok {
+			if maxPower, ok := powerVar.Value().(int); ok && maxPower < 999 {
+				fmt.Printf("\nLimits:\n")
+				fmt.Printf("  Max Power: %dW\n", maxPower)
+			}
+		}
+		if fanVar, ok := info["maxFan"]; ok {
+			if maxFan, ok := fanVar.Value().(int); ok && maxFan < 100 {
+				fmt.Printf("  Max Fan:   %d%%\n", maxFan)
+			}
 		}
 	}
 }
