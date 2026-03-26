@@ -64,10 +64,10 @@ func TestThermalMonitor_StartStop(t *testing.T) {
 
 	tm.Stop()
 
-	// Verify context is cancelled
+	// Verify context is canceled
 	select {
 	case <-tm.ctx.Done():
-		// Good - context was cancelled
+		// Good - context was canceled
 	case <-time.After(1 * time.Second):
 		t.Error("Stop() did not cancel context")
 	}
@@ -1062,7 +1062,7 @@ func TestThermalMonitor_MonitorLoopExecution(t *testing.T) {
 	// Verify context is still active
 	select {
 	case <-tm.ctx.Done():
-		t.Error("Context should not be cancelled while running")
+		t.Error("Context should not be canceled while running")
 	default:
 		// Good - context is still active
 	}
@@ -1074,7 +1074,7 @@ func TestThermalMonitor_MonitorLoopExecution(t *testing.T) {
 	case <-tm.ctx.Done():
 		// Good
 	case <-time.After(1 * time.Second):
-		t.Error("Context should be cancelled after Stop()")
+		t.Error("Context should be canceled after Stop()")
 	}
 }
 
@@ -1103,6 +1103,7 @@ func TestThermalMonitor_GetStateThreadSafety(t *testing.T) {
 		state := <-results
 		if state == nil {
 			t.Error("GetState returned nil during concurrent access")
+			continue
 		}
 		if state.Temperature != 50.0 {
 			t.Errorf("Got corrupted state: %.1f", state.Temperature)

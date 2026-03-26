@@ -233,7 +233,8 @@ func (bs *BackendsService) GetSupportedModels(id string) ([]string, *dbus.Error)
 		if backend.ID() == id {
 			models, err := backend.ListModels(context.Background())
 			if err != nil {
-				// Return preferred models as fallback
+				// Return preferred models as fallback when listing fails
+				_ = err // Explicitly ignore - using fallback
 				return backend.GetPreferredModels(), nil
 			}
 			return models, nil

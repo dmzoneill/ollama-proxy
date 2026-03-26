@@ -111,6 +111,7 @@ func (s *Settings) GetQuietHoursEnabled() (bool, error) {
 	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-enabled")
 	output, err := cmd.Output()
 	if err != nil {
+		_ = err // Explicitly ignore - returning default
 		return true, nil
 	}
 
@@ -127,6 +128,7 @@ func (s *Settings) GetQuietHoursStart() (int, error) {
 	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-start")
 	output, err := cmd.Output()
 	if err != nil {
+		_ = err // Explicitly ignore - returning default
 		return 22, nil
 	}
 
@@ -144,6 +146,7 @@ func (s *Settings) GetQuietHoursEnd() (int, error) {
 	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-end")
 	output, err := cmd.Output()
 	if err != nil {
+		_ = err // Explicitly ignore - returning default
 		return 7, nil
 	}
 

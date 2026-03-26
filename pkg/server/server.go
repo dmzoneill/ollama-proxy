@@ -452,6 +452,8 @@ func (s *ComputeServer) ExecutePipeline(ctx context.Context, req *pb.ExecutePipe
 	// Execute pipeline
 	result, err := s.pipelineExecutor.Execute(ctx, pipelineDef, req.Input)
 	if err != nil {
+		// Return application error in response, not RPC error
+		_ = err // Explicitly using err.Error() in response
 		return &pb.ExecutePipelineResponse{
 			PipelineId: req.PipelineId,
 			Success:    false,

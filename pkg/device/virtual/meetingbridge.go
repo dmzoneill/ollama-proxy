@@ -444,6 +444,8 @@ func (mab *MeetingAudioBridge) writeToMicrophone(audioData []byte) error {
 }
 
 // pcmToWAV converts raw PCM audio to WAV format
+//
+//nolint:unparam // error return kept for future extensibility
 func (mab *MeetingAudioBridge) pcmToWAV(pcmData []byte, sampleRate, channels int) ([]byte, error) {
 	// WAV header (44 bytes)
 	dataSize := len(pcmData)

@@ -65,7 +65,7 @@ func TestQueueTrackingBackend_Generate(t *testing.T) {
 	}
 
 	// Call Generate (it will call MarkRequestEnd via defer)
-	resp, err := qtb.Generate(nil, &backends.GenerateRequest{})
+	resp, err := qtb.Generate(context.TODO(), &backends.GenerateRequest{})
 
 	if err != nil {
 		t.Fatalf("Generate failed: %v", err)
@@ -91,7 +91,7 @@ func TestQueueTrackingBackend_GenerateStream(t *testing.T) {
 	}
 
 	// Call GenerateStream (MockBackend returns nil reader, nil error)
-	_, err := qtb.GenerateStream(nil, &backends.GenerateRequest{})
+	_, err := qtb.GenerateStream(context.TODO(), &backends.GenerateRequest{})
 
 	// MockBackend returns nil, nil so we expect this to succeed
 	// but won't get a usable reader
@@ -125,7 +125,7 @@ func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 	qm.MarkRequestStart("test-backend", backends.PriorityNormal)
 
 	// Call GenerateStream - should return tracking reader
-	reader, err := qtb.GenerateStream(nil, &backends.GenerateRequest{})
+	reader, err := qtb.GenerateStream(context.TODO(), &backends.GenerateRequest{})
 	if err != nil {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestQueueTrackingBackend_GenerateStream_Error(t *testing.T) {
 	}
 
 	// Call GenerateStream - should return error and mark request end
-	reader, err := qtb.GenerateStream(nil, &backends.GenerateRequest{})
+	reader, err := qtb.GenerateStream(context.TODO(), &backends.GenerateRequest{})
 
 	if err == nil {
 		t.Fatal("Expected error from GenerateStream")

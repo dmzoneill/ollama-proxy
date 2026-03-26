@@ -141,6 +141,8 @@ func (pl *PipelineLoader) convertYAMLToPipeline(yamlPipeline PipelineYAML) (*Pip
 }
 
 // convertYAMLToStage converts YAML stage to Stage struct
+//
+//nolint:unparam // error return kept for future validation logic
 func (pl *PipelineLoader) convertYAMLToStage(yamlStage StageYAML) (*Stage, error) {
 	stage := &Stage{
 		ID:                yamlStage.ID,

@@ -108,7 +108,7 @@ func (r *Router) RouteRequest(ctx context.Context, annotations *backends.Annotat
 	// Check context before expensive operations
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("routing cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("routing canceled: %w", ctx.Err())
 	default:
 	}
 

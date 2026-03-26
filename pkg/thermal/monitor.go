@@ -178,6 +178,8 @@ func (tm *ThermalMonitor) getNVIDIAState() (*ThermalState, error) {
 }
 
 // getIntelGPUState reads Intel GPU thermal state
+//
+//nolint:unparam // error return kept for consistency with other sensor methods
 func (tm *ThermalMonitor) getIntelGPUState() (*ThermalState, error) {
 	// Try intel_gpu_top for newer systems (disabled for now)
 	// TODO: Parse intel_gpu_top JSON output when available
@@ -215,6 +217,8 @@ func (tm *ThermalMonitor) getIntelGPUState() (*ThermalState, error) {
 }
 
 // getIntelNPUState reads NPU thermal state
+//
+//nolint:unparam // error return kept for consistency with other sensor methods
 func (tm *ThermalMonitor) getIntelNPUState() (*ThermalState, error) {
 	// NPU is typically part of the SoC, low power
 	// Read from sysfs or estimate based on system load

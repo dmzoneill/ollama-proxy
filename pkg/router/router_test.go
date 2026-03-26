@@ -888,7 +888,7 @@ func TestRouter_RouteRequest_ContextCancellation(t *testing.T) {
 	backend := &MockBackend{id: "backend-1", healthy: true}
 	router.RegisterBackend(backend)
 
-	// Create already-cancelled context
+	// Create already-canceled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
@@ -896,10 +896,10 @@ func TestRouter_RouteRequest_ContextCancellation(t *testing.T) {
 
 	_, err := router.RouteRequest(ctx, annotations)
 	if err == nil {
-		t.Error("Expected error when context is cancelled")
+		t.Error("Expected error when context is canceled")
 	}
-	if !strings.Contains(err.Error(), "cancelled") {
-		t.Errorf("Expected 'cancelled' in error message, got: %v", err)
+	if !strings.Contains(err.Error(), "canceled") {
+		t.Errorf("Expected 'canceled' in error message, got: %v", err)
 	}
 }
 
