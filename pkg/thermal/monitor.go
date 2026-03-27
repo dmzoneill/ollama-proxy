@@ -156,10 +156,22 @@ func (tm *ThermalMonitor) getNVIDIAState() (*ThermalState, error) {
 		return nil, fmt.Errorf("unexpected nvidia-smi output")
 	}
 
-	temp, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-	fanPercent, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
-	power, _ := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
-	util, _ := strconv.Atoi(strings.TrimSpace(parts[3]))
+	temp, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse temperature: %w", err)
+	}
+	fanPercent, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fan speed: %w", err)
+	}
+	power, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse power draw: %w", err)
+	}
+	util, err := strconv.Atoi(strings.TrimSpace(parts[3]))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse utilization: %w", err)
+	}
 
 	throttling := false
 	if len(parts) >= 5 {
