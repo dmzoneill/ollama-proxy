@@ -154,6 +154,10 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 }
 
 func TestALSADevice_IntegrationWithSHM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	// Create shared memory ring for audio
 	// 48kHz stereo S16_LE = 48000 * 2 * 2 = 192,000 bytes/sec
 	// Use 10ms buffers = 1920 bytes per frame
