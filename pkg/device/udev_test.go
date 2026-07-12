@@ -252,6 +252,9 @@ func TestParseDeviceName(t *testing.T) {
 }
 
 func TestUdevMonitor_Creation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping udev monitor test in short mode")
+	}
 	// This test will skip if not running with appropriate permissions
 	um, err := NewUdevMonitor()
 	if err != nil {
@@ -279,6 +282,9 @@ func TestUdevMonitor_Creation(t *testing.T) {
 }
 
 func TestUdevMonitor_StartStop(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping udev monitor test in short mode")
+	}
 	um, err := NewUdevMonitor()
 	if err != nil {
 		if strings.Contains(err.Error(), "permission denied") ||
@@ -312,6 +318,9 @@ func TestUdevMonitor_StartStop(t *testing.T) {
 }
 
 func TestUdevMonitor_EventChannel(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping udev monitor test in short mode")
+	}
 	um, err := NewUdevMonitor()
 	if err != nil {
 		if strings.Contains(err.Error(), "permission denied") ||

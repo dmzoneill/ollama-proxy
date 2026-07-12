@@ -9,6 +9,9 @@ import (
 )
 
 func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	// Create ring
 	ring, err := CreateSharedMemoryRing("test-ring", 4, 1024, logging.Logger)
 	if err != nil {
@@ -37,6 +40,9 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 }
 
 func TestSharedMemoryRing_WriteRead(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	ring, err := CreateSharedMemoryRing("test-write-read", 8, 512, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
@@ -87,6 +93,9 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 }
 
 func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	ring, err := CreateSharedMemoryRing("test-multi-frame", 4, 256, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
@@ -132,6 +141,9 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 }
 
 func TestSharedMemoryRing_Wrap(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	ring, err := CreateSharedMemoryRing("test-wrap", 4, 128, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
@@ -173,6 +185,9 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 }
 
 func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	ring, err := CreateSharedMemoryRing("test-concurrent", 16, 1024, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
@@ -250,6 +265,9 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 }
 
 func TestSharedMemoryRing_Stats(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping shared memory test in short mode")
+	}
 	ring, err := CreateSharedMemoryRing("test-stats", 8, 512, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)

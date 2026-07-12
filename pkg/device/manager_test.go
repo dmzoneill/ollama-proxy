@@ -9,6 +9,9 @@ import (
 )
 
 func TestDeviceManager_NewDeviceManager(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	// Note: This test requires D-Bus system bus access
 	// Skip if not running with proper permissions
 	dm, err := NewDeviceManager()
@@ -32,6 +35,9 @@ func TestDeviceManager_NewDeviceManager(t *testing.T) {
 }
 
 func TestDeviceManager_RegisterDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -84,6 +90,9 @@ func TestDeviceManager_RegisterDevice(t *testing.T) {
 }
 
 func TestDeviceManager_UnregisterDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -117,6 +126,9 @@ func TestDeviceManager_UnregisterDevice(t *testing.T) {
 }
 
 func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -132,6 +144,9 @@ func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
 }
 
 func TestDeviceManager_ListDevices(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -176,6 +191,9 @@ func TestDeviceManager_ListDevices(t *testing.T) {
 }
 
 func TestDeviceManager_GetDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -216,6 +234,9 @@ func TestDeviceManager_GetDevice(t *testing.T) {
 }
 
 func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -230,6 +251,9 @@ func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
 }
 
 func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -284,6 +308,9 @@ func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 }
 
 func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -298,6 +325,9 @@ func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 }
 
 func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -335,6 +365,9 @@ func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 }
 
 func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -349,6 +382,9 @@ func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
 }
 
 func TestDeviceManager_ConcurrentAccess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -387,6 +423,9 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 }
 
 func TestDeviceManager_Properties(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -442,6 +481,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 }
 
 func TestDeviceManager_StateTransitions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -476,6 +518,9 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 }
 
 func TestDeviceManager_MultipleClients(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
@@ -523,6 +568,9 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 }
 
 func TestDeviceManager_Stop(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping device manager test in short mode")
+	}
 	dm, err := NewDeviceManager()
 	if err != nil {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
