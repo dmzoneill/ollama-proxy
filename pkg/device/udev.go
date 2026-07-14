@@ -230,8 +230,8 @@ func (e UdevEvent) GetDeviceType() DeviceType {
 	case SUBSYSTEM_VIDEO4LINUX:
 		return DeviceTypeCamera
 	case SUBSYSTEM_SOUND:
-		// Check if it's capture or playback
-		if strings.Contains(e.DevName, "pcmC") && strings.Contains(e.DevName, "c") {
+		// ALSA naming: pcmC{card}D{dev}c = capture, pcmC{card}D{dev}p = playback
+		if strings.HasSuffix(e.DevName, "c") {
 			return DeviceTypeMicrophone
 		}
 		return DeviceTypeSpeaker
