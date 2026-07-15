@@ -94,11 +94,8 @@ linters:
       - vendor
       - api/gen
 
-    max-issues-per-linter: 0
-    max-same-issues: 0
 
 output:
   formats:
-    colored-line-number: {}
-  print-issued-lines: true
-  print-linter-name: true
+    text:
+      path: stdout
