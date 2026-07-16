@@ -12,8 +12,6 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - goconst
     - gocyclo
@@ -94,6 +92,11 @@ linters:
       - vendor
       - api/gen
 
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 output:
   formats:
