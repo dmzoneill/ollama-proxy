@@ -8,6 +8,7 @@ import (
 
 type contextKey string
 
+// RequestIDKey is an exported const.
 const RequestIDKey contextKey = "request_id"
 
 // WithRequestID adds a request ID to the context

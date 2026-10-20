@@ -3,34 +3,35 @@ package device
 import (
 	"fmt"
 	"syscall"
-	"unsafe"
 
 	"go.uber.org/zap"
+
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // V4L2 ioctl constants
 const (
-	VIDIOC_QUERYCAP        = 0x80685600
-	VIDIOC_ENUM_FMT        = 0xc0405602
-	VIDIOC_G_FMT           = 0xc0d05604
-	VIDIOC_S_FMT           = 0xc0d05605
-	VIDIOC_REQBUFS         = 0xc0145608
-	VIDIOC_QUERYBUF        = 0xc0445609
-	VIDIOC_QBUF            = 0xc058560f
-	VIDIOC_DQBUF           = 0xc0585611
-	VIDIOC_STREAMON        = 0x40045612
-	VIDIOC_STREAMOFF       = 0x40045613
-	VIDIOC_ENUM_FRAMESIZES = 0xc02c564a
-	VIDIOC_ENUM_FRAMEINTERVALS = 0xc034564b
+	VidiocQuerycap           = 0x80685600
+	VidiocEnumFmt            = 0xc0405602
+	VidiocGFmt               = 0xc0d05604
+	VidiocSFmt               = 0xc0d05605
+	VidiocReqbufs            = 0xc0145608
+	VidiocQuerybuf           = 0xc0445609
+	VidiocQbuf               = 0xc058560f
+	VidiocDqbuf              = 0xc0585611
+	VidiocStreamon           = 0x40045612
+	VidiocStreamoff          = 0x40045613
+	VidiocEnumFramesizes     = 0xc02c564a
+	VidiocEnumFrameintervals = 0xc034564b
 
-	V4L2_BUF_TYPE_VIDEO_CAPTURE = 1
-	V4L2_MEMORY_MMAP            = 1
-	V4L2_FIELD_INTERLACED       = 4
+	V4l2BufTypeVideoCapture = 1
+	V4l2MemoryMmap          = 1
+	V4l2FieldInterlaced     = 4
 
 	// Pixel formats
-	V4L2_PIX_FMT_YUYV = 0x56595559 // YUYV 4:2:2
-	V4L2_PIX_FMT_MJPEG = 0x47504a4d // Motion-JPEG
-	V4L2_PIX_FMT_RGB24 = 0x33424752 // 24-bit RGB
+	V4l2PixFmtYuyv  = 0x56595559 // YUYV 4:2:2
+	V4l2PixFmtMjpeg = 0x47504a4d // Motion-JPEG
+	V4l2PixFmtRgb24 = 0x33424752 // 24-bit RGB
 )
 
 // V4L2Capability represents device capabilities
@@ -75,7 +76,10 @@ type V4L2RequestBuffers struct {
 	Reserved     [1]uint32
 }
 
-// V4L2Buffer represents a buffer
+// V4L2Buffer matches the Linux v4l2_buffer ioctl memory layout.
+// Field order is the kernel ABI and must not be rearranged for Go alignment.
+//
+//nolint:govet // kernel ioctl ABI; field order is load-bearing
 type V4L2Buffer struct {
 	Index     uint32
 	Type      uint32
@@ -95,15 +99,15 @@ type V4L2Buffer struct {
 
 // V4L2Device represents a V4L2 camera device
 type V4L2Device struct {
-	path           string
-	fd             int
-	caps           V4L2Capability
-	format         V4L2PixFormat
-	buffers        []V4L2MappedBuffer
-	streaming      bool
-	logger         *zap.Logger
-	shmRing        *SharedMemoryRing
-	stopChan       chan struct{}
+	logger    *zap.Logger
+	shmRing   *SharedMemoryRing
+	stopChan  chan struct{}
+	path      string
+	buffers   []V4L2MappedBuffer
+	fd        int
+	caps      V4L2Capability
+	format    V4L2PixFormat
+	streaming bool
 }
 
 // V4L2MappedBuffer represents a memory-mapped buffer
@@ -130,7 +134,7 @@ func OpenV4L2Device(path string, logger *zap.Logger) (*V4L2Device, error) {
 
 	// Query capabilities
 	if err := device.queryCapabilities(); err != nil {
-		syscall.Close(fd)
+		warnErr("failed to close v4l2 device", syscall.Close(fd), zap.String("path", path))
 		return nil, fmt.Errorf("failed to query capabilities: %w", err)
 	}
 
@@ -145,14 +149,8 @@ func OpenV4L2Device(path string, logger *zap.Logger) (*V4L2Device, error) {
 
 // queryCapabilities queries device capabilities
 func (d *V4L2Device) queryCapabilities() error {
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_QUERYCAP),
-		uintptr(unsafe.Pointer(&d.caps)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_QUERYCAP failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocQuerycap), &d.caps); err != nil {
+		return fmt.Errorf("VidiocQuerycap failed: %w", err)
 	}
 	return nil
 }
@@ -160,35 +158,23 @@ func (d *V4L2Device) queryCapabilities() error {
 // SetFormat sets the video format
 func (d *V4L2Device) SetFormat(width, height, pixelFormat uint32) error {
 	var v4l2fmt V4L2Format
-	v4l2fmt.Type = V4L2_BUF_TYPE_VIDEO_CAPTURE
+	v4l2fmt.Type = V4l2BufTypeVideoCapture
 
 	// Get current format first
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_G_FMT),
-		uintptr(unsafe.Pointer(&v4l2fmt)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_G_FMT failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocGFmt), &v4l2fmt); err != nil {
+		return fmt.Errorf("VidiocGFmt failed: %w", err)
 	}
 
 	// Decode pixel format from union
-	pixFmt := (*V4L2PixFormat)(unsafe.Pointer(&v4l2fmt.Fmt[0]))
+	pixFmt := overlayStruct[V4L2PixFormat](v4l2fmt.Fmt[:])
 	pixFmt.Width = width
 	pixFmt.Height = height
 	pixFmt.PixelFormat = pixelFormat
-	pixFmt.Field = V4L2_FIELD_INTERLACED
+	pixFmt.Field = V4l2FieldInterlaced
 
 	// Set new format
-	_, _, errno = syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_S_FMT),
-		uintptr(unsafe.Pointer(&v4l2fmt)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_S_FMT failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocSFmt), &v4l2fmt); err != nil {
+		return fmt.Errorf("VidiocSFmt failed: %w", err)
 	}
 
 	// Store format
@@ -209,17 +195,11 @@ func (d *V4L2Device) SetFormat(width, height, pixelFormat uint32) error {
 func (d *V4L2Device) RequestBuffers(count uint32) error {
 	var reqbuf V4L2RequestBuffers
 	reqbuf.Count = count
-	reqbuf.Type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-	reqbuf.Memory = V4L2_MEMORY_MMAP
+	reqbuf.Type = V4l2BufTypeVideoCapture
+	reqbuf.Memory = V4l2MemoryMmap
 
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_REQBUFS),
-		uintptr(unsafe.Pointer(&reqbuf)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_REQBUFS failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocReqbufs), &reqbuf); err != nil {
+		return fmt.Errorf("VidiocReqbufs failed: %w", err)
 	}
 
 	if reqbuf.Count < count {
@@ -239,19 +219,13 @@ func (d *V4L2Device) MapBuffers(count uint32) error {
 
 	for i := uint32(0); i < count; i++ {
 		var buf V4L2Buffer
-		buf.Type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-		buf.Memory = V4L2_MEMORY_MMAP
+		buf.Type = V4l2BufTypeVideoCapture
+		buf.Memory = V4l2MemoryMmap
 		buf.Index = i
 
 		// Query buffer
-		_, _, errno := syscall.Syscall(
-			syscall.SYS_IOCTL,
-			uintptr(d.fd),
-			uintptr(VIDIOC_QUERYBUF),
-			uintptr(unsafe.Pointer(&buf)),
-		)
-		if errno != 0 {
-			return fmt.Errorf("VIDIOC_QUERYBUF failed for buffer %d: %v", i, errno)
+		if err := ioctl(uintptr(d.fd), uintptr(VidiocQuerybuf), &buf); err != nil {
+			return fmt.Errorf("VidiocQuerybuf failed for buffer %d: %w", i, err)
 		}
 
 		// Memory map buffer
@@ -285,18 +259,12 @@ func (d *V4L2Device) MapBuffers(count uint32) error {
 // QueueBuffer queues a buffer for capture
 func (d *V4L2Device) QueueBuffer(index uint32) error {
 	var buf V4L2Buffer
-	buf.Type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-	buf.Memory = V4L2_MEMORY_MMAP
+	buf.Type = V4l2BufTypeVideoCapture
+	buf.Memory = V4l2MemoryMmap
 	buf.Index = index
 
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_QBUF),
-		uintptr(unsafe.Pointer(&buf)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_QBUF failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocQbuf), &buf); err != nil {
+		return fmt.Errorf("VidiocQbuf failed: %w", err)
 	}
 
 	return nil
@@ -305,17 +273,11 @@ func (d *V4L2Device) QueueBuffer(index uint32) error {
 // DequeueBuffer dequeues a captured buffer
 func (d *V4L2Device) DequeueBuffer() (*V4L2Buffer, error) {
 	var buf V4L2Buffer
-	buf.Type = V4L2_BUF_TYPE_VIDEO_CAPTURE
-	buf.Memory = V4L2_MEMORY_MMAP
+	buf.Type = V4l2BufTypeVideoCapture
+	buf.Memory = V4l2MemoryMmap
 
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_DQBUF),
-		uintptr(unsafe.Pointer(&buf)),
-	)
-	if errno != 0 {
-		return nil, fmt.Errorf("VIDIOC_DQBUF failed: %v", errno)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocDqbuf), &buf); err != nil {
+		return nil, fmt.Errorf("VidiocDqbuf failed: %w", err)
 	}
 
 	return &buf, nil
@@ -335,15 +297,9 @@ func (d *V4L2Device) StartStreaming() error {
 	}
 
 	// Start streaming
-	bufType := uint32(V4L2_BUF_TYPE_VIDEO_CAPTURE)
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_STREAMON),
-		uintptr(unsafe.Pointer(&bufType)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_STREAMON failed: %v", errno)
+	bufType := uint32(V4l2BufTypeVideoCapture)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocStreamon), &bufType); err != nil {
+		return fmt.Errorf("VidiocStreamon failed: %w", err)
 	}
 
 	d.streaming = true
@@ -358,15 +314,9 @@ func (d *V4L2Device) StopStreaming() error {
 		return nil
 	}
 
-	bufType := uint32(V4L2_BUF_TYPE_VIDEO_CAPTURE)
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(d.fd),
-		uintptr(VIDIOC_STREAMOFF),
-		uintptr(unsafe.Pointer(&bufType)),
-	)
-	if errno != 0 {
-		return fmt.Errorf("VIDIOC_STREAMOFF failed: %v", errno)
+	bufType := uint32(V4l2BufTypeVideoCapture)
+	if err := ioctl(uintptr(d.fd), uintptr(VidiocStreamoff), &bufType); err != nil {
+		return fmt.Errorf("VidiocStreamoff failed: %w", err)
 	}
 
 	d.streaming = false
@@ -456,16 +406,37 @@ func (d *V4L2Device) Close() error {
 	return nil
 }
 
+// BufferData returns mapped capture bytes for index, limited to n bytes.
+// The slice aliases device memory and is invalid after the buffer is queued again.
+func (d *V4L2Device) BufferData(index, n uint32) ([]byte, error) {
+	if d == nil {
+		return nil, fmt.Errorf("v4l2 device is nil")
+	}
+	idx := safeconv.IntFromUint64(uint64(index))
+	if idx < 0 || idx >= len(d.buffers) {
+		return nil, fmt.Errorf("buffer index %d out of range", index)
+	}
+	data := d.buffers[idx].data
+	limit := safeconv.IntFromUint64(uint64(n))
+	if limit > len(data) {
+		limit = len(data)
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	return data[:limit], nil
+}
+
 // GetCapabilities returns device capabilities as a map
 func (d *V4L2Device) GetCapabilities() map[string]interface{} {
 	return map[string]interface{}{
-		"driver":       string(d.caps.Driver[:]),
-		"card":         string(d.caps.Card[:]),
-		"bus_info":     string(d.caps.BusInfo[:]),
-		"width":        d.format.Width,
-		"height":       d.format.Height,
-		"pixel_format": d.format.PixelFormat,
+		"driver":         string(d.caps.Driver[:]),
+		"card":           string(d.caps.Card[:]),
+		"bus_info":       string(d.caps.BusInfo[:]),
+		"width":          d.format.Width,
+		"height":         d.format.Height,
+		"pixel_format":   d.format.PixelFormat,
 		"bytes_per_line": d.format.BytesPerLine,
-		"size_image":   d.format.SizeImage,
+		"size_image":     d.format.SizeImage,
 	}
 }

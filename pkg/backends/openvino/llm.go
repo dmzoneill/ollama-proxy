@@ -1,7 +1,9 @@
+// Package openvino implements an OpenVINO local-inference backend.
 package openvino
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,65 +16,55 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"go.uber.org/zap"
 )
 
-// OpenVINOLLMBackend implements LLM generation using OpenVINO GenAI
+// LLMBackend implements LLM generation using OpenVINO GenAI
 // Optimized for Intel hardware (CPU/GPU/NPU) with INT4 quantization
-type OpenVINOLLMBackend struct {
-	mu sync.RWMutex
-
-	// Config
-	id       string
-	name     string
-	hardware string
-	device   string // "CPU", "GPU", "NPU"
-
-	// Model
-	modelPath string
-	modelName string
-
-	// Characteristics
-	powerWatts   float64
-	avgLatencyMs int32
-	priority     int
-
-	// Model capabilities
+type LLMBackend struct {
+	lastCheck       time.Time
 	modelCapability *backends.ModelCapability
-
-	// Health
-	healthy      atomic.Bool
-	lastCheck    time.Time
-	checkTimeout time.Duration
-
-	// Metrics
-	metrics *backends.BackendMetrics
-
-	logger *zap.Logger
+	logger          *zap.Logger
+	metrics         *backends.BackendMetrics
+	device          string
+	modelPath       string
+	modelName       string
+	hardware        string
+	name            string
+	id              string
+	powerWatts      float64
+	priority        int
+	checkTimeout    time.Duration
+	mu              sync.RWMutex
+	avgLatencyMs    int32
+	healthy         atomic.Bool
 }
 
-// Config for OpenVINO LLM backend
+// LLMConfig configures the OpenVINO LLM backend.
 type LLMConfig struct {
-	backends.BackendConfig
 	Device    string
 	ModelPath string
 	ModelName string
+	backends.BackendConfig
 }
 
 // NewOpenVINOLLMBackend creates a new OpenVINO LLM backend
-func NewOpenVINOLLMBackend(cfg LLMConfig, logger *zap.Logger) (*OpenVINOLLMBackend, error) {
-	backend := &OpenVINOLLMBackend{
-		id:           cfg.ID,
-		name:         cfg.Name,
-		hardware:     cfg.Hardware,
-		device:       cfg.Device,
-		modelPath:    cfg.ModelPath,
-		modelName:    cfg.ModelName,
-		powerWatts:   cfg.PowerWatts,
-		avgLatencyMs: cfg.AvgLatencyMs,
-		priority:     cfg.Priority,
+func NewOpenVINOLLMBackend(cfg LLMConfig, logger *zap.Logger) (*LLMBackend, error) {
+	backend := &LLMBackend{
+		id:              cfg.ID,
+		name:            cfg.Name,
+		hardware:        cfg.Hardware,
+		device:          cfg.Device,
+		modelPath:       cfg.ModelPath,
+		modelName:       cfg.ModelName,
+		powerWatts:      cfg.PowerWatts,
+		avgLatencyMs:    cfg.AvgLatencyMs,
+		priority:        cfg.Priority,
 		modelCapability: cfg.ModelCapability,
-		checkTimeout: 5 * time.Second,
+		checkTimeout:    5 * time.Second,
 		metrics: &backends.BackendMetrics{
 			LoadedModels: []string{cfg.ModelName},
 		},
@@ -84,32 +76,32 @@ func NewOpenVINOLLMBackend(cfg LLMConfig, logger *zap.Logger) (*OpenVINOLLMBacke
 }
 
 // ID returns backend identifier
-func (b *OpenVINOLLMBackend) ID() string {
+func (b *LLMBackend) ID() string {
 	return b.id
 }
 
 // Type returns backend type
-func (b *OpenVINOLLMBackend) Type() string {
+func (b *LLMBackend) Type() string {
 	return "openvino"
 }
 
 // Name returns human-readable name
-func (b *OpenVINOLLMBackend) Name() string {
+func (b *LLMBackend) Name() string {
 	return b.name
 }
 
 // Hardware returns hardware type
-func (b *OpenVINOLLMBackend) Hardware() string {
+func (b *LLMBackend) Hardware() string {
 	return b.hardware
 }
 
 // IsHealthy returns current health status
-func (b *OpenVINOLLMBackend) IsHealthy() bool {
+func (b *LLMBackend) IsHealthy() bool {
 	return b.healthy.Load()
 }
 
 // HealthCheck performs health check
-func (b *OpenVINOLLMBackend) HealthCheck(ctx context.Context) error {
+func (b *LLMBackend) HealthCheck(_ context.Context) error {
 	// Check if model path exists
 	if _, err := os.Stat(b.modelPath); os.IsNotExist(err) {
 		b.healthy.Store(false)
@@ -125,12 +117,12 @@ func (b *OpenVINOLLMBackend) HealthCheck(ctx context.Context) error {
 }
 
 // PowerWatts returns estimated power consumption
-func (b *OpenVINOLLMBackend) PowerWatts() float64 {
+func (b *LLMBackend) PowerWatts() float64 {
 	return b.powerWatts
 }
 
 // AvgLatencyMs returns average latency
-func (b *OpenVINOLLMBackend) AvgLatencyMs() int32 {
+func (b *LLMBackend) AvgLatencyMs() int32 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -141,32 +133,32 @@ func (b *OpenVINOLLMBackend) AvgLatencyMs() int32 {
 }
 
 // Priority returns backend priority
-func (b *OpenVINOLLMBackend) Priority() int {
+func (b *LLMBackend) Priority() int {
 	return b.priority
 }
 
 // SupportsGenerate returns true
-func (b *OpenVINOLLMBackend) SupportsGenerate() bool {
+func (b *LLMBackend) SupportsGenerate() bool {
 	return true
 }
 
 // SupportsStream returns true
-func (b *OpenVINOLLMBackend) SupportsStream() bool {
+func (b *LLMBackend) SupportsStream() bool {
 	return true
 }
 
 // SupportsEmbed returns false (not implemented)
-func (b *OpenVINOLLMBackend) SupportsEmbed() bool {
+func (b *LLMBackend) SupportsEmbed() bool {
 	return false
 }
 
 // ListModels returns available models
-func (b *OpenVINOLLMBackend) ListModels(ctx context.Context) ([]string, error) {
+func (b *LLMBackend) ListModels(_ context.Context) ([]string, error) {
 	return []string{b.modelName}, nil
 }
 
 // Generate performs text generation using OpenVINO GenAI
-func (b *OpenVINOLLMBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+func (b *LLMBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	start := time.Now()
 
 	// Build request JSON
@@ -188,26 +180,16 @@ func (b *OpenVINOLLMBackend) Generate(ctx context.Context, req *backends.Generat
 		return nil, err
 	}
 
-	// Call OpenVINO GenAI via Python wrapper
-	cmd := exec.CommandContext(ctx, "python3", "-c", fmt.Sprintf(`
-import sys
-import json
-import openvino_genai as ov_genai
-
-request = json.loads(%q)
-pipe = ov_genai.LLMPipeline(%q, request["device"])
-
-config = ov_genai.GenerationConfig()
-config.max_new_tokens = request["max_tokens"]
-config.temperature = request["temperature"]
-
-result = pipe.generate(request["prompt"], config)
-print(json.dumps({"response": result}))
-`, string(reqJSON), b.modelPath))
+	// Call OpenVINO GenAI via Python wrapper. The prompt stays in the JSON
+	// payload on stdin so it is never interpolated into Python source.
+	cmd, err := openvinoCommand(ctx, openvinoGenerateScript, reqJSON, b.modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("openvino generate: %w", err)
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, fmt.Errorf("openvino generate failed: %w - %s", err, string(output))
 	}
 
@@ -216,12 +198,12 @@ print(json.dumps({"response": result}))
 		Response string `json:"response"`
 	}
 	if err := json.Unmarshal(output, &response); err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 	b.UpdateMetrics(latencyMs, true)
 
 	energyWh := (b.powerWatts * elapsed.Seconds()) / 3600.0
@@ -229,28 +211,27 @@ print(json.dumps({"response": result}))
 	return &backends.GenerateResponse{
 		Response: response.Response,
 		Stats: &backends.GenerationStats{
-			TotalTimeMs: latencyMs,
-			TokensGenerated: int32(len(strings.Fields(response.Response))), // Approximation
-			EnergyWh:    float32(energyWh),
+			TotalTimeMs:     latencyMs,
+			TokensGenerated: safeconv.Int32FromInt(len(strings.Fields(response.Response))), // Approximation
+			EnergyWh:        float32(energyWh),
 		},
 	}, nil
 }
 
 // openvinoStreamReader implements StreamReader for OpenVINO streaming
 type openvinoStreamReader struct {
-	scanner *bufio.Scanner
-	cmd     *exec.Cmd
-	start   time.Time
-	backend *OpenVINOLLMBackend
-	done    bool
-
-	firstToken     bool
+	start          time.Time
+	scanner        *bufio.Scanner
+	cmd            *exec.Cmd
+	backend        *LLMBackend
 	firstTokenTime *time.Time
 	tokenCount     int
+	done           bool
+	firstToken     bool
 }
 
 // GenerateStream performs streaming text generation
-func (b *OpenVINOLLMBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+func (b *LLMBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
 	// Build request JSON
 	reqData := map[string]interface{}{
 		"prompt":      req.Prompt,
@@ -271,31 +252,11 @@ func (b *OpenVINOLLMBackend) GenerateStream(ctx context.Context, req *backends.G
 		return nil, err
 	}
 
-	// Start streaming Python process
-	cmd := exec.CommandContext(ctx, "python3", "-c", fmt.Sprintf(`
-import sys
-import json
-import openvino_genai as ov_genai
-
-request = json.loads(%q)
-pipe = ov_genai.LLMPipeline(%q, request["device"])
-
-config = ov_genai.GenerationConfig()
-config.max_new_tokens = request["max_tokens"]
-config.temperature = request["temperature"]
-
-class StreamPrinter(ov_genai.StreamerBase):
-    def put(self, token_id):
-        token = pipe.get_tokenizer().decode([token_id])
-        print(json.dumps({"token": token, "done": False}), flush=True)
-        return False
-
-    def end(self):
-        print(json.dumps({"token": "", "done": True}), flush=True)
-
-streamer = StreamPrinter()
-pipe.generate(request["prompt"], config, streamer)
-`, string(reqJSON), b.modelPath))
+	// Start streaming Python process. The prompt is passed on stdin.
+	cmd, err := openvinoCommand(ctx, openvinoStreamScript, reqJSON, b.modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("openvino stream: %w", err)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -358,7 +319,7 @@ func (r *openvinoStreamReader) Recv() (*backends.StreamChunk, error) {
 	if chunk.Done {
 		r.done = true
 		elapsed := time.Since(r.start)
-		latencyMs := int32(elapsed.Milliseconds())
+		latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 		r.backend.UpdateMetrics(latencyMs, true)
 
 		energyWh := (r.backend.powerWatts * elapsed.Seconds()) / 3600.0
@@ -377,17 +338,19 @@ func (r *openvinoStreamReader) Recv() (*backends.StreamChunk, error) {
 
 // Close closes the stream
 func (r *openvinoStreamReader) Close() error {
-	r.cmd.Process.Kill()
+	if err := r.cmd.Process.Kill(); err != nil {
+		logging.Warn("kill openvino process", zap.Error(err))
+	}
 	return r.cmd.Wait()
 }
 
 // Embed is not implemented
-func (b *OpenVINOLLMBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+func (b *LLMBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return nil, fmt.Errorf("embeddings not supported by OpenVINO backend")
 }
 
 // UpdateMetrics updates backend metrics
-func (b *OpenVINOLLMBackend) UpdateMetrics(latencyMs int32, success bool) {
+func (b *LLMBackend) UpdateMetrics(latencyMs int32, success bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -398,7 +361,7 @@ func (b *OpenVINOLLMBackend) UpdateMetrics(latencyMs int32, success bool) {
 		atomic.AddInt64(&b.metrics.TotalLatencyMs, int64(latencyMs))
 
 		if b.metrics.RequestCount > 0 {
-			b.metrics.AvgLatencyMs = int32(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
+			b.metrics.AvgLatencyMs = safeconv.Int32FromInt64(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
 		}
 	} else {
 		atomic.AddInt64(&b.metrics.ErrorCount, 1)
@@ -410,7 +373,7 @@ func (b *OpenVINOLLMBackend) UpdateMetrics(latencyMs int32, success bool) {
 }
 
 // GetMetrics returns current metrics
-func (b *OpenVINOLLMBackend) GetMetrics() *backends.BackendMetrics {
+func (b *LLMBackend) GetMetrics() *backends.BackendMetrics {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -426,22 +389,35 @@ func (b *OpenVINOLLMBackend) GetMetrics() *backends.BackendMetrics {
 }
 
 // Start initializes the backend
-func (b *OpenVINOLLMBackend) Start(ctx context.Context) error {
+func (b *LLMBackend) Start(ctx context.Context) error {
 	return b.HealthCheck(ctx)
 }
 
 // Stop shuts down the backend
-func (b *OpenVINOLLMBackend) Stop(ctx context.Context) error {
+func (b *LLMBackend) Stop(_ context.Context) error {
 	return nil
 }
 
+// openvinoCommand starts python3 with a constant script. The request JSON,
+// including the user prompt, is passed on stdin and the model path is an
+// environment variable.
+func openvinoCommand(ctx context.Context, script string, reqJSON []byte, modelPath string) (*exec.Cmd, error) {
+	cmd, err := cmdexec.CommandContext(ctx, "python3", "-c", script)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stdin = bytes.NewReader(reqJSON)
+	cmd.Env = append(os.Environ(), envModelPath+"="+modelPath)
+	return cmd, nil
+}
+
 // SupportsModel checks if this backend can run the specified model
-func (b *OpenVINOLLMBackend) SupportsModel(modelName string) bool {
+func (b *LLMBackend) SupportsModel(modelName string) bool {
 	return modelName == b.modelName
 }
 
 // GetMaxModelSizeGB returns maximum model size
-func (b *OpenVINOLLMBackend) GetMaxModelSizeGB() int {
+func (b *LLMBackend) GetMaxModelSizeGB() int {
 	if b.modelCapability == nil {
 		return 999
 	}
@@ -449,7 +425,7 @@ func (b *OpenVINOLLMBackend) GetMaxModelSizeGB() int {
 }
 
 // GetSupportedModelPatterns returns patterns of supported models
-func (b *OpenVINOLLMBackend) GetSupportedModelPatterns() []string {
+func (b *LLMBackend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
 		return []string{"*"}
 	}
@@ -457,7 +433,7 @@ func (b *OpenVINOLLMBackend) GetSupportedModelPatterns() []string {
 }
 
 // GetPreferredModels returns list of preferred models
-func (b *OpenVINOLLMBackend) GetPreferredModels() []string {
+func (b *LLMBackend) GetPreferredModels() []string {
 	return []string{b.modelName}
 }
 
@@ -466,32 +442,32 @@ func (b *OpenVINOLLMBackend) GetPreferredModels() []string {
 // ============================================================
 
 // SupportsAudioToText returns whether backend supports speech-to-text
-func (b *OpenVINOLLMBackend) SupportsAudioToText() bool {
+func (b *LLMBackend) SupportsAudioToText() bool {
 	return false // OpenVINO LLM backend is text-only
 }
 
 // SupportsTextToAudio returns whether backend supports text-to-speech
-func (b *OpenVINOLLMBackend) SupportsTextToAudio() bool {
+func (b *LLMBackend) SupportsTextToAudio() bool {
 	return false // OpenVINO LLM backend is text-only
 }
 
 // SupportsImageToText returns whether backend supports image captioning/OCR
-func (b *OpenVINOLLMBackend) SupportsImageToText() bool {
+func (b *LLMBackend) SupportsImageToText() bool {
 	return false
 }
 
 // SupportsTextToImage returns whether backend supports image generation
-func (b *OpenVINOLLMBackend) SupportsTextToImage() bool {
+func (b *LLMBackend) SupportsTextToImage() bool {
 	return false
 }
 
 // SupportsVideoToText returns whether backend supports video transcription
-func (b *OpenVINOLLMBackend) SupportsVideoToText() bool {
+func (b *LLMBackend) SupportsVideoToText() bool {
 	return false
 }
 
 // SupportsTextToVideo returns whether backend supports video generation
-func (b *OpenVINOLLMBackend) SupportsTextToVideo() bool {
+func (b *LLMBackend) SupportsTextToVideo() bool {
 	return false
 }
 
@@ -500,22 +476,22 @@ func (b *OpenVINOLLMBackend) SupportsTextToVideo() bool {
 // ============================================================
 
 // TranscribeAudio is not implemented
-func (b *OpenVINOLLMBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+func (b *LLMBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 	return nil, fmt.Errorf("audio transcription not supported by OpenVINO LLM backend")
 }
 
 // TranscribeAudioStream is not implemented
-func (b *OpenVINOLLMBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+func (b *LLMBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
 	return nil, fmt.Errorf("audio transcription streaming not supported by OpenVINO LLM backend")
 }
 
 // SynthesizeSpeech is not implemented
-func (b *OpenVINOLLMBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+func (b *LLMBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
 	return nil, fmt.Errorf("speech synthesis not supported by OpenVINO LLM backend")
 }
 
 // SynthesizeSpeechStream is not implemented
-func (b *OpenVINOLLMBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+func (b *LLMBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
 	return nil, fmt.Errorf("speech synthesis streaming not supported by OpenVINO LLM backend")
 }
 
@@ -524,17 +500,17 @@ func (b *OpenVINOLLMBackend) SynthesizeSpeechStream(ctx context.Context, req *ba
 // ============================================================
 
 // AnalyzeImage is not implemented
-func (b *OpenVINOLLMBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+func (b *LLMBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
 	return nil, fmt.Errorf("image analysis not supported by OpenVINO LLM backend")
 }
 
 // GenerateImage is not implemented
-func (b *OpenVINOLLMBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+func (b *LLMBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
 	return nil, fmt.Errorf("image generation not supported by OpenVINO LLM backend")
 }
 
 // GenerateImageStream is not implemented
-func (b *OpenVINOLLMBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+func (b *LLMBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
 	return nil, fmt.Errorf("image generation streaming not supported by OpenVINO LLM backend")
 }
 
@@ -543,21 +519,21 @@ func (b *OpenVINOLLMBackend) GenerateImageStream(ctx context.Context, req *backe
 // ============================================================
 
 // AnalyzeVideo is not implemented
-func (b *OpenVINOLLMBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+func (b *LLMBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
 	return nil, fmt.Errorf("video analysis not supported by OpenVINO LLM backend")
 }
 
 // AnalyzeVideoStream is not implemented
-func (b *OpenVINOLLMBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+func (b *LLMBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("video analysis streaming not supported by OpenVINO LLM backend")
 }
 
 // GenerateVideo is not implemented
-func (b *OpenVINOLLMBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+func (b *LLMBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
 	return nil, fmt.Errorf("video generation not supported by OpenVINO LLM backend")
 }
 
 // GenerateVideoStream is not implemented
-func (b *OpenVINOLLMBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+func (b *LLMBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("video generation streaming not supported by OpenVINO LLM backend")
 }

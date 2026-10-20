@@ -10,60 +10,156 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/router"
 )
 
 // mockBackend implements backends.Backend interface for testing
 type mockBackend struct {
-	id              string
-	supportsModel   bool
-	supportsStream  bool
-	generateErr     error
-	generateResp    *backends.GenerateResponse
-	streamErr       error
+	generateErr    error
+	streamErr      error
+	generateResp   *backends.GenerateResponse
+	id             string
+	supportsModel  bool
+	supportsStream bool
 }
 
-func (m *mockBackend) ID() string                                      { return m.id }
-func (m *mockBackend) Type() string                                    { return "mock" }
-func (m *mockBackend) Name() string                                    { return "Mock Backend" }
-func (m *mockBackend) Hardware() string                                { return "mock-hw" }
-func (m *mockBackend) IsHealthy() bool                                 { return true }
-func (m *mockBackend) PowerWatts() float64                             { return 10.0 }
-func (m *mockBackend) AvgLatencyMs() int32                             { return 50 }
-func (m *mockBackend) Priority() int                                   { return 1 }
-func (m *mockBackend) Start(ctx context.Context) error                 { return nil }
-func (m *mockBackend) Stop(ctx context.Context) error                  { return nil }
+// ID is part of the public API.
+func (m *mockBackend) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *mockBackend) Type() string { return "mock" }
+
+// Name is part of the public API.
+func (m *mockBackend) Name() string { return "Mock Backend" }
+
+// Hardware is part of the public API.
+func (m *mockBackend) Hardware() string { return "mock-hw" }
+
+// IsHealthy reports whether the condition holds.
+func (m *mockBackend) IsHealthy() bool { return true }
+
+// PowerWatts is part of the public API.
+func (m *mockBackend) PowerWatts() float64 { return 10.0 }
+
+// AvgLatencyMs is part of the public API.
+func (m *mockBackend) AvgLatencyMs() int32 { return 50 }
+
+// Priority is part of the public API.
+func (m *mockBackend) Priority() int { return 1 }
+
+// Start is part of the public API.
+func (m *mockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *mockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *mockBackend) SupportsAudioToText() bool { return false }
-func (m *mockBackend) SupportsTextToAudio() bool { return false }
-func (m *mockBackend) SupportsImageToText() bool { return false }
-func (m *mockBackend) SupportsTextToImage() bool { return false }
-func (m *mockBackend) SupportsVideoToText() bool { return false }
-func (m *mockBackend) SupportsTextToVideo() bool { return false }
-func (m *mockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) HealthCheck(ctx context.Context) error           { return nil }
-func (m *mockBackend) SupportsModel(model string) bool                { return m.supportsModel }
-func (m *mockBackend) SupportsStream() bool                           { return m.supportsStream }
-func (m *mockBackend) SupportsGenerate() bool                         { return true }
-func (m *mockBackend) SupportsEmbed() bool                            { return true }
-func (m *mockBackend) ListModels(ctx context.Context) ([]string, error) { return []string{"test-model"}, nil }
-func (m *mockBackend) GetMaxModelSizeGB() int                         { return 10 }
-func (m *mockBackend) GetSupportedModelPatterns() []string            { return []string{"*"} }
-func (m *mockBackend) GetPreferredModels() []string                   { return []string{"test-model"} }
 
-func (m *mockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// SupportsTextToAudio is part of the public API.
+func (m *mockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *mockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *mockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *mockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *mockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *mockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *mockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *mockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *mockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *mockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *mockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *mockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *mockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *mockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *mockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *mockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// HealthCheck is part of the public API.
+func (m *mockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// SupportsModel is part of the public API.
+func (m *mockBackend) SupportsModel(_ string) bool { return m.supportsModel }
+
+// SupportsStream is part of the public API.
+func (m *mockBackend) SupportsStream() bool { return m.supportsStream }
+
+// SupportsGenerate is part of the public API.
+func (m *mockBackend) SupportsGenerate() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *mockBackend) SupportsEmbed() bool { return true }
+
+// ListModels is part of the public API.
+func (m *mockBackend) ListModels(_ context.Context) ([]string, error) {
+	return []string{strTestModel}, nil
+}
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *mockBackend) GetMaxModelSizeGB() int { return 10 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *mockBackend) GetSupportedModelPatterns() []string { return []string{"*"} }
+
+// GetPreferredModels is part of the public API.
+func (m *mockBackend) GetPreferredModels() []string { return []string{strTestModel} }
+
+// Generate is part of the public API.
+func (m *mockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	if m.generateErr != nil {
 		return nil, m.generateErr
 	}
@@ -78,17 +174,22 @@ func (m *mockBackend) Generate(ctx context.Context, req *backends.GenerateReques
 	}, nil
 }
 
-func (m *mockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return nil, m.streamErr
 }
 
-func (m *mockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *mockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return &backends.EmbedResponse{
 		Embedding: []float32{0.1, 0.2, 0.3},
 	}, nil
 }
 
-func (m *mockBackend) UpdateMetrics(latencyMs int32, success bool) {}
+// UpdateMetrics is part of the public API.
+func (m *mockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// GetMetrics is part of the public API.
 func (m *mockBackend) GetMetrics() *backends.BackendMetrics {
 	return &backends.BackendMetrics{
 		RequestCount: 10,
@@ -97,6 +198,7 @@ func (m *mockBackend) GetMetrics() *backends.BackendMetrics {
 	}
 }
 
+// TestHandleChatCompletion_MethodNotAllowed is part of the public API.
 func TestHandleChatCompletion_MethodNotAllowed(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleChatCompletion(r)
@@ -111,6 +213,7 @@ func TestHandleChatCompletion_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_InvalidJSON is part of the public API.
 func TestHandleChatCompletion_InvalidJSON(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleChatCompletion(r)
@@ -125,17 +228,21 @@ func TestHandleChatCompletion_InvalidJSON(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_MissingModel is part of the public API.
 func TestHandleChatCompletion_MissingModel(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -146,15 +253,19 @@ func TestHandleChatCompletion_MissingModel(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_MissingMessages is part of the public API.
 func TestHandleChatCompletion_MissingMessages(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -165,25 +276,29 @@ func TestHandleChatCompletion_MissingMessages(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_Success is part of the public API.
 func TestHandleChatCompletion_Success(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -198,28 +313,32 @@ func TestHandleChatCompletion_Success(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	if resp.Model != "test-model" {
+	if resp.Model != strTestModel {
 		t.Errorf("Expected model 'test-model', got %s", resp.Model)
 	}
 }
 
+// TestHandleCompletion_Success is part of the public API.
 func TestHandleCompletion_Success(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -230,23 +349,27 @@ func TestHandleCompletion_Success(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_Success is part of the public API.
 func TestHandleEmbedding_Success(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Input: "Hello world",
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -266,13 +389,14 @@ func TestHandleEmbedding_Success(t *testing.T) {
 	}
 }
 
+// TestHandleModels_Success is part of the public API.
 func TestHandleModels_Success(t *testing.T) {
 	backend := &mockBackend{
-		id: "test-backend",
+		id: strTestBackend,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleModels(r)
 
@@ -286,15 +410,16 @@ func TestHandleModels_Success(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders is part of the public API.
 func TestParseRoutingHeaders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Target-Backend", "test-backend")
-	req.Header.Set("X-Priority", "high")
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Target-Backend", strTestBackend)
+	req.Header.Set("X-Priority", strHigh)
+	req.Header.Set("X-Latency-Critical", strTrue)
 
 	annotations := ParseRoutingHeaders(req)
 
-	if annotations.Target != "test-backend" {
+	if annotations.Target != strTestBackend {
 		t.Errorf("Expected target backend 'test-backend', got %s", annotations.Target)
 	}
 
@@ -303,16 +428,17 @@ func TestParseRoutingHeaders(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders_AllHeaders is part of the public API.
 func TestParseRoutingHeaders_AllHeaders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Target-Backend", "ollama-nvidia")
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Latency-Critical", strTrue)
 	req.Header.Set("X-Power-Efficient", "false")
 	req.Header.Set("X-Max-Latency-Ms", "100")
 	req.Header.Set("X-Max-Power-Watts", "50")
-	req.Header.Set("X-Cache-Enabled", "yes")
-	req.Header.Set("X-Media-Type", "code")
-	req.Header.Set("X-Priority", "critical")
+	req.Header.Set("X-Cache-Enabled", strYes)
+	req.Header.Set("X-Media-Type", strCode)
+	req.Header.Set("X-Priority", strCritical)
 	req.Header.Set("X-Request-ID", "req-12345")
 	req.Header.Set("X-Deadline-Ms", "1234567890")
 	req.Header.Set("X-Custom-Key1", "value1")
@@ -358,19 +484,20 @@ func TestParseRoutingHeaders_AllHeaders(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders_MediaTypes is part of the public API.
 func TestParseRoutingHeaders_MediaTypes(t *testing.T) {
 	tests := []struct {
-		name      string
-		value     string
-		expected  backends.MediaType
+		name     string
+		value    string
+		expected backends.MediaType
 	}{
-		{"text", "text", backends.MediaTypeText},
-		{"code", "code", backends.MediaTypeCode},
-		{"image", "image", backends.MediaTypeImage},
-		{"audio", "audio", backends.MediaTypeAudio},
-		{"realtime", "realtime", backends.MediaTypeRealtime},
-		{"auto", "auto", backends.MediaTypeAuto},
-		{"uppercase", "TEXT", backends.MediaTypeText},
+		{name: strText, value: strText, expected: backends.MediaTypeText},
+		{name: strCode, value: strCode, expected: backends.MediaTypeCode},
+		{name: strImage, value: strImage, expected: backends.MediaTypeImage},
+		{name: strAudio, value: strAudio, expected: backends.MediaTypeAudio},
+		{name: strRealtime, value: strRealtime, expected: backends.MediaTypeRealtime},
+		{name: strAuto, value: strAuto, expected: backends.MediaTypeAuto},
+		{name: strUppercase, value: "TEXT", expected: backends.MediaTypeText},
 	}
 
 	for _, tt := range tests {
@@ -387,19 +514,20 @@ func TestParseRoutingHeaders_MediaTypes(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders_Priorities is part of the public API.
 func TestParseRoutingHeaders_Priorities(t *testing.T) {
 	tests := []struct {
 		name     string
 		value    string
 		expected backends.Priority
 	}{
-		{"best-effort", "best-effort", backends.PriorityBestEffort},
-		{"low", "low", backends.PriorityBestEffort},
-		{"normal", "normal", backends.PriorityNormal},
-		{"high", "high", backends.PriorityHigh},
-		{"critical", "critical", backends.PriorityCritical},
-		{"realtime", "realtime", backends.PriorityCritical},
-		{"uppercase", "HIGH", backends.PriorityHigh},
+		{name: strBestEffort, value: strBestEffort, expected: backends.PriorityBestEffort},
+		{name: strLow, value: strLow, expected: backends.PriorityBestEffort},
+		{name: strNormal, value: strNormal, expected: backends.PriorityNormal},
+		{name: strHigh, value: strHigh, expected: backends.PriorityHigh},
+		{name: strCritical, value: strCritical, expected: backends.PriorityCritical},
+		{name: strRealtime, value: strRealtime, expected: backends.PriorityCritical},
+		{name: strUppercase, value: "HIGH", expected: backends.PriorityHigh},
 	}
 
 	for _, tt := range tests {
@@ -416,10 +544,11 @@ func TestParseRoutingHeaders_Priorities(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders_AutoPriority is part of the public API.
 func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 	// Latency-critical should set critical priority
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Latency-Critical", strTrue)
 
 	annotations := ParseRoutingHeaders(req)
 
@@ -429,7 +558,7 @@ func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 
 	// Realtime media should set critical priority
 	req = httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Media-Type", "realtime")
+	req.Header.Set("X-Media-Type", strRealtime)
 
 	annotations = ParseRoutingHeaders(req)
 
@@ -439,7 +568,7 @@ func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 
 	// Audio media should set high priority
 	req = httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Media-Type", "audio")
+	req.Header.Set("X-Media-Type", strAudio)
 
 	annotations = ParseRoutingHeaders(req)
 
@@ -457,22 +586,23 @@ func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 	}
 }
 
+// TestParseRoutingHeaders_BoolParsing is part of the public API.
 func TestParseRoutingHeaders_BoolParsing(t *testing.T) {
 	tests := []struct {
 		name     string
 		value    string
 		expected bool
 	}{
-		{"true", "true", true},
-		{"1", "1", true},
-		{"yes", "yes", true},
-		{"on", "on", true},
-		{"false", "false", false},
-		{"0", "0", false},
-		{"no", "no", false},
-		{"off", "off", false},
-		{"uppercase", "TRUE", true},
-		{"whitespace", " yes ", true},
+		{name: strTrue, value: strTrue, expected: true},
+		{name: "1", value: "1", expected: true},
+		{name: strYes, value: strYes, expected: true},
+		{name: "on", value: "on", expected: true},
+		{name: "false", value: "false", expected: false},
+		{name: "0", value: "0", expected: false},
+		{name: "no", value: "no", expected: false},
+		{name: "off", value: "off", expected: false},
+		{name: strUppercase, value: "TRUE", expected: true},
+		{name: "whitespace", value: " yes ", expected: true},
 	}
 
 	for _, tt := range tests {
@@ -489,6 +619,7 @@ func TestParseRoutingHeaders_BoolParsing(t *testing.T) {
 	}
 }
 
+// TestWriteError is part of the public API.
 func TestWriteError(t *testing.T) {
 	w := httptest.NewRecorder()
 
@@ -512,25 +643,29 @@ func TestWriteError(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_ModelNotSupported is part of the public API.
 func TestHandleChatCompletion_ModelNotSupported(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "unsupported-model",
+		Model: strUnsupportedModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -541,26 +676,30 @@ func TestHandleChatCompletion_ModelNotSupported(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_GenerationError is part of the public API.
 func TestHandleChatCompletion_GenerationError(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 		generateErr:   fmt.Errorf("generation failed"),
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -571,27 +710,31 @@ func TestHandleChatCompletion_GenerationError(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_StreamingNotSupported is part of the public API.
 func TestHandleChatCompletion_StreamingNotSupported(t *testing.T) {
 	backend := &mockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		supportsModel:  true,
 		supportsStream: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model:  "test-model",
+		Model:  strTestModel,
 		Stream: true,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -602,28 +745,32 @@ func TestHandleChatCompletion_StreamingNotSupported(t *testing.T) {
 	}
 }
 
+// TestHandleChatCompletion_StreamingError is part of the public API.
 func TestHandleChatCompletion_StreamingError(t *testing.T) {
 	backend := &mockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		supportsModel:  true,
 		supportsStream: true,
 		streamErr:      fmt.Errorf("streaming failed"),
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model:  "test-model",
+		Model:  strTestModel,
 		Stream: true,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -634,6 +781,7 @@ func TestHandleChatCompletion_StreamingError(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_MethodNotAllowed is part of the public API.
 func TestHandleCompletion_MethodNotAllowed(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleCompletion(r)
@@ -648,6 +796,7 @@ func TestHandleCompletion_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_InvalidJSON is part of the public API.
 func TestHandleCompletion_InvalidJSON(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleCompletion(r)
@@ -662,15 +811,19 @@ func TestHandleCompletion_InvalidJSON(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_MissingModel is part of the public API.
 func TestHandleCompletion_MissingModel(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Prompt: "Hello",
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -681,15 +834,19 @@ func TestHandleCompletion_MissingModel(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_MissingPrompt is part of the public API.
 func TestHandleCompletion_MissingPrompt(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -700,23 +857,27 @@ func TestHandleCompletion_MissingPrompt(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_ModelNotSupported is part of the public API.
 func TestHandleCompletion_ModelNotSupported(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "unsupported-model",
-		Prompt: "Hello",
+		Model:  strUnsupportedModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -727,24 +888,28 @@ func TestHandleCompletion_ModelNotSupported(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_GenerationError is part of the public API.
 func TestHandleCompletion_GenerationError(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 		generateErr:   fmt.Errorf("generation failed"),
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -755,25 +920,29 @@ func TestHandleCompletion_GenerationError(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_StreamingNotSupported is part of the public API.
 func TestHandleCompletion_StreamingNotSupported(t *testing.T) {
 	backend := &mockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		supportsModel:  true,
 		supportsStream: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -784,26 +953,30 @@ func TestHandleCompletion_StreamingNotSupported(t *testing.T) {
 	}
 }
 
+// TestHandleCompletion_StreamingError is part of the public API.
 func TestHandleCompletion_StreamingError(t *testing.T) {
 	backend := &mockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		supportsModel:  true,
 		supportsStream: true,
 		streamErr:      fmt.Errorf("streaming failed"),
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -814,6 +987,7 @@ func TestHandleCompletion_StreamingError(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_MethodNotAllowed is part of the public API.
 func TestHandleEmbedding_MethodNotAllowed(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleEmbedding(r)
@@ -828,6 +1002,7 @@ func TestHandleEmbedding_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_InvalidJSON is part of the public API.
 func TestHandleEmbedding_InvalidJSON(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleEmbedding(r)
@@ -842,15 +1017,19 @@ func TestHandleEmbedding_InvalidJSON(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_MissingModel is part of the public API.
 func TestHandleEmbedding_MissingModel(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Input: "Hello",
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -861,15 +1040,19 @@ func TestHandleEmbedding_MissingModel(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_MissingInput is part of the public API.
 func TestHandleEmbedding_MissingInput(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
+		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -880,23 +1063,27 @@ func TestHandleEmbedding_MissingInput(t *testing.T) {
 	}
 }
 
+// TestHandleEmbedding_ModelNotSupported is part of the public API.
 func TestHandleEmbedding_ModelNotSupported(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "unsupported-model",
-		Input: "Hello",
+		Model: strUnsupportedModel,
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -907,6 +1094,7 @@ func TestHandleEmbedding_ModelNotSupported(t *testing.T) {
 	}
 }
 
+// TestHandleModels_MethodNotAllowed is part of the public API.
 func TestHandleModels_MethodNotAllowed(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	handler := HandleModels(r)
@@ -921,9 +1109,10 @@ func TestHandleModels_MethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestWriteRoutingHeaders is part of the public API.
 func TestWriteRoutingHeaders(t *testing.T) {
 	backend := &mockBackend{
-		id: "test-backend",
+		id: strTestBackend,
 	}
 
 	decision := &router.RoutingDecision{
@@ -937,7 +1126,7 @@ func TestWriteRoutingHeaders(t *testing.T) {
 	w := httptest.NewRecorder()
 	WriteRoutingHeaders(w, decision)
 
-	if w.Header().Get("X-Backend-Used") != "test-backend" {
+	if w.Header().Get("X-Backend-Used") != strTestBackend {
 		t.Errorf("Expected X-Backend-Used 'test-backend', got %s", w.Header().Get("X-Backend-Used"))
 	}
 
@@ -958,6 +1147,7 @@ func TestWriteRoutingHeaders(t *testing.T) {
 	}
 }
 
+// TestWriteRoutingHeaders_Nil is part of the public API.
 func TestWriteRoutingHeaders_Nil(t *testing.T) {
 	w := httptest.NewRecorder()
 	WriteRoutingHeaders(w, nil)
@@ -968,6 +1158,7 @@ func TestWriteRoutingHeaders_Nil(t *testing.T) {
 	}
 }
 
+// TestWriteRoutingHeaders_Minimal is part of the public API.
 func TestWriteRoutingHeaders_Minimal(t *testing.T) {
 	backend := &mockBackend{
 		id: "minimal-backend",
@@ -996,21 +1187,24 @@ func TestWriteRoutingHeaders_Minimal(t *testing.T) {
 // Test HandleEmbedding succeeds when backend supports embeddings
 func TestHandleEmbedding_BackendSupportsEmbed(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
-		Input: "Hello",
+		Model: strTestModel,
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1025,21 +1219,24 @@ func TestHandleEmbedding_BackendSupportsEmbed(t *testing.T) {
 // Test HandleEmbedding with embedding error
 func TestHandleEmbedding_EmbeddingError(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
-		Input: "Hello",
+		Model: strTestModel,
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1058,13 +1255,16 @@ func TestHandleChatCompletion_RoutingError(t *testing.T) {
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1083,11 +1283,14 @@ func TestHandleCompletion_RoutingError(t *testing.T) {
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1106,11 +1309,14 @@ func TestHandleEmbedding_RoutingError(t *testing.T) {
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
-		Input: "Hello",
+		Model: strTestModel,
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1141,7 +1347,7 @@ func TestHandleModels_EmptyBackendList(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	if resp.Object != "list" {
+	if resp.Object != strList {
 		t.Errorf("Expected object 'list', got %s", resp.Object)
 	}
 }
@@ -1151,15 +1357,15 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 	// Create a mock StreamReader
 	mockReader := &mockStreamReader{
 		chunks: []backends.StreamChunk{
-			{Token: "Hello", Done: false},
-			{Token: " world", Done: false},
+			{Token: strHello2, Done: false},
+			{Token: strWorld2, Done: false},
 			{Token: "!", Done: true},
 		},
 	}
 
 	backend := &mockBackendWithStream{
 		mockBackend: &mockBackend{
-			id:             "test-backend",
+			id:             strTestBackend,
 			supportsModel:  true,
 			supportsStream: true,
 		},
@@ -1167,19 +1373,22 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model:  "test-model",
+		Model:  strTestModel,
 		Stream: true,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1189,7 +1398,7 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 		t.Errorf("Expected status 200, got %d, body: %s", w.Code, w.Body.String())
 	}
 
-	if ct := w.Header().Get("Content-Type"); ct != "text/event-stream" {
+	if ct := w.Header().Get("Content-Type"); ct != strTextEventStream {
 		t.Errorf("Expected Content-Type 'text/event-stream', got %s", ct)
 	}
 }
@@ -1198,14 +1407,14 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 	mockReader := &mockStreamReader{
 		chunks: []backends.StreamChunk{
-			{Token: "Hello", Done: false},
-			{Token: " world", Done: true},
+			{Token: strHello2, Done: false},
+			{Token: strWorld2, Done: true},
 		},
 	}
 
 	backend := &mockBackendWithStream{
 		mockBackend: &mockBackend{
-			id:             "test-backend",
+			id:             strTestBackend,
 			supportsModel:  true,
 			supportsStream: true,
 		},
@@ -1213,17 +1422,20 @@ func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1233,7 +1445,7 @@ func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	if ct := w.Header().Get("Content-Type"); ct != "text/event-stream" {
+	if ct := w.Header().Get("Content-Type"); ct != strTextEventStream {
 		t.Errorf("Expected Content-Type 'text/event-stream', got %s", ct)
 	}
 }
@@ -1300,23 +1512,26 @@ func TestParseRoutingHeaders_NoHeadersDefaultsNormal(t *testing.T) {
 // Test response headers in successful requests
 func TestHandleChatCompletion_ResponseHeaders(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1328,7 +1543,7 @@ func TestHandleChatCompletion_ResponseHeaders(t *testing.T) {
 	}
 
 	// Check routing headers
-	if backend := w.Header().Get("X-Backend-Used"); backend != "test-backend" {
+	if backend := w.Header().Get("X-Backend-Used"); backend != strTestBackend {
 		t.Errorf("Expected X-Backend-Used 'test-backend', got %s", backend)
 	}
 }
@@ -1339,11 +1554,14 @@ func TestHandleCompletion_NoBackends(t *testing.T) {
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1361,11 +1579,14 @@ func TestHandleChatCompletion_EmptyMessageList(t *testing.T) {
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model:    "test-model",
+		Model:    strTestModel,
 		Messages: []ChatCompletionMessage{},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1382,11 +1603,14 @@ func TestHandleEmbedding_NoBackends(t *testing.T) {
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
-		Input: "Hello",
+		Model: strTestModel,
+		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1401,23 +1625,26 @@ func TestHandleEmbedding_NoBackends(t *testing.T) {
 // Test chat completion response structure
 func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1436,10 +1663,10 @@ func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 	if len(resp.Choices) == 0 {
 		t.Error("Expected at least one choice")
 	} else {
-		if resp.Choices[0].FinishReason != "stop" {
+		if resp.Choices[0].FinishReason != strStop {
 			t.Errorf("Expected finish_reason 'stop', got %s", resp.Choices[0].FinishReason)
 		}
-		if resp.Choices[0].Message.Role != "assistant" {
+		if resp.Choices[0].Message.Role != strAssistant {
 			t.Errorf("Expected role 'assistant', got %s", resp.Choices[0].Message.Role)
 		}
 	}
@@ -1456,21 +1683,24 @@ func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 // Test completion response structure
 func TestHandleCompletion_ResponseStructure(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	reqBody := CompletionRequest{
-		Model:  "test-model",
-		Prompt: "Hello",
+		Model:  strTestModel,
+		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1488,7 +1718,7 @@ func TestHandleCompletion_ResponseStructure(t *testing.T) {
 	if len(resp.Choices) == 0 {
 		t.Error("Expected at least one choice")
 	} else {
-		if resp.Choices[0].FinishReason != "stop" {
+		if resp.Choices[0].FinishReason != strStop {
 			t.Errorf("Expected finish_reason 'stop', got %s", resp.Choices[0].FinishReason)
 		}
 	}
@@ -1497,21 +1727,24 @@ func TestHandleCompletion_ResponseStructure(t *testing.T) {
 // Test embedding response structure
 func TestHandleEmbedding_ResponseStructure(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	reqBody := EmbeddingRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Input: "Hello world",
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1522,7 +1755,7 @@ func TestHandleEmbedding_ResponseStructure(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	if resp.Object != "list" {
+	if resp.Object != strList {
 		t.Errorf("Expected object 'list', got %s", resp.Object)
 	}
 
@@ -1544,6 +1777,7 @@ type mockStreamReader struct {
 	index  int
 }
 
+// Recv is part of the public API.
 func (m *mockStreamReader) Recv() (*backends.StreamChunk, error) {
 	if m.index >= len(m.chunks) {
 		return nil, fmt.Errorf("EOF")
@@ -1553,6 +1787,7 @@ func (m *mockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return &chunk, nil
 }
 
+// Close is part of the public API.
 func (m *mockStreamReader) Close() error {
 	return nil
 }
@@ -1563,7 +1798,8 @@ type mockBackendWithStream struct {
 	reader backends.StreamReader
 }
 
-func (m *mockBackendWithStream) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackendWithStream) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	if m.streamErr != nil {
 		return nil, m.streamErr
 	}
@@ -1573,23 +1809,26 @@ func (m *mockBackendWithStream) GenerateStream(ctx context.Context, req *backend
 // Test chat completion with model that doesn't support the model
 func TestHandleChatCompletion_ModelNotFound(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: false,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
 		Model: "unknown-model",
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1614,7 +1853,9 @@ func TestHandleChatCompletion_ReadBodyError(t *testing.T) {
 
 	// Use a reader that returns an error
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-	req.Body.Close() // Close body to cause read error
+	if err := req.Body.Close(); err != nil { // Close body to cause read error
+		t.Fatal(err)
+	}
 	w := httptest.NewRecorder()
 
 	handler(w, req)
@@ -1659,26 +1900,29 @@ func TestHandleEmbedding_NullInput(t *testing.T) {
 // Test multiple messages in chat completion
 func TestHandleChatCompletion_MultipleMessages(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
 	reqBody := ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "system", Content: "You are helpful"},
-			{Role: "user", Content: "Hello"},
-			{Role: "assistant", Content: "Hi there"},
-			{Role: "user", Content: "How are you?"},
+			{Role: strSystem, Content: strYouAreHelpful},
+			{Role: strUser, Content: strHello2},
+			{Role: strAssistant, Content: "Hi there"},
+			{Role: strUser, Content: "How are you?"},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1701,22 +1945,25 @@ func TestHandleChatCompletion_MultipleMessages(t *testing.T) {
 // Test completion with various prompt formats
 func TestHandleCompletion_ArrayPrompt(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
 	// Send array of prompts
 	reqBody := map[string]interface{}{
-		"model":  "test-model",
-		"prompt": []string{"Hello", "Hi"},
+		strModel: strTestModel,
+		"prompt": []string{strHello2, "Hi"},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1730,22 +1977,25 @@ func TestHandleCompletion_ArrayPrompt(t *testing.T) {
 // Test embedding with array input
 func TestHandleEmbedding_ArrayInput(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
 	// Send array of inputs
 	reqBody := map[string]interface{}{
-		"model": "test-model",
-		"input": []string{"Hello", "World"},
+		strModel: strTestModel,
+		"input":  []string{strHello2, "World"},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1766,8 +2016,8 @@ func TestHandleModels_MultipleBackends(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	handler := HandleModels(r)
 
@@ -1793,12 +2043,12 @@ func TestHandleModels_MultipleBackends(t *testing.T) {
 // Test chat completion with temperature and other parameters
 func TestHandleChatCompletion_WithParameters(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1807,16 +2057,19 @@ func TestHandleChatCompletion_WithParameters(t *testing.T) {
 	maxTokens := int32(100)
 
 	reqBody := ChatCompletionRequest{
-		Model:       "test-model",
+		Model:       strTestModel,
 		Temperature: &temp,
 		TopP:        &topP,
 		MaxTokens:   &maxTokens,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Hello"},
+			{Role: strUser, Content: strHello2},
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1830,12 +2083,12 @@ func TestHandleChatCompletion_WithParameters(t *testing.T) {
 // Test completion with temperature and parameters
 func TestHandleCompletion_WithParameters(t *testing.T) {
 	backend := &mockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		supportsModel: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -1843,13 +2096,16 @@ func TestHandleCompletion_WithParameters(t *testing.T) {
 	topP := float32(0.8)
 
 	reqBody := CompletionRequest{
-		Model:       "test-model",
-		Prompt:      "Hello",
+		Model:       strTestModel,
+		Prompt:      strHello2,
 		Temperature: &temp,
 		TopP:        &topP,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1863,7 +2119,7 @@ func TestHandleCompletion_WithParameters(t *testing.T) {
 // Test WriteRoutingHeaders with all fields populated
 func TestWriteRoutingHeaders_AllFields(t *testing.T) {
 	backend := &mockBackend{
-		id: "test-backend",
+		id: strTestBackend,
 	}
 
 	decision := &router.RoutingDecision{
@@ -1877,7 +2133,7 @@ func TestWriteRoutingHeaders_AllFields(t *testing.T) {
 	w := httptest.NewRecorder()
 	WriteRoutingHeaders(w, decision)
 
-	if w.Header().Get("X-Backend-Used") != "test-backend" {
+	if w.Header().Get("X-Backend-Used") != strTestBackend {
 		t.Error("Missing X-Backend-Used header")
 	}
 	if w.Header().Get("X-Routing-Reason") != "lowest latency" {
@@ -1897,7 +2153,7 @@ func TestWriteRoutingHeaders_AllFields(t *testing.T) {
 // Test WriteRoutingHeaders with zero values
 func TestWriteRoutingHeaders_ZeroValues(t *testing.T) {
 	backend := &mockBackend{
-		id: "test-backend",
+		id: strTestBackend,
 	}
 
 	decision := &router.RoutingDecision{
@@ -1911,7 +2167,7 @@ func TestWriteRoutingHeaders_ZeroValues(t *testing.T) {
 	WriteRoutingHeaders(w, decision)
 
 	// Should have backend header
-	if w.Header().Get("X-Backend-Used") != "test-backend" {
+	if w.Header().Get("X-Backend-Used") != strTestBackend {
 		t.Error("Missing X-Backend-Used header")
 	}
 

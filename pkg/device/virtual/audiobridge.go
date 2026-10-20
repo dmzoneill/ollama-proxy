@@ -1,43 +1,37 @@
+// Package virtual creates virtual audio and video devices.
 package virtual
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"sync"
 
 	"go.uber.org/zap"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 	"github.com/daoneill/ollama-proxy/pkg/pipeline"
 )
 
 // AudioBridge bridges physical microphone to virtual speaker via processing pipeline
 type AudioBridge struct {
-	// Devices
-	physicalMic    string // Physical microphone device name
-	virtualSource  string // Virtual microphone name (what Chrome selects)
-	virtualSink    string // Virtual speaker name (what proxy writes to)
-
-	// Pipeline
-	pipeline     *pipeline.Pipeline
-	pipelineExec *pipeline.PipelineExecutor
-	backend      backends.Backend
-
-	// Configuration
-	inputSampleRate  int
-	inputChannels    int
-	outputSampleRate int
+	ctx              context.Context
+	backend          backends.Backend
+	pipeline         *pipeline.Pipeline
+	pipelineExec     *pipeline.Executor
+	logger           *zap.Logger
+	cancel           context.CancelFunc
+	virtualSource    string
+	virtualSink      string
+	physicalMic      string
+	wg               sync.WaitGroup
 	outputChannels   int
-
-	// Lifecycle
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	running  bool
-	mu       sync.RWMutex
-	logger   *zap.Logger
+	outputSampleRate int
+	inputChannels    int
+	inputSampleRate  int
+	mu               sync.RWMutex
+	running          bool
 }
 
 // NewAudioBridge creates a new audio bridge
@@ -46,7 +40,7 @@ func NewAudioBridge(
 	virtualSource string,
 	virtualSink string,
 	pipeline *pipeline.Pipeline,
-	pipelineExec *pipeline.PipelineExecutor,
+	pipelineExec *pipeline.Executor,
 	backend backends.Backend,
 	logger *zap.Logger,
 ) *AudioBridge {
@@ -123,13 +117,17 @@ func (ab *AudioBridge) processMicInput() {
 	// Use parec to capture audio from physical microphone
 	// parec is PulseAudio's recording utility
 	args := []string{
-		"--device", ab.physicalMic,
-		"--format", "s16le",
-		"--rate", fmt.Sprintf("%d", ab.inputSampleRate),
-		"--channels", fmt.Sprintf("%d", ab.inputChannels),
+		strDevice, ab.physicalMic,
+		strFormat, strS16le,
+		strRate, fmt.Sprintf("%d", ab.inputSampleRate),
+		strChannels, fmt.Sprintf("%d", ab.inputChannels),
 	}
 
-	cmd := exec.CommandContext(ab.ctx, "parec", args...)
+	cmd, err := cmdexec.CommandContext(ab.ctx, "parec", args...)
+	if err != nil {
+		ab.logger.Error("Failed to create parec command", zap.Error(err))
+		return
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -151,8 +149,8 @@ func (ab *AudioBridge) processMicInput() {
 	for {
 		select {
 		case <-ab.ctx.Done():
-			ab.logger.Info("Microphone processing stopped (context cancelled)")
-			cmd.Process.Kill()
+			ab.logger.Info("Microphone processing stopped (context canceled)")
+			warnErr("failed to kill parec", cmd.Process.Kill())
 			return
 		default:
 		}
@@ -181,7 +179,7 @@ func (ab *AudioBridge) processMicInput() {
 		}
 
 		// Write processed audio to virtual speaker
-		if processedAudio != nil && len(processedAudio) > 0 {
+		if len(processedAudio) > 0 {
 			if err := ab.writeToVirtualSpeaker(processedAudio); err != nil {
 				ab.logger.Error("Failed to write to virtual speaker", zap.Error(err))
 			}
@@ -227,13 +225,16 @@ func (ab *AudioBridge) writeToVirtualSpeaker(audioData []byte) error {
 	// Use pacat to play audio to virtual speaker
 	// pacat is PulseAudio's playback utility
 	args := []string{
-		"--device", ab.virtualSink,
-		"--format", "s16le",
-		"--rate", fmt.Sprintf("%d", ab.outputSampleRate),
-		"--channels", fmt.Sprintf("%d", ab.outputChannels),
+		strDevice, ab.virtualSink,
+		strFormat, strS16le,
+		strRate, fmt.Sprintf("%d", ab.outputSampleRate),
+		strChannels, fmt.Sprintf("%d", ab.outputChannels),
 	}
 
-	cmd := exec.CommandContext(ab.ctx, "pacat", args...)
+	cmd, err := cmdexec.CommandContext(ab.ctx, "pacat", args...)
+	if err != nil {
+		return fmt.Errorf("failed to create pacat command: %w", err)
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -241,16 +242,20 @@ func (ab *AudioBridge) writeToVirtualSpeaker(audioData []byte) error {
 	}
 
 	if err := cmd.Start(); err != nil {
+		warnErr("failed to close pacat stdin", stdin.Close())
 		return fmt.Errorf("failed to start pacat: %w", err)
 	}
 
 	// Write audio data
 	if _, err := stdin.Write(audioData); err != nil {
+		warnErr("failed to close pacat stdin", stdin.Close())
 		return fmt.Errorf("failed to write audio data: %w", err)
 	}
 
 	// Close stdin to signal end of data
-	stdin.Close()
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close pacat stdin: %w", err)
+	}
 
 	// Wait for pacat to finish
 	if err := cmd.Wait(); err != nil {

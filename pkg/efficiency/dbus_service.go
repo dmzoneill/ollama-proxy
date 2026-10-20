@@ -1,3 +1,4 @@
+// Package efficiency selects power-aware routing modes.
 package efficiency
 
 import (
@@ -18,12 +19,12 @@ const (
 // DBusService exposes efficiency mode control via D-Bus
 type DBusService struct {
 	conn    *dbus.Conn
-	manager *EfficiencyManager
+	manager *Manager
 	props   *prop.Properties
 }
 
 // NewDBusService creates a D-Bus service for mode control
-func NewDBusService(manager *EfficiencyManager) (*DBusService, error) {
+func NewDBusService(manager *Manager) (*DBusService, error) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		// Try session bus if system bus fails
@@ -70,32 +71,32 @@ func (ds *DBusService) Start() error {
 					{
 						Name: "SetMode",
 						Args: []introspect.Arg{
-							{Name: "mode", Type: "s", Direction: "in"},
+							{Name: strMode, Type: "s", Direction: "in"},
 						},
 					},
 					{
 						Name: "GetMode",
 						Args: []introspect.Arg{
-							{Name: "mode", Type: "s", Direction: "out"},
+							{Name: strMode, Type: "s", Direction: strOut},
 						},
 					},
 					{
 						Name: "GetEffectiveMode",
 						Args: []introspect.Arg{
-							{Name: "mode", Type: "s", Direction: "out"},
+							{Name: strMode, Type: "s", Direction: strOut},
 						},
 					},
 					{
 						Name: "ListModes",
 						Args: []introspect.Arg{
-							{Name: "modes", Type: "as", Direction: "out"},
+							{Name: "modes", Type: "as", Direction: strOut},
 						},
 					},
 					{
 						Name: "GetModeInfo",
 						Args: []introspect.Arg{
-							{Name: "mode", Type: "s", Direction: "in"},
-							{Name: "info", Type: "a{sv}", Direction: "out"},
+							{Name: strMode, Type: "s", Direction: "in"},
+							{Name: "info", Type: "a{sv}", Direction: strOut},
 						},
 					},
 				},
@@ -110,12 +111,12 @@ func (ds *DBusService) Start() error {
 				},
 				Properties: []introspect.Property{
 					{
-						Name:   "CurrentMode",
+						Name:   strCurrentMode,
 						Type:   "s",
 						Access: "readwrite",
 					},
 					{
-						Name:   "EffectiveMode",
+						Name:   strEffectiveMode,
 						Type:   "s",
 						Access: "read",
 					},
@@ -129,8 +130,11 @@ func (ds *DBusService) Start() error {
 		return fmt.Errorf("failed to export introspection: %w", err)
 	}
 
-	// Setup properties
-	ds.props, _ = prop.Export(ds.conn, dbusPath, ds.makePropertyMap())
+	props, err := prop.Export(ds.conn, dbusPath, ds.makePropertyMap())
+	if err != nil {
+		return fmt.Errorf("failed to export properties: %w", err)
+	}
+	ds.props = props
 
 	logging.Logger.Info("D-Bus Efficiency service started",
 		zap.String("interface", dbusInterface),
@@ -142,19 +146,19 @@ func (ds *DBusService) Start() error {
 func (ds *DBusService) SetMode(mode string) *dbus.Error {
 	oldMode := ds.manager.GetMode()
 
-	var newMode EfficiencyMode
+	var newMode Mode
 	switch mode {
-	case "Performance":
+	case strPerformance:
 		newMode = ModePerformance
-	case "Balanced":
+	case strBalanced:
 		newMode = ModeBalanced
-	case "Efficiency":
+	case strEfficiency:
 		newMode = ModeEfficiency
-	case "Quiet":
+	case strQuiet:
 		newMode = ModeQuiet
-	case "Auto":
+	case strAuto:
 		newMode = ModeAuto
-	case "UltraEfficiency":
+	case strUltraEfficiency:
 		newMode = ModeUltraEfficiency
 	default:
 		return dbus.MakeFailedError(fmt.Errorf("unknown mode: %s", mode))
@@ -162,15 +166,11 @@ func (ds *DBusService) SetMode(mode string) *dbus.Error {
 
 	ds.manager.SetMode(newMode)
 
-	// Emit signal
-	if ds.conn != nil {
-		ds.conn.Emit(dbusPath, dbusInterface+".ModeChanged",
-			oldMode.String(), newMode.String())
-	}
+	emitModeChanged(ds.conn, oldMode.String(), newMode.String())
 
 	// Update property
 	if ds.props != nil {
-		ds.props.SetMust(dbusInterface, "CurrentMode", newMode.String())
+		ds.props.SetMust(dbusInterface, strCurrentMode, newMode.String())
 	}
 
 	logging.Logger.Info("Efficiency mode changed",
@@ -205,20 +205,20 @@ func (ds *DBusService) ListModes() ([]string, *dbus.Error) {
 
 // GetModeInfo returns information about a mode (D-Bus method)
 func (ds *DBusService) GetModeInfo(modeName string) (map[string]dbus.Variant, *dbus.Error) {
-	var mode EfficiencyMode
+	var mode Mode
 
 	switch modeName {
-	case "Performance":
+	case strPerformance:
 		mode = ModePerformance
-	case "Balanced":
+	case strBalanced:
 		mode = ModeBalanced
-	case "Efficiency":
+	case strEfficiency:
 		mode = ModeEfficiency
-	case "Quiet":
+	case strQuiet:
 		mode = ModeQuiet
-	case "Auto":
+	case strAuto:
 		mode = ModeAuto
-	case "UltraEfficiency":
+	case strUltraEfficiency:
 		mode = ModeUltraEfficiency
 	default:
 		return nil, dbus.MakeFailedError(fmt.Errorf("unknown mode: %s", modeName))
@@ -242,15 +242,19 @@ func (ds *DBusService) GetModeInfo(modeName string) (map[string]dbus.Variant, *d
 func (ds *DBusService) makePropertyMap() map[string]map[string]*prop.Prop {
 	return map[string]map[string]*prop.Prop{
 		dbusInterface: {
-			"CurrentMode": {
+			strCurrentMode: {
 				Value:    ds.manager.GetMode().String(),
 				Writable: true,
 				Emit:     prop.EmitTrue,
 				Callback: func(c *prop.Change) *dbus.Error {
-					return ds.SetMode(c.Value.(string))
+					mode, ok := c.Value.(string)
+					if !ok {
+						return dbus.MakeFailedError(fmt.Errorf("current mode must be a string"))
+					}
+					return ds.SetMode(mode)
 				},
 			},
-			"EffectiveMode": {
+			strEffectiveMode: {
 				Value:    ds.manager.GetEffectiveMode().String(),
 				Writable: false,
 				Emit:     prop.EmitTrue,
@@ -261,7 +265,19 @@ func (ds *DBusService) makePropertyMap() map[string]map[string]*prop.Prop {
 
 // Stop stops the D-Bus service
 func (ds *DBusService) Stop() {
-	if ds.conn != nil {
-		ds.conn.Close()
+	if ds.conn == nil {
+		return
+	}
+	if err := ds.conn.Close(); err != nil {
+		logging.Warn("failed to close dbus connection", zap.Error(err))
+	}
+}
+
+func emitModeChanged(conn *dbus.Conn, oldMode, newMode string) {
+	if conn == nil {
+		return
+	}
+	if err := conn.Emit(dbusPath, dbusInterface+".ModeChanged", oldMode, newMode); err != nil {
+		logging.Warn("failed to emit dbus signal", zap.String("signal", dbusInterface+".ModeChanged"), zap.Error(err))
 	}
 }

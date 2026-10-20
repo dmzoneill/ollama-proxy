@@ -1,0 +1,28 @@
+package openai
+
+const (
+	strChoices             = "choices"
+	strCloseResponseBody   = "close response body"
+	strClaude3Opus         = "claude-3-opus"
+	strContent             = "content"
+	strData                = "data"
+	strGpt                 = "gpt-*"
+	strGpt35Turbo          = "gpt-3.5-turbo"
+	strGpt4                = "gpt-4*"
+	strGpt42               = "gpt-4"
+	strGpt4Turbo           = "gpt-4-turbo"
+	strHello               = "Hello"
+	strMessage             = "message"
+	strO1                  = "o1-*"
+	strOpenai              = "openai"
+	strOpenaiTest          = "openai-test"
+	strResponse            = "response"
+	strTest                = "test"
+	strTest2               = "Test"
+	strTestAPIKey          = "test-api-key"
+	strTestKey             = "test-key"
+	strTestOpenAI          = "Test OpenAI"
+	strTextEmbeddingAda002 = "text-embedding-ada-002"
+	strTotalTokens         = "total_tokens"
+	strUsage               = "usage"
+)

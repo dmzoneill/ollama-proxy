@@ -29,7 +29,7 @@ func TestNewThermalService(t *testing.T) {
 	}
 
 	// Test with valid monitor
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -61,7 +61,7 @@ func TestNewThermalService(t *testing.T) {
 
 // TestGetThermalStateMethod tests the GetThermalState D-Bus method with empty states
 func TestGetThermalStateMethod(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -97,7 +97,7 @@ func TestGetThermalStateMethod(t *testing.T) {
 		t.Errorf("Expected average_fan_speed 0 with no states, got %v", avgFan)
 	}
 
-	throttling := state["throttling"].Value().(bool)
+	throttling := state[strThrottling].Value().(bool)
 	if throttling {
 		t.Error("Expected throttling false with no states")
 	}
@@ -110,7 +110,7 @@ func TestGetThermalStateMethod(t *testing.T) {
 
 // TestGetHardwareStateNotFound tests GetHardwareState with non-existent hardware
 func TestGetHardwareStateNotFound(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -133,7 +133,7 @@ func TestGetHardwareStateNotFound(t *testing.T) {
 
 // TestGetThermalThresholdsMethod tests the GetThermalThresholds D-Bus method
 func TestGetThermalThresholdsMethod(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -180,7 +180,7 @@ func TestGetThermalThresholdsMethod(t *testing.T) {
 
 // TestIsThrottlingMethod tests the IsThrottling D-Bus method
 func TestIsThrottlingMethod(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -206,7 +206,7 @@ func TestIsThrottlingMethod(t *testing.T) {
 
 // TestEmitMethodsWithNilConn tests emit methods handle nil connection gracefully
 func TestEmitMethodsWithNilConn(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -224,17 +224,17 @@ func TestEmitMethodsWithNilConn(t *testing.T) {
 
 	// All these should not panic
 	tests := []struct {
-		name string
 		fn   func()
+		name string
 	}{
-		{"EmitThermalWarning", func() { svc.EmitThermalWarning("cpu", 85.0) }},
-		{"EmitThrottlingStarted", func() { svc.EmitThrottlingStarted("gpu") }},
-		{"EmitThrottlingStopped", func() { svc.EmitThrottlingStopped("gpu") }},
-		{"UpdatePropertiesThermal", func() { svc.UpdateProperties() }},
+		{name: "EmitThermalWarning", fn: func() { svc.EmitThermalWarning("cpu", 85.0) }},
+		{name: "EmitThrottlingStarted", fn: func() { svc.EmitThrottlingStarted("gpu") }},
+		{name: "EmitThrottlingStopped", fn: func() { svc.EmitThrottlingStopped("gpu") }},
+		{name: "UpdatePropertiesThermal", fn: func() { svc.UpdateProperties() }},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Should not panic
 			tt.fn()
 		})
@@ -243,7 +243,7 @@ func TestEmitMethodsWithNilConn(t *testing.T) {
 
 // TestMakePropertyMapThermal tests the property map creation
 func TestMakePropertyMapThermal(t *testing.T) {
-	config := &thermal.ThermalConfig{
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -312,8 +312,8 @@ func TestMakePropertyMapThermal(t *testing.T) {
 }
 
 // TestUpdatePropertiesThermal tests the UpdateProperties method
-func TestUpdatePropertiesThermal(t *testing.T) {
-	config := &thermal.ThermalConfig{
+func TestUpdatePropertiesThermal(_ *testing.T) {
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -333,8 +333,8 @@ func TestUpdatePropertiesThermal(t *testing.T) {
 }
 
 // TestStopThermalService tests the Stop method
-func TestStopThermalService(t *testing.T) {
-	config := &thermal.ThermalConfig{
+func TestStopThermalService(_ *testing.T) {
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -354,8 +354,8 @@ func TestStopThermalService(t *testing.T) {
 }
 
 // TestEmitThrottlingStoppedCallsIsThrottling tests that EmitThrottlingStopped calls IsThrottling
-func TestEmitThrottlingStoppedCallsIsThrottling(t *testing.T) {
-	config := &thermal.ThermalConfig{
+func TestEmitThrottlingStoppedCallsIsThrottling(_ *testing.T) {
+	config := &thermal.Config{
 		TempWarning:  75.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,

@@ -1,3 +1,4 @@
+// Package auth authenticates HTTP requests to the proxy.
 package auth
 
 import (
@@ -8,8 +9,8 @@ import (
 
 // Config holds authentication configuration
 type Config struct {
+	APIKeys map[string]APIKeyInfo
 	Enabled bool
-	APIKeys map[string]APIKeyInfo // key -> metadata
 }
 
 // APIKeyInfo holds metadata about an API key

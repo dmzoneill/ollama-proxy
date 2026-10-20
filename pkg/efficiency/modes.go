@@ -7,12 +7,13 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
-// EfficiencyMode defines AI inference behavior profile
-type EfficiencyMode int
+// Mode defines AI inference behavior profile
+type Mode int
 
+// ModePerformance is an exported const.
 const (
 	// ModePerformance - Maximum speed, ignore power/thermal
-	ModePerformance EfficiencyMode = iota
+	ModePerformance Mode = iota
 
 	// ModeBalanced - Smart routing based on complexity
 	ModeBalanced
@@ -31,60 +32,43 @@ const (
 )
 
 // String returns mode name
-func (m EfficiencyMode) String() string {
+func (m Mode) String() string {
 	switch m {
 	case ModePerformance:
-		return "Performance"
+		return strPerformance
 	case ModeBalanced:
-		return "Balanced"
+		return strBalanced
 	case ModeEfficiency:
-		return "Efficiency"
+		return strEfficiency
 	case ModeQuiet:
-		return "Quiet"
+		return strQuiet
 	case ModeAuto:
-		return "Auto"
+		return strAuto
 	case ModeUltraEfficiency:
-		return "Ultra Efficiency"
+		return strUltraEfficiency2
 	default:
-		return "Unknown"
+		return strUnknown
 	}
 }
 
 // ModeConfig defines behavior for each mode
 type ModeConfig struct {
-	// Preferred backends in priority order
-	PreferredBackends []string
-
-	// Maximum power draw (watts)
-	MaxPowerWatts int
-
-	// Maximum fan speed (percentage)
-	MaxFanPercent int
-
-	// Maximum temperature (Celsius)
-	MaxTempCelsius float64
-
-	// Allow overriding user's critical flag
-	OverrideCriticalFlag bool
-
-	// Throttle latency-critical requests
+	Description             string
+	Icon                    string
+	PreferredBackends       []string
+	MaxPowerWatts           int
+	MaxFanPercent           int
+	MaxTempCelsius          float64
+	OverrideCriticalFlag    bool
 	ThrottleLatencyCritical bool
-
-	// Prefer classification to save power
-	UseClassification bool
-
-	// Description for UI
-	Description string
-
-	// Icon name for UI
-	Icon string
+	UseClassification       bool
 }
 
 // GetModeConfig returns configuration for a mode
-func GetModeConfig(mode EfficiencyMode) *ModeConfig {
-	configs := map[EfficiencyMode]*ModeConfig{
+func GetModeConfig(mode Mode) *ModeConfig {
+	configs := map[Mode]*ModeConfig{
 		ModePerformance: {
-			PreferredBackends:       []string{"ollama-nvidia", "ollama-igpu", "ollama-npu"},
+			PreferredBackends:       []string{strOllamaNvidia, strOllamaIgpu, strOllamaNpu},
 			MaxPowerWatts:           999,
 			MaxFanPercent:           100,
 			MaxTempCelsius:          90.0,
@@ -96,7 +80,7 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 		},
 
 		ModeBalanced: {
-			PreferredBackends:       []string{"ollama-igpu", "ollama-nvidia", "ollama-npu"},
+			PreferredBackends:       []string{strOllamaIgpu, strOllamaNvidia, strOllamaNpu},
 			MaxPowerWatts:           60,
 			MaxFanPercent:           80,
 			MaxTempCelsius:          85.0,
@@ -108,7 +92,7 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 		},
 
 		ModeEfficiency: {
-			PreferredBackends:       []string{"ollama-npu", "ollama-igpu", "ollama-nvidia"},
+			PreferredBackends:       []string{strOllamaNpu, strOllamaIgpu, strOllamaNvidia},
 			MaxPowerWatts:           15,
 			MaxFanPercent:           60,
 			MaxTempCelsius:          75.0,
@@ -120,7 +104,7 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 		},
 
 		ModeQuiet: {
-			PreferredBackends:       []string{"ollama-npu", "ollama-igpu"},
+			PreferredBackends:       []string{strOllamaNpu, strOllamaIgpu},
 			MaxPowerWatts:           15,
 			MaxFanPercent:           40,
 			MaxTempCelsius:          70.0,
@@ -132,7 +116,7 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 		},
 
 		ModeAuto: {
-			PreferredBackends:       []string{"ollama-igpu", "ollama-npu", "ollama-nvidia"},
+			PreferredBackends:       []string{strOllamaIgpu, strOllamaNpu, strOllamaNvidia},
 			MaxPowerWatts:           0, // Determined automatically
 			MaxFanPercent:           0, // Determined automatically
 			MaxTempCelsius:          85.0,
@@ -144,7 +128,7 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 		},
 
 		ModeUltraEfficiency: {
-			PreferredBackends:       []string{"ollama-npu"},
+			PreferredBackends:       []string{strOllamaNpu},
 			MaxPowerWatts:           5,
 			MaxFanPercent:           30,
 			MaxTempCelsius:          65.0,
@@ -163,42 +147,40 @@ func GetModeConfig(mode EfficiencyMode) *ModeConfig {
 	return configs[ModeBalanced] // Default
 }
 
-// EfficiencyManager manages efficiency mode
-type EfficiencyManager struct {
-	mu   sync.RWMutex
-	mode EfficiencyMode
-
-	// System state for Auto mode
+// Manager manages efficiency mode
+type Manager struct {
+	mode           Mode
 	batteryPercent int
-	onBattery      bool
 	avgTemp        float64
 	avgFanSpeed    int
+	mu             sync.RWMutex
+	onBattery      bool
 	quietHours     bool
 }
 
 // NewEfficiencyManager creates manager with default mode
-func NewEfficiencyManager(defaultMode EfficiencyMode) *EfficiencyManager {
-	return &EfficiencyManager{
+func NewEfficiencyManager(defaultMode Mode) *Manager {
+	return &Manager{
 		mode: defaultMode,
 	}
 }
 
 // SetMode changes efficiency mode
-func (em *EfficiencyManager) SetMode(mode EfficiencyMode) {
+func (em *Manager) SetMode(mode Mode) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
 	em.mode = mode
 }
 
 // GetMode returns current mode
-func (em *EfficiencyManager) GetMode() EfficiencyMode {
+func (em *Manager) GetMode() Mode {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 	return em.mode
 }
 
 // GetEffectiveMode returns the actual mode to use (resolves Auto)
-func (em *EfficiencyManager) GetEffectiveMode() EfficiencyMode {
+func (em *Manager) GetEffectiveMode() Mode {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 
@@ -211,7 +193,7 @@ func (em *EfficiencyManager) GetEffectiveMode() EfficiencyMode {
 }
 
 // determineAutoMode intelligently selects mode based on conditions
-func (em *EfficiencyManager) determineAutoMode() EfficiencyMode {
+func (em *Manager) determineAutoMode() Mode {
 	// Critical battery - Ultra Efficiency
 	if em.onBattery && em.batteryPercent < 20 {
 		return ModeUltraEfficiency
@@ -247,7 +229,7 @@ func (em *EfficiencyManager) determineAutoMode() EfficiencyMode {
 }
 
 // UpdateSystemState updates state for Auto mode decisions
-func (em *EfficiencyManager) UpdateSystemState(
+func (em *Manager) UpdateSystemState(
 	batteryPercent int,
 	onBattery bool,
 	avgTemp float64,
@@ -265,7 +247,7 @@ func (em *EfficiencyManager) UpdateSystemState(
 }
 
 // ApplyModeToAnnotations modifies annotations based on current mode
-func (em *EfficiencyManager) ApplyModeToAnnotations(annotations *backends.Annotations) {
+func (em *Manager) ApplyModeToAnnotations(annotations *backends.Annotations) {
 	effectiveMode := em.GetEffectiveMode()
 	config := GetModeConfig(effectiveMode)
 
@@ -276,11 +258,9 @@ func (em *EfficiencyManager) ApplyModeToAnnotations(annotations *backends.Annota
 		}
 	}
 
-	// Override critical flag if configured
-	if config.OverrideCriticalFlag && annotations.LatencyCritical {
-		// Mode will determine if we respect this
-		// Actually throttled in router
-	}
+	// Latency-critical overrides are applied by the router when the mode
+	// sets OverrideCriticalFlag. ApplyModeToAnnotations only records the
+	// efficiency preference below.
 
 	// Apply efficiency preference
 	switch effectiveMode {
@@ -303,7 +283,7 @@ func (em *EfficiencyManager) ApplyModeToAnnotations(annotations *backends.Annota
 }
 
 // ShouldUseBackend checks if backend is allowed in current mode
-func (em *EfficiencyManager) ShouldUseBackend(backendID string, temp float64, fanSpeed int) bool {
+func (em *Manager) ShouldUseBackend(_ string, temp float64, fanSpeed int) bool {
 	effectiveMode := em.GetEffectiveMode()
 	config := GetModeConfig(effectiveMode)
 
@@ -321,14 +301,14 @@ func (em *EfficiencyManager) ShouldUseBackend(backendID string, temp float64, fa
 }
 
 // GetPreferredBackends returns backend preference for current mode
-func (em *EfficiencyManager) GetPreferredBackends() []string {
+func (em *Manager) GetPreferredBackends() []string {
 	effectiveMode := em.GetEffectiveMode()
 	config := GetModeConfig(effectiveMode)
 	return config.PreferredBackends
 }
 
 // GetModeDescription returns human-readable mode info
-func (em *EfficiencyManager) GetModeDescription() string {
+func (em *Manager) GetModeDescription() string {
 	mode := em.GetMode()
 	effectiveMode := em.GetEffectiveMode()
 	config := GetModeConfig(effectiveMode)
@@ -343,14 +323,14 @@ func (em *EfficiencyManager) GetModeDescription() string {
 // SystemState represents current system state
 type SystemState struct {
 	BatteryPercent int
-	OnBattery      bool
 	AvgTemp        float64
 	AvgFanSpeed    int
+	OnBattery      bool
 	QuietHours     bool
 }
 
 // GetSystemState returns current system state
-func (em *EfficiencyManager) GetSystemState() SystemState {
+func (em *Manager) GetSystemState() SystemState {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 
@@ -364,8 +344,8 @@ func (em *EfficiencyManager) GetSystemState() SystemState {
 }
 
 // AllModes returns all available modes for UI
-func AllModes() []EfficiencyMode {
-	return []EfficiencyMode{
+func AllModes() []Mode {
+	return []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,

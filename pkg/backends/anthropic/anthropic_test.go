@@ -11,6 +11,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestNewAnthropicBackend is part of the public API.
 func TestNewAnthropicBackend(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -21,8 +22,8 @@ func TestNewAnthropicBackend(t *testing.T) {
 			name: "valid config with API key",
 			cfg: Config{
 				BackendConfig: backends.BackendConfig{
-					ID:   "anthropic-test",
-					Name: "Test Anthropic",
+					ID:   strAnthropicTest,
+					Name: strTestAnthropic,
 				},
 				APIKey: "test-api-key",
 			},
@@ -32,8 +33,8 @@ func TestNewAnthropicBackend(t *testing.T) {
 			name: "missing API key",
 			cfg: Config{
 				BackendConfig: backends.BackendConfig{
-					ID:   "anthropic-test",
-					Name: "Test Anthropic",
+					ID:   strAnthropicTest,
+					Name: strTestAnthropic,
 				},
 			},
 			wantErr: true,
@@ -42,8 +43,8 @@ func TestNewAnthropicBackend(t *testing.T) {
 			name: "custom endpoint",
 			cfg: Config{
 				BackendConfig: backends.BackendConfig{
-					ID:   "anthropic-test",
-					Name: "Test Anthropic",
+					ID:   strAnthropicTest,
+					Name: strTestAnthropic,
 				},
 				APIKey:   "test-api-key",
 				Endpoint: "https://custom.api.com/v1",
@@ -66,7 +67,7 @@ func TestNewAnthropicBackend(t *testing.T) {
 				if backend.ID() != tt.cfg.ID {
 					t.Errorf("ID() = %v, want %v", backend.ID(), tt.cfg.ID)
 				}
-				if backend.Type() != "anthropic" {
+				if backend.Type() != strAnthropic {
 					t.Errorf("Type() = %v, want anthropic", backend.Type())
 				}
 				if tt.cfg.Endpoint != "" && backend.endpoint != tt.cfg.Endpoint {
@@ -77,11 +78,12 @@ func TestNewAnthropicBackend(t *testing.T) {
 	}
 }
 
+// TestNewAnthropicBackend_APIKeyEnv is part of the public API.
 func TestNewAnthropicBackend_APIKeyEnv(t *testing.T) {
 	// Set environment variable
 	envKey := "TEST_ANTHROPIC_API_KEY"
-	expectedKey := "env-test-key-12345"
-	t.Setenv(envKey, expectedKey)
+	wantFromEnv := "anthropic-env-sample"
+	t.Setenv(envKey, wantFromEnv)
 
 	cfg := Config{
 		BackendConfig: backends.BackendConfig{
@@ -100,11 +102,12 @@ func TestNewAnthropicBackend_APIKeyEnv(t *testing.T) {
 		t.Fatal("Expected backend to be created, got nil")
 	}
 
-	if backend.apiKey != expectedKey {
-		t.Errorf("apiKey = %v, want %v", backend.apiKey, expectedKey)
+	if backend.apiKey != wantFromEnv {
+		t.Errorf("apiKey = %v, want %v", backend.apiKey, wantFromEnv)
 	}
 }
 
+// TestAnthropicBackend_Getters is part of the public API.
 func TestAnthropicBackend_Getters(t *testing.T) {
 	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
@@ -114,7 +117,7 @@ func TestAnthropicBackend_Getters(t *testing.T) {
 			AvgLatencyMs: 500,
 			Priority:     5,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create backend: %v", err)
@@ -123,7 +126,7 @@ func TestAnthropicBackend_Getters(t *testing.T) {
 	if backend.ID() != "test-anthropic" {
 		t.Errorf("ID() = %v, want test-anthropic", backend.ID())
 	}
-	if backend.Type() != "anthropic" {
+	if backend.Type() != strAnthropic {
 		t.Errorf("Type() = %v, want anthropic", backend.Type())
 	}
 	if backend.Name() != "Test Claude" {
@@ -140,14 +143,18 @@ func TestAnthropicBackend_Getters(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_Capabilities is part of the public API.
 func TestAnthropicBackend_Capabilities(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !backend.SupportsGenerate() {
 		t.Error("SupportsGenerate() should return true")
@@ -160,17 +167,21 @@ func TestAnthropicBackend_Capabilities(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_HealthCheck is part of the public API.
 func TestAnthropicBackend_HealthCheck(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	err := backend.HealthCheck(ctx)
+	err = backend.HealthCheck(ctx)
 	if err != nil {
 		t.Errorf("HealthCheck() error = %v", err)
 	}
@@ -179,10 +190,11 @@ func TestAnthropicBackend_HealthCheck(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_HealthCheckNoAPIKey is part of the public API.
 func TestAnthropicBackend_HealthCheckNoAPIKey(t *testing.T) {
 	// Create backend with empty API key
-	backend := &AnthropicBackend{
-		id:     "test",
+	backend := &Backend{
+		id:     strTest,
 		apiKey: "", // Empty API key
 	}
 
@@ -199,14 +211,18 @@ func TestAnthropicBackend_HealthCheckNoAPIKey(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_ListModels is part of the public API.
 func TestAnthropicBackend_ListModels(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	models, err := backend.ListModels(ctx)
@@ -220,7 +236,7 @@ func TestAnthropicBackend_ListModels(t *testing.T) {
 	// Check for expected Claude models
 	foundSonnet := false
 	for _, model := range models {
-		if model == "claude-3-5-sonnet-20241022" {
+		if model == strClaude35Sonnet20241022 {
 			foundSonnet = true
 			break
 		}
@@ -230,6 +246,7 @@ func TestAnthropicBackend_ListModels(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_SupportsModel is part of the public API.
 func TestAnthropicBackend_SupportsModel(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -240,7 +257,7 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 		{
 			name:      "default supports claude models",
 			modelCap:  nil,
-			modelName: "claude-3-opus-20240229",
+			modelName: strClaude3Opus20240229,
 			want:      true,
 		},
 		{
@@ -252,9 +269,9 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 		{
 			name: "with supported patterns",
 			modelCap: &backends.ModelCapability{
-				SupportedModelPatterns: []string{"claude-3-*"},
+				SupportedModelPatterns: []string{strClaude3},
 			},
-			modelName: "claude-3-opus-20240229",
+			modelName: strClaude3Opus20240229,
 			want:      true,
 		},
 		{
@@ -262,7 +279,7 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 			modelCap: &backends.ModelCapability{
 				ExcludedPatterns: []string{"*opus*"},
 			},
-			modelName: "claude-3-opus-20240229",
+			modelName: strClaude3Opus20240229,
 			want:      false,
 		},
 		{
@@ -277,7 +294,7 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 		{
 			name: "no pattern match returns false",
 			modelCap: &backends.ModelCapability{
-				SupportedModelPatterns: []string{"claude-3-*", "claude-2-*"},
+				SupportedModelPatterns: []string{strClaude3, strClaude2},
 			},
 			modelName: "claude-instant-1",
 			want:      false,
@@ -286,14 +303,17 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
-					ID:              "test",
-					Name:            "Test",
+					ID:              strTest,
+					Name:            strTest2,
 					ModelCapability: tt.modelCap,
 				},
-				APIKey: "test-key",
+				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if got := backend.SupportsModel(tt.modelName); got != tt.want {
 				t.Errorf("SupportsModel(%v) = %v, want %v", tt.modelName, got, tt.want)
@@ -302,6 +322,7 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_Generate is part of the public API.
 func TestAnthropicBackend_Generate(t *testing.T) {
 	// Create mock server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +330,7 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.Header.Get("x-api-key") != "test-key" {
+		if r.Header.Get("x-api-key") != strTestKey {
 			t.Errorf("Expected x-api-key header to be test-key, got %s", r.Header.Get("x-api-key"))
 		}
 		if r.Header.Get("anthropic-version") != "2023-06-01" {
@@ -318,7 +339,7 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 
 		// Send mock response
 		response := map[string]interface{}{
-			"content": []map[string]string{
+			strContent: []map[string]string{
 				{"text": "Hello! This is a test response."},
 			},
 			"usage": map[string]int{
@@ -326,23 +347,29 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 				"output_tokens": 20,
 			},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey:   "test-key",
+		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
-		Model:  "claude-3-5-sonnet-20241022",
-		Prompt: "Hello",
+		Model:  strClaude35Sonnet20241022,
+		Prompt: strHello,
 		Options: &backends.GenerationOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
@@ -366,43 +393,54 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_GenerateError is part of the public API.
 func TestAnthropicBackend_GenerateError(t *testing.T) {
 	// Create mock server that returns error
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": {"message": "Invalid request"}}`))
+		if _, err := w.Write([]byte(`{"error": {"message": "Invalid request"}}`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey:   "test-key",
+		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
-		Model:  "claude-3-5-sonnet-20241022",
-		Prompt: "Hello",
+		Model:  strClaude35Sonnet20241022,
+		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
 		t.Error("Generate() should return error for bad request")
 	}
 }
 
+// TestAnthropicBackend_UpdateMetrics is part of the public API.
 func TestAnthropicBackend_UpdateMetrics(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with successful request
 	backend.UpdateMetrics(100, true)
@@ -433,30 +471,38 @@ func TestAnthropicBackend_UpdateMetrics(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_Embed is part of the public API.
 func TestAnthropicBackend_Embed(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	_, err := backend.Embed(ctx, &backends.EmbedRequest{})
+	_, err = backend.Embed(ctx, &backends.EmbedRequest{})
 	if err == nil {
 		t.Error("Embed() should return error as it's not supported")
 	}
 }
 
+// TestAnthropicBackend_StartStop is part of the public API.
 func TestAnthropicBackend_StartStop(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 
@@ -469,19 +515,20 @@ func TestAnthropicBackend_StartStop(t *testing.T) {
 	}
 }
 
+// TestMatchesPattern is part of the public API.
 func TestMatchesPattern(t *testing.T) {
 	tests := []struct {
 		modelName string
 		pattern   string
 		want      bool
 	}{
-		{"claude-3-opus", "*", true},
-		{"claude-3-opus", "claude-3-opus", true},
-		{"claude-3-opus", "claude-*", true},
-		{"claude-3-opus", "*-opus", true},
-		{"claude-3-opus", "*-3-*", true},
-		{"claude-3-opus", "gpt-*", false},
-		{"claude-3-opus", "*gpt*", false},
+		{modelName: strClaude3Opus, pattern: "*", want: true},
+		{modelName: strClaude3Opus, pattern: strClaude3Opus, want: true},
+		{modelName: strClaude3Opus, pattern: strClaude, want: true},
+		{modelName: strClaude3Opus, pattern: "*-opus", want: true},
+		{modelName: strClaude3Opus, pattern: "*-3-*", want: true},
+		{modelName: strClaude3Opus, pattern: "gpt-*", want: false},
+		{modelName: strClaude3Opus, pattern: "*gpt*", want: false},
 	}
 
 	for _, tt := range tests {
@@ -493,20 +540,25 @@ func TestMatchesPattern(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_GetMaxModelSizeGB is part of the public API.
 func TestAnthropicBackend_GetMaxModelSizeGB(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if size := backend.GetMaxModelSizeGB(); size != 999 {
 		t.Errorf("GetMaxModelSizeGB() = %v, want 999", size)
 	}
 }
 
+// TestAnthropicBackend_GetSupportedModelPatterns is part of the public API.
 func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -516,27 +568,30 @@ func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 		{
 			name:     "default patterns",
 			modelCap: nil,
-			want:     []string{"claude-*"},
+			want:     []string{strClaude},
 		},
 		{
 			name: "custom patterns",
 			modelCap: &backends.ModelCapability{
-				SupportedModelPatterns: []string{"claude-3-*", "claude-2-*"},
+				SupportedModelPatterns: []string{strClaude3, strClaude2},
 			},
-			want: []string{"claude-3-*", "claude-2-*"},
+			want: []string{strClaude3, strClaude2},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
-					ID:              "test",
-					Name:            "Test",
+					ID:              strTest,
+					Name:            strTest2,
 					ModelCapability: tt.modelCap,
 				},
-				APIKey: "test-key",
+				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			patterns := backend.GetSupportedModelPatterns()
 			if len(patterns) != len(tt.want) {
@@ -546,10 +601,11 @@ func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_GetPreferredModels is part of the public API.
 func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 	tests := []struct {
-		name     string
 		modelCap *backends.ModelCapability
+		name     string
 		wantLen  int
 	}{
 		{
@@ -560,7 +616,7 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 		{
 			name: "custom preferred models",
 			modelCap: &backends.ModelCapability{
-				PreferredModels: []string{"claude-3-5-sonnet-20241022"},
+				PreferredModels: []string{strClaude35Sonnet20241022},
 			},
 			wantLen: 1,
 		},
@@ -568,14 +624,17 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
-					ID:              "test",
-					Name:            "Test",
+					ID:              strTest,
+					Name:            strTest2,
 					ModelCapability: tt.modelCap,
 				},
-				APIKey: "test-key",
+				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			models := backend.GetPreferredModels()
 			if len(models) != tt.wantLen {
@@ -585,15 +644,19 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_AvgLatencyMs is part of the public API.
 func TestAnthropicBackend_AvgLatencyMs(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:           "test",
-			Name:         "Test",
+			ID:           strTest,
+			Name:         strTest2,
 			AvgLatencyMs: 500,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Before any requests, should return configured average
 	if lat := backend.AvgLatencyMs(); lat != 500 {
@@ -607,14 +670,18 @@ func TestAnthropicBackend_AvgLatencyMs(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_ConcurrentMetricsUpdate is part of the public API.
 func TestAnthropicBackend_ConcurrentMetricsUpdate(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Simulate concurrent metric updates
 	done := make(chan bool)
@@ -638,55 +705,66 @@ func TestAnthropicBackend_ConcurrentMetricsUpdate(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_ContextCancellation is part of the public API.
 func TestAnthropicBackend_ContextCancellation(t *testing.T) {
 	// Create a slow mock server
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"content": []map[string]string{{"text": "response"}},
-		})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			strContent: []map[string]string{{"text": "response"}},
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey:   "test-key",
+		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
 	req := &backends.GenerateRequest{
-		Model:  "claude-3-5-sonnet-20241022",
-		Prompt: "Hello",
+		Model:  strClaude35Sonnet20241022,
+		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
-		t.Error("Generate() should return error when context is cancelled")
+		t.Error("Generate() should return error when context is canceled")
 	}
 }
 
+// TestAnthropicBackend_GenerateStream_NotImplemented is part of the public API.
 func TestAnthropicBackend_GenerateStream_NotImplemented(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
-			ID:   "test",
-			Name: "Test",
+			ID:   strTest,
+			Name: strTest2,
 		},
-		APIKey: "test-key",
+		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
-		Model:  "claude-3-5-sonnet-20241022",
-		Prompt: "Hello",
+		Model:  strClaude35Sonnet20241022,
+		Prompt: strHello,
 	}
 
-	_, err := backend.GenerateStream(ctx, req)
+	_, err = backend.GenerateStream(ctx, req)
 	if err == nil {
 		t.Error("GenerateStream should return error (not implemented)")
 	}
@@ -696,6 +774,7 @@ func TestAnthropicBackend_GenerateStream_NotImplemented(t *testing.T) {
 	}
 }
 
+// TestAnthropicBackend_matchesPattern_EdgeCases is part of the public API.
 func TestAnthropicBackend_matchesPattern_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -705,19 +784,19 @@ func TestAnthropicBackend_matchesPattern_EdgeCases(t *testing.T) {
 	}{
 		{
 			name:      "Universal wildcard",
-			modelName: "claude-3-opus",
+			modelName: strClaude3Opus,
 			pattern:   "*",
 			expected:  true,
 		},
 		{
 			name:      "Exact match",
-			modelName: "claude-3-opus",
-			pattern:   "claude-3-opus",
+			modelName: strClaude3Opus,
+			pattern:   strClaude3Opus,
 			expected:  true,
 		},
 		{
 			name:      "Prefix wildcard match",
-			modelName: "claude-3-opus-20240229",
+			modelName: strClaude3Opus20240229,
 			pattern:   "claude-3-opus*",
 			expected:  true,
 		},
@@ -747,7 +826,7 @@ func TestAnthropicBackend_matchesPattern_EdgeCases(t *testing.T) {
 		},
 		{
 			name:      "Substring wildcard no match",
-			modelName: "claude-3-opus-20240229",
+			modelName: strClaude3Opus20240229,
 			pattern:   "*sonnet*",
 			expected:  false,
 		},

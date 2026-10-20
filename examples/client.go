@@ -1,5 +1,6 @@
 //go:build ignore
 
+// Package main is an example client for the proxy.
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Package policy enforces power and tier routing policy.
 package policy
 
 import (
@@ -9,6 +10,7 @@ import (
 // UserTier defines user access level
 type UserTier int
 
+// TierFree is an exported const.
 const (
 	TierFree UserTier = iota
 	TierBasic
@@ -18,39 +20,26 @@ const (
 
 // PowerBudget tracks power/compute usage
 type PowerBudget struct {
-	mu sync.RWMutex
-
-	// Energy budget (Watt-hours per day)
-	dailyBudgetWh    float64
-	usedTodayWh      float64
-	lastResetTime    time.Time
-
-	// Request quotas per backend
-	nvidiaQuotaPerHour   int
-	nvidiaUsedThisHour   int
-	lastNvidiaResetTime  time.Time
-
-	// Cost tracking (if using cloud backends)
-	dailyBudgetUSD float64
-	usedTodayUSD   float64
+	lastResetTime       time.Time
+	lastNvidiaResetTime time.Time
+	dailyBudgetWh       float64
+	usedTodayWh         float64
+	nvidiaQuotaPerHour  int
+	nvidiaUsedThisHour  int
+	dailyBudgetUSD      float64
+	usedTodayUSD        float64
+	mu                  sync.RWMutex
 }
 
 // Policy enforces usage policies
 type Policy struct {
-	mu sync.RWMutex
-
-	// User budgets
-	budgets map[string]*PowerBudget // userID -> budget
-
-	// System-wide limits
-	batteryMode       bool
+	budgets           map[string]*PowerBudget
 	batteryPercentage int
-
-	// Time-based policies
-	quietHours      bool // 10pm-6am
-	peakHours       bool // 9am-5pm weekdays
+	mu                sync.RWMutex
+	batteryMode       bool
 }
 
+// NewPolicy constructs a policy.
 func NewPolicy() *Policy {
 	return &Policy{
 		budgets: make(map[string]*PowerBudget),
@@ -74,19 +63,19 @@ func (p *Policy) GetOrCreateBudget(userID string, tier UserTier) *PowerBudget {
 
 	switch tier {
 	case TierFree:
-		budget.dailyBudgetWh = 10.0         // ~10 Wh/day (333 NPU requests or 18 NVIDIA)
-		budget.nvidiaQuotaPerHour = 5       // 5 NVIDIA requests/hour
+		budget.dailyBudgetWh = 10.0   // ~10 Wh/day (333 NPU requests or 18 NVIDIA)
+		budget.nvidiaQuotaPerHour = 5 // 5 NVIDIA requests/hour
 		budget.dailyBudgetUSD = 0.0
 	case TierBasic:
-		budget.dailyBudgetWh = 50.0         // 50 Wh/day
+		budget.dailyBudgetWh = 50.0 // 50 Wh/day
 		budget.nvidiaQuotaPerHour = 20
 		budget.dailyBudgetUSD = 1.0
 	case TierPremium:
-		budget.dailyBudgetWh = 200.0        // 200 Wh/day
+		budget.dailyBudgetWh = 200.0 // 200 Wh/day
 		budget.nvidiaQuotaPerHour = 100
 		budget.dailyBudgetUSD = 10.0
 	case TierEnterprise:
-		budget.dailyBudgetWh = 1000.0       // Unlimited effectively
+		budget.dailyBudgetWh = 1000.0 // Unlimited effectively
 		budget.nvidiaQuotaPerHour = 1000
 		budget.dailyBudgetUSD = 100.0
 	}
@@ -114,7 +103,7 @@ func (b *PowerBudget) CheckAndDeduct(backendID string, estimatedEnergyWh float64
 	}
 
 	// Check NVIDIA quota
-	if backendID == "ollama-nvidia" {
+	if backendID == strOllamaNvidia {
 		if b.nvidiaUsedThisHour >= b.nvidiaQuotaPerHour {
 			return fmt.Errorf("NVIDIA quota exceeded (%d/%d per hour). Try Intel GPU or NPU, or wait %v",
 				b.nvidiaUsedThisHour, b.nvidiaQuotaPerHour,
@@ -129,7 +118,7 @@ func (b *PowerBudget) CheckAndDeduct(backendID string, estimatedEnergyWh float64
 	}
 
 	// Deduct from quotas
-	if backendID == "ollama-nvidia" {
+	if backendID == strOllamaNvidia {
 		b.nvidiaUsedThisHour++
 	}
 	b.usedTodayWh += estimatedEnergyWh
@@ -138,7 +127,7 @@ func (b *PowerBudget) CheckAndDeduct(backendID string, estimatedEnergyWh float64
 }
 
 // SuggestAlternative suggests cheaper alternative if quota exceeded
-func (b *PowerBudget) SuggestAlternative(requestedBackend string) string {
+func (b *PowerBudget) SuggestAlternative(_ string) string {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -146,20 +135,20 @@ func (b *PowerBudget) SuggestAlternative(requestedBackend string) string {
 
 	// If very low budget remaining, suggest NPU
 	if remaining < 1.0 {
-		return "ollama-npu"
+		return strOllamaNpu
 	}
 
 	// If moderate budget, suggest Intel GPU
 	if remaining < 10.0 {
-		return "ollama-igpu"
+		return strOllamaIgpu
 	}
 
 	// Otherwise allow NVIDIA if quota available
 	if b.nvidiaUsedThisHour < b.nvidiaQuotaPerHour {
-		return "ollama-nvidia"
+		return strOllamaNvidia
 	}
 
-	return "ollama-igpu"
+	return strOllamaIgpu
 }
 
 // SetBatteryMode sets system battery state
@@ -239,18 +228,18 @@ func (p *Policy) GetRecommendedBackend(
 
 	// Map backends to power
 	backendPower := map[string]int{
-		"ollama-npu":    3,
-		"ollama-igpu":   12,
-		"ollama-nvidia": 55,
-		"ollama-cpu":    28,
+		strOllamaNpu:    3,
+		strOllamaIgpu:   12,
+		strOllamaNvidia: 55,
+		strOllamaCPU:    28,
 	}
 
 	if backendPower[requestedBackend] > maxPower {
 		// Downgrade to fit power budget
 		if maxPower >= 12 {
-			return "ollama-igpu", fmt.Errorf("battery low, downgraded from %s to igpu", requestedBackend)
+			return strOllamaIgpu, fmt.Errorf("battery low, downgraded from %s to igpu", requestedBackend)
 		}
-		return "ollama-npu", fmt.Errorf("battery critical, downgraded from %s to npu", requestedBackend)
+		return strOllamaNpu, fmt.Errorf("battery critical, downgraded from %s to npu", requestedBackend)
 	}
 
 	return requestedBackend, nil
@@ -265,15 +254,15 @@ func estimateEnergy(backend string, estimatedTokens int) float64 {
 	}
 
 	characteristics := map[string]backendChar{
-		"ollama-npu":    {tokensPerSec: 10, powerWatts: 3},
-		"ollama-igpu":   {tokensPerSec: 22, powerWatts: 12},
-		"ollama-nvidia": {tokensPerSec: 65, powerWatts: 55},
-		"ollama-cpu":    {tokensPerSec: 6, powerWatts: 28},
+		strOllamaNpu:    {tokensPerSec: 10, powerWatts: 3},
+		strOllamaIgpu:   {tokensPerSec: 22, powerWatts: 12},
+		strOllamaNvidia: {tokensPerSec: 65, powerWatts: 55},
+		strOllamaCPU:    {tokensPerSec: 6, powerWatts: 28},
 	}
 
 	char := characteristics[backend]
 	if char.tokensPerSec == 0 {
-		char = characteristics["ollama-igpu"] // Default
+		char = characteristics[strOllamaIgpu] // Default
 	}
 
 	// Calculate time needed

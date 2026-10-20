@@ -6,112 +6,211 @@ import (
 	"io"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/router"
 )
 
 // mockBackend implements the backends.Backend interface for testing
 type mockBackend struct {
-	id                    string
-	name                  string
-	backendType           string
-	hardware              string
-	healthy               bool
-	powerWatts            float64
-	avgLatencyMs          int32
-	priority              int
-	supportsGenerate      bool
-	supportsStream        bool
-	supportsEmbed         bool
-	maxModelSizeGB        int
-	supportedPatterns     []string
-	preferredModels       []string
-	metrics               *backends.BackendMetrics
-	models                []string
-	modelsErr             error
+	modelsErr         error
+	metrics           *backends.BackendMetrics
+	name              string
+	backendType       string
+	hardware          string
+	id                string
+	models            []string
+	preferredModels   []string
+	supportedPatterns []string
+	priority          int
+	powerWatts        float64
+	maxModelSizeGB    int
+	avgLatencyMs      int32
+	healthy           bool
+	supportsEmbed     bool
+	supportsStream    bool
+	supportsGenerate  bool
 }
 
-func (m *mockBackend) ID() string                               { return m.id }
-func (m *mockBackend) Type() string                             { return m.backendType }
-func (m *mockBackend) Name() string                             { return m.name }
-func (m *mockBackend) Hardware() string                         { return m.hardware }
-func (m *mockBackend) IsHealthy() bool                          { return m.healthy }
-func (m *mockBackend) HealthCheck(ctx context.Context) error    { return nil }
-func (m *mockBackend) PowerWatts() float64                      { return m.powerWatts }
-func (m *mockBackend) AvgLatencyMs() int32                      { return m.avgLatencyMs }
-func (m *mockBackend) Priority() int                            { return m.priority }
-func (m *mockBackend) SupportsGenerate() bool                   { return m.supportsGenerate }
-func (m *mockBackend) SupportsStream() bool                     { return m.supportsStream }
-func (m *mockBackend) SupportsEmbed() bool                      { return m.supportsEmbed }
-func (m *mockBackend) GetMaxModelSizeGB() int                   { return m.maxModelSizeGB }
-func (m *mockBackend) GetSupportedModelPatterns() []string      { return m.supportedPatterns }
-func (m *mockBackend) GetPreferredModels() []string             { return m.preferredModels }
-func (m *mockBackend) GetMetrics() *backends.BackendMetrics     { return m.metrics }
-func (m *mockBackend) SupportsModel(modelName string) bool      { return true }
-func (m *mockBackend) UpdateMetrics(latencyMs int32, success bool) {}
-func (m *mockBackend) Start(ctx context.Context) error          { return nil }
-func (m *mockBackend) Stop(ctx context.Context) error           { return nil }
+// ID is part of the public API.
+func (m *mockBackend) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *mockBackend) Type() string { return m.backendType }
+
+// Name is part of the public API.
+func (m *mockBackend) Name() string { return m.name }
+
+// Hardware is part of the public API.
+func (m *mockBackend) Hardware() string { return m.hardware }
+
+// IsHealthy reports whether the condition holds.
+func (m *mockBackend) IsHealthy() bool { return m.healthy }
+
+// HealthCheck is part of the public API.
+func (m *mockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// PowerWatts is part of the public API.
+func (m *mockBackend) PowerWatts() float64 { return m.powerWatts }
+
+// AvgLatencyMs is part of the public API.
+func (m *mockBackend) AvgLatencyMs() int32 { return m.avgLatencyMs }
+
+// Priority is part of the public API.
+func (m *mockBackend) Priority() int { return m.priority }
+
+// SupportsGenerate is part of the public API.
+func (m *mockBackend) SupportsGenerate() bool { return m.supportsGenerate }
+
+// SupportsStream is part of the public API.
+func (m *mockBackend) SupportsStream() bool { return m.supportsStream }
+
+// SupportsEmbed is part of the public API.
+func (m *mockBackend) SupportsEmbed() bool { return m.supportsEmbed }
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *mockBackend) GetMaxModelSizeGB() int { return m.maxModelSizeGB }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *mockBackend) GetSupportedModelPatterns() []string { return m.supportedPatterns }
+
+// GetPreferredModels is part of the public API.
+func (m *mockBackend) GetPreferredModels() []string { return m.preferredModels }
+
+// GetMetrics is part of the public API.
+func (m *mockBackend) GetMetrics() *backends.BackendMetrics { return m.metrics }
+
+// SupportsModel is part of the public API.
+func (m *mockBackend) SupportsModel(_ string) bool { return true }
+
+// UpdateMetrics is part of the public API.
+func (m *mockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// Start is part of the public API.
+func (m *mockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *mockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *mockBackend) SupportsAudioToText() bool { return false }
-func (m *mockBackend) SupportsTextToAudio() bool { return false }
-func (m *mockBackend) SupportsImageToText() bool { return false }
-func (m *mockBackend) SupportsTextToImage() bool { return false }
-func (m *mockBackend) SupportsVideoToText() bool { return false }
-func (m *mockBackend) SupportsTextToVideo() bool { return false }
-func (m *mockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
 
-func (m *mockBackend) ListModels(ctx context.Context) ([]string, error) {
+// SupportsTextToAudio is part of the public API.
+func (m *mockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *mockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *mockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *mockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *mockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *mockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *mockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *mockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *mockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *mockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *mockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *mockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *mockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *mockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *mockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *mockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ListModels is part of the public API.
+func (m *mockBackend) ListModels(_ context.Context) ([]string, error) {
 	if m.modelsErr != nil {
 		return nil, m.modelsErr
 	}
 	return m.models, nil
 }
 
-func (m *mockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// Generate is part of the public API.
+func (m *mockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *mockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return nil, nil
 }
 
 // TestBackendInfo tests the BackendInfo structure
 func TestBackendInfo(t *testing.T) {
 	info := BackendInfo{
-		ID:           "test-backend",
-		Name:         "Test Backend",
-		Type:         "ollama",
-		Hardware:     "npu",
+		ID:           strTestBackend,
+		Name:         strTestBackend2,
+		Type:         strOllama,
+		Hardware:     strNpu,
 		Healthy:      true,
 		PowerWatts:   15.5,
 		AvgLatencyMs: 100,
 	}
 
-	if info.ID != "test-backend" {
+	if info.ID != strTestBackend {
 		t.Errorf("Expected ID 'test-backend', got '%s'", info.ID)
 	}
-	if info.Name != "Test Backend" {
+	if info.Name != strTestBackend2 {
 		t.Errorf("Expected Name 'Test Backend', got '%s'", info.Name)
 	}
-	if info.Type != "ollama" {
+	if info.Type != strOllama {
 		t.Errorf("Expected Type 'ollama', got '%s'", info.Type)
 	}
-	if info.Hardware != "npu" {
+	if info.Hardware != strNpu {
 		t.Errorf("Expected Hardware 'npu', got '%s'", info.Hardware)
 	}
 	if !info.Healthy {
@@ -171,22 +270,22 @@ func TestNewBackendsService(t *testing.T) {
 // TestListBackendsMethod tests the ListBackends D-Bus method
 func TestListBackendsMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{
-		DefaultBackendID: "backend1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	})
 
 	// Register mock backends
 	backend1 := &mockBackend{
-		id:           "backend1",
+		id:           strBackend1,
 		name:         "Backend 1",
-		backendType:  "ollama",
-		hardware:     "npu",
+		backendType:  strOllama,
+		hardware:     strNpu,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 50,
 	}
 	backend2 := &mockBackend{
-		id:           "backend2",
+		id:           strBackend2,
 		name:         "Backend 2",
 		backendType:  "openai",
 		hardware:     "cloud",
@@ -195,8 +294,8 @@ func TestListBackendsMethod(t *testing.T) {
 		avgLatencyMs: 200,
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	// Create service without D-Bus connection (just for method testing)
 	svc := &BackendsService{
@@ -217,15 +316,15 @@ func TestListBackendsMethod(t *testing.T) {
 	// Find backend1 in results
 	var found1, found2 bool
 	for _, b := range backends {
-		if b.ID == "backend1" {
+		if b.ID == strBackend1 {
 			found1 = true
 			if b.Name != "Backend 1" {
 				t.Errorf("Expected Name 'Backend 1', got '%s'", b.Name)
 			}
-			if b.Type != "ollama" {
+			if b.Type != strOllama {
 				t.Errorf("Expected Type 'ollama', got '%s'", b.Type)
 			}
-			if b.Hardware != "npu" {
+			if b.Hardware != strNpu {
 				t.Errorf("Expected Hardware 'npu', got '%s'", b.Hardware)
 			}
 			if !b.Healthy {
@@ -238,7 +337,7 @@ func TestListBackendsMethod(t *testing.T) {
 				t.Errorf("Expected AvgLatencyMs 50, got %d", b.AvgLatencyMs)
 			}
 		}
-		if b.ID == "backend2" {
+		if b.ID == strBackend2 {
 			found2 = true
 			if b.Healthy {
 				t.Error("Expected backend2 to be unhealthy")
@@ -259,10 +358,10 @@ func TestGetBackendDetailsMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	backend := &mockBackend{
-		id:                "test-backend",
-		name:              "Test Backend",
-		backendType:       "ollama",
-		hardware:          "npu",
+		id:                strTestBackend,
+		name:              strTestBackend2,
+		backendType:       strOllama,
+		hardware:          strNpu,
 		healthy:           true,
 		powerWatts:        15.5,
 		avgLatencyMs:      100,
@@ -272,17 +371,17 @@ func TestGetBackendDetailsMethod(t *testing.T) {
 		supportsEmbed:     false,
 		maxModelSizeGB:    8,
 		supportedPatterns: []string{"llama*", "mistral*"},
-		preferredModels:   []string{"llama3:8b", "mistral:7b"},
+		preferredModels:   []string{strLlama38b, strMistral7b},
 	}
 
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
 	}
 
 	// Test successful case
-	details, dbusErr := svc.GetBackendDetails("test-backend")
+	details, dbusErr := svc.GetBackendDetails(strTestBackend)
 
 	if dbusErr != nil {
 		t.Fatalf("Expected no D-Bus error, got %v", dbusErr)
@@ -293,17 +392,17 @@ func TestGetBackendDetailsMethod(t *testing.T) {
 	}
 
 	// Verify all fields
-	if details["id"].Value().(string) != "test-backend" {
+	if details["id"].Value().(string) != strTestBackend {
 		t.Errorf("Expected id 'test-backend', got '%v'", details["id"].Value())
 	}
-	if details["name"].Value().(string) != "Test Backend" {
+	if details["name"].Value().(string) != strTestBackend2 {
 		t.Errorf("Expected name 'Test Backend', got '%v'", details["name"].Value())
 	}
-	if details["type"].Value().(string) != "ollama" {
+	if details["type"].Value().(string) != strOllama {
 		t.Errorf("Expected type 'ollama', got '%v'", details["type"].Value())
 	}
-	if details["hardware"].Value().(string) != "npu" {
-		t.Errorf("Expected hardware 'npu', got '%v'", details["hardware"].Value())
+	if details[strHardware].Value().(string) != strNpu {
+		t.Errorf("Expected hardware 'npu', got '%v'", details[strHardware].Value())
 	}
 	if details["healthy"].Value().(bool) != true {
 		t.Errorf("Expected healthy true, got %v", details["healthy"].Value())
@@ -339,28 +438,28 @@ func TestGetBackendMetricsMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	metrics := &backends.BackendMetrics{
-		RequestCount:      100,
-		SuccessCount:      95,
-		ErrorCount:        5,
-		TotalLatencyMs:    10000,
-		AvgLatencyMs:      100,
-		ErrorRate:         0.05,
-		LoadedModels:      []string{"llama3:8b", "mistral:7b"},
+		RequestCount:   100,
+		SuccessCount:   95,
+		ErrorCount:     5,
+		TotalLatencyMs: 10000,
+		AvgLatencyMs:   100,
+		ErrorRate:      0.05,
+		LoadedModels:   []string{strLlama38b, strMistral7b},
 	}
 
 	backend := &mockBackend{
-		id:      "test-backend",
+		id:      strTestBackend,
 		metrics: metrics,
 	}
 
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
 	}
 
 	// Test successful case
-	result, dbusErr := svc.GetBackendMetrics("test-backend")
+	result, dbusErr := svc.GetBackendMetrics(strTestBackend)
 
 	if dbusErr != nil {
 		t.Fatalf("Expected no D-Bus error, got %v", dbusErr)
@@ -403,19 +502,19 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	backend := &mockBackend{
-		id:              "test-backend",
-		models:          []string{"llama3:8b", "mistral:7b", "codellama:13b"},
-		preferredModels: []string{"llama3:8b"},
+		id:              strTestBackend,
+		models:          []string{strLlama38b, strMistral7b, "codellama:13b"},
+		preferredModels: []string{strLlama38b},
 	}
 
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
 	}
 
 	// Test successful case
-	models, dbusErr := svc.GetSupportedModels("test-backend")
+	models, dbusErr := svc.GetSupportedModels(strTestBackend)
 
 	if dbusErr != nil {
 		t.Fatalf("Expected no D-Bus error, got %v", dbusErr)
@@ -426,8 +525,8 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 	}
 
 	expectedModels := map[string]bool{
-		"llama3:8b":     true,
-		"mistral:7b":    true,
+		strLlama38b:     true,
+		strMistral7b:    true,
 		"codellama:13b": true,
 	}
 
@@ -443,11 +542,11 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 		modelsErr:       io.ErrUnexpectedEOF,
 		preferredModels: []string{"fallback:model"},
 	}
-	r.RegisterBackend(backendWithError)
+	testutil.Check(t, r.RegisterBackend(backendWithError))
 
 	models, dbusErr = svc.GetSupportedModels("error-backend")
-	if dbusErr != nil {
-		t.Fatalf("Expected no D-Bus error (should fallback), got %v", dbusErr)
+	if dbusErr == nil {
+		t.Fatal("Expected D-Bus error when listing models fails")
 	}
 
 	if len(models) != 1 || models[0] != "fallback:model" {
@@ -466,16 +565,16 @@ func TestRefreshBackendStatusMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	backend1 := &mockBackend{
-		id:      "backend1",
+		id:      strBackend1,
 		healthy: true,
 	}
 	backend2 := &mockBackend{
-		id:      "backend2",
+		id:      strBackend2,
 		healthy: false,
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	svc := &BackendsService{
 		router: r,
@@ -496,13 +595,13 @@ func TestRefreshBackendStatusMethod(t *testing.T) {
 func TestMakePropertyMap(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
-	backend1 := &mockBackend{id: "backend1", healthy: true}
-	backend2 := &mockBackend{id: "backend2", healthy: false}
-	backend3 := &mockBackend{id: "backend3", healthy: true}
+	backend1 := &mockBackend{id: strBackend1, healthy: true}
+	backend2 := &mockBackend{id: strBackend2, healthy: false}
+	backend3 := &mockBackend{id: strBackend3, healthy: true}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
-	r.RegisterBackend(backend3)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
+	testutil.Check(t, r.RegisterBackend(backend3))
 
 	svc := &BackendsService{
 		router: r,
@@ -549,11 +648,11 @@ func TestMakePropertyMap(t *testing.T) {
 func TestUpdateProperties(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
-	backend1 := &mockBackend{id: "backend1", healthy: true}
-	backend2 := &mockBackend{id: "backend2", healthy: true}
+	backend1 := &mockBackend{id: strBackend1, healthy: true}
+	backend2 := &mockBackend{id: strBackend2, healthy: true}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	svc := &BackendsService{
 		router: r,
@@ -571,7 +670,7 @@ func TestUpdateProperties(t *testing.T) {
 }
 
 // TestStopService tests the Stop method
-func TestStopService(t *testing.T) {
+func TestStopService(_ *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	svc := &BackendsService{

@@ -1,3 +1,4 @@
+// Package server implements the proxy RPC service.
 package server
 
 import (
@@ -10,6 +11,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 	"github.com/daoneill/ollama-proxy/pkg/pipeline"
 	"github.com/daoneill/ollama-proxy/pkg/router"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"go.uber.org/zap"
 )
 
@@ -18,8 +20,8 @@ type ComputeServer struct {
 	pb.UnimplementedComputeServiceServer
 	router           *router.Router
 	forwardingRouter *router.ForwardingRouter
-	pipelineExecutor *pipeline.PipelineExecutor
-	pipelineLoader   *pipeline.PipelineLoader
+	pipelineExecutor *pipeline.Executor
+	pipelineLoader   *pipeline.Loader
 }
 
 // NewComputeServer creates a new gRPC server
@@ -35,7 +37,7 @@ func (s *ComputeServer) SetForwardingRouter(fr *router.ForwardingRouter) {
 }
 
 // SetPipelineExecutor sets the pipeline executor (optional)
-func (s *ComputeServer) SetPipelineExecutor(pe *pipeline.PipelineExecutor, pl *pipeline.PipelineLoader) {
+func (s *ComputeServer) SetPipelineExecutor(pe *pipeline.Executor, pl *pipeline.Loader) {
 	s.pipelineExecutor = pe
 	s.pipelineLoader = pl
 }
@@ -217,7 +219,11 @@ func (s *ComputeServer) GenerateStream(req *pb.GenerateRequest, stream pb.Comput
 		)
 		return fmt.Errorf("streaming failed: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			logging.Warn("failed to close generate stream", zap.Error(err))
+		}
+	}()
 
 	// Send first message with backend info
 	firstChunk := true
@@ -287,25 +293,28 @@ func (s *ComputeServer) Embed(ctx context.Context, req *pb.EmbedRequest) (*pb.Em
 	}
 
 	return &pb.EmbedResponse{
-		Embedding: backendResp.Embedding,
+		Embedding:   backendResp.Embedding,
 		BackendUsed: decision.Backend.ID(),
 		Routing: &pb.RoutingMetadata{
-			Backend:               decision.Backend.ID(),
-			Reason:                decision.Reason,
-			EstimatedPowerWatts:   float32(decision.EstimatedPowerW),
-			EstimatedLatencyMs:    decision.EstimatedLatencyMs,
-			Alternatives:          decision.Alternatives,
+			Backend:             decision.Backend.ID(),
+			Reason:              decision.Reason,
+			EstimatedPowerWatts: float32(decision.EstimatedPowerW),
+			EstimatedLatencyMs:  decision.EstimatedLatencyMs,
+			Alternatives:        decision.Alternatives,
 		},
 	}, nil
 }
 
 // ListBackends returns available backends and their status
-func (s *ComputeServer) ListBackends(ctx context.Context, req *pb.ListBackendsRequest) (*pb.ListBackendsResponse, error) {
+func (s *ComputeServer) ListBackends(ctx context.Context, _ *pb.ListBackendsRequest) (*pb.ListBackendsResponse, error) {
 	backends := s.router.ListBackends()
 
 	pbBackends := make([]*pb.BackendInfo, 0, len(backends))
 	for _, backend := range backends {
-		models, _ := backend.ListModels(ctx)
+		models, err := backend.ListModels(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list models for %s: %w", backend.ID(), err)
+		}
 		metrics := backend.GetMetrics()
 
 		pbBackends = append(pbBackends, &pb.BackendInfo{
@@ -324,10 +333,10 @@ func (s *ComputeServer) ListBackends(ctx context.Context, req *pb.ListBackendsRe
 				Models:   models,
 			},
 			Metrics: &pb.BackendMetrics{
-				AvgLatencyMs:      metrics.AvgLatencyMs,
-				ErrorRate:         metrics.ErrorRate,
-				PowerWatts:        float32(backend.PowerWatts()),
-				LoadedModels:      metrics.LoadedModels,
+				AvgLatencyMs: metrics.AvgLatencyMs,
+				ErrorRate:    metrics.ErrorRate,
+				PowerWatts:   float32(backend.PowerWatts()),
+				LoadedModels: metrics.LoadedModels,
 			},
 		})
 	}
@@ -338,22 +347,22 @@ func (s *ComputeServer) ListBackends(ctx context.Context, req *pb.ListBackendsRe
 }
 
 // HealthCheck checks proxy and backend health
-func (s *ComputeServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
+func (s *ComputeServer) HealthCheck(ctx context.Context, _ *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
 	backendHealth := s.router.HealthCheckAll(ctx)
 
 	overallHealthy := true
 	backendHealthMap := make(map[string]string)
 
 	for id, healthy := range backendHealth {
-		status := "healthy"
+		status := strHealthy
 		if !healthy {
-			status = "unhealthy"
+			status = strUnhealthy
 			overallHealthy = false
 		}
 		backendHealthMap[id] = status
 	}
 
-	overallStatus := "healthy"
+	overallStatus := strHealthy
 	if !overallHealthy {
 		overallStatus = "degraded"
 	}
@@ -414,9 +423,9 @@ func convertStats(stats *backends.GenerationStats) *pb.GenerationStats {
 
 func healthState(healthy bool) string {
 	if healthy {
-		return "healthy"
+		return strHealthy
 	}
-	return "unhealthy"
+	return strUnhealthy
 }
 
 func healthMessage(healthy bool) string {
@@ -426,11 +435,11 @@ func healthMessage(healthy bool) string {
 	return "Backend is not responding"
 }
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
+func truncate(s string, limit int) string {
+	if len(s) <= limit {
 		return s
 	}
-	return s[:max] + "..."
+	return s[:limit] + "..."
 }
 
 // ExecutePipeline executes a multi-stage processing pipeline
@@ -452,13 +461,11 @@ func (s *ComputeServer) ExecutePipeline(ctx context.Context, req *pb.ExecutePipe
 	// Execute pipeline
 	result, err := s.pipelineExecutor.Execute(ctx, pipelineDef, req.Input)
 	if err != nil {
-		// Return application error in response, not RPC error
-		_ = err // Explicitly using err.Error() in response
 		return &pb.ExecutePipelineResponse{
 			PipelineId: req.PipelineId,
 			Success:    false,
 			Error:      err.Error(),
-		}, nil
+		}, err
 	}
 
 	// Convert result to protobuf
@@ -495,10 +502,10 @@ func (s *ComputeServer) ExecutePipeline(ctx context.Context, req *pb.ExecutePipe
 				TokensOut:     stageResult.Metadata.TokensOut,
 				Confidence:    float32(stageResult.Metadata.Confidence),
 				Temperature:   float32(stageResult.Metadata.Temperature),
-				FanSpeed:      int32(stageResult.Metadata.FanSpeed),
+				FanSpeed:      safeconv.Int32FromInt(stageResult.Metadata.FanSpeed),
 				Forwarded:     stageResult.Metadata.Forwarded,
 				ForwardReason: stageResult.Metadata.ForwardReason,
-				AttemptCount:  int32(stageResult.Metadata.AttemptCount),
+				AttemptCount:  safeconv.Int32FromInt(stageResult.Metadata.AttemptCount),
 			}
 		}
 
@@ -520,13 +527,13 @@ func (s *ComputeServer) ExecutePipeline(ctx context.Context, req *pb.ExecutePipe
 	}
 
 	response := &pb.ExecutePipelineResponse{
-		PipelineId:   req.PipelineId,
-		Success:      result.Success,
-		FinalOutput:  finalOutput,
-		StageResults: stageResults,
-		TotalTimeMs:  int32(result.TotalTimeMs),
+		PipelineId:    req.PipelineId,
+		Success:       result.Success,
+		FinalOutput:   finalOutput,
+		StageResults:  stageResults,
+		TotalTimeMs:   safeconv.Int32FromInt64(result.TotalTimeMs),
 		TotalEnergyWh: float32(result.TotalEnergyWh),
-		Error:        "",
+		Error:         "",
 	}
 
 	if result.Error != nil {
@@ -563,9 +570,9 @@ func (s *ComputeServer) ExecutePipelineStream(req *pb.ExecutePipelineRequest, st
 	// Send stage results as they complete
 	for _, stageResult := range result.StageResults {
 		streamResp := &pb.PipelineStreamResponse{
-			StageId:      stageResult.StageId,
-			Done:         false,
-			StageResult:  stageResult,
+			StageId:     stageResult.StageId,
+			Done:        false,
+			StageResult: stageResult,
 		}
 
 		if err := stream.Send(streamResp); err != nil {

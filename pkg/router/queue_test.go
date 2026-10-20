@@ -8,6 +8,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestQueueManager_GetRawQueueDepth is part of the public API.
 func TestQueueManager_GetRawQueueDepth(t *testing.T) {
 	qm := NewQueueManager()
 
@@ -18,6 +19,7 @@ func TestQueueManager_GetRawQueueDepth(t *testing.T) {
 	}
 }
 
+// TestQueueManager_GetPriorityBreakdown is part of the public API.
 func TestQueueManager_GetPriorityBreakdown(t *testing.T) {
 	qm := NewQueueManager()
 
@@ -29,16 +31,18 @@ func TestQueueManager_GetPriorityBreakdown(t *testing.T) {
 	}
 }
 
-func TestQueueManager_MarkRequestEnd(t *testing.T) {
+// TestQueueManager_MarkRequestEnd is part of the public API.
+func TestQueueManager_MarkRequestEnd(_ *testing.T) {
 	qm := NewQueueManager()
 
 	// Test marking end for non-existent backend (should not panic)
 	qm.MarkRequestEnd("non-existent", backends.PriorityNormal)
 
 	// Test marking end for another backend
-	qm.MarkRequestEnd("test-backend", backends.PriorityHigh)
+	qm.MarkRequestEnd(strTestBackend, backends.PriorityHigh)
 }
 
+// TestQueueManager_GetAllQueueStats is part of the public API.
 func TestQueueManager_GetAllQueueStats(t *testing.T) {
 	qm := NewQueueManager()
 
@@ -50,11 +54,12 @@ func TestQueueManager_GetAllQueueStats(t *testing.T) {
 	}
 }
 
+// TestQueueTrackingBackend_Generate is part of the public API.
 func TestQueueTrackingBackend_Generate(t *testing.T) {
 	qm := NewQueueManager()
 
 	backend := &MockBackend{
-		id:      "test-backend",
+		id:      strTestBackend,
 		healthy: true,
 	}
 
@@ -76,11 +81,12 @@ func TestQueueTrackingBackend_Generate(t *testing.T) {
 	}
 }
 
+// TestQueueTrackingBackend_GenerateStream is part of the public API.
 func TestQueueTrackingBackend_GenerateStream(t *testing.T) {
 	qm := NewQueueManager()
 
 	backend := &MockBackend{
-		id:      "test-backend",
+		id:      strTestBackend,
 		healthy: true,
 	}
 
@@ -100,6 +106,7 @@ func TestQueueTrackingBackend_GenerateStream(t *testing.T) {
 	}
 }
 
+// TestQueueTrackingBackend_GenerateStream_Success is part of the public API.
 func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 	qm := NewQueueManager()
 
@@ -108,7 +115,7 @@ func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 
 	backend := &mockBackendWithStreamReader{
 		MockBackend: MockBackend{
-			id:      "test-backend",
+			id:      strTestBackend,
 			healthy: true,
 		},
 		streamReader: mockReader,
@@ -122,7 +129,7 @@ func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 	}
 
 	// Start a request to track
-	qm.MarkRequestStart("test-backend", backends.PriorityNormal)
+	qm.MarkRequestStart(strTestBackend, backends.PriorityNormal)
 
 	// Call GenerateStream - should return tracking reader
 	reader, err := qtb.GenerateStream(context.TODO(), &backends.GenerateRequest{})
@@ -141,7 +148,7 @@ func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 	}
 
 	// Verify queue depth increased
-	depth := qm.GetRawQueueDepth("test-backend")
+	depth := qm.GetRawQueueDepth(strTestBackend)
 	if depth != 1 {
 		t.Errorf("Expected queue depth 1, got %d", depth)
 	}
@@ -150,18 +157,19 @@ func TestQueueTrackingBackend_GenerateStream_Success(t *testing.T) {
 	trackingReader.Close()
 
 	// Verify queue depth decreased
-	depth = qm.GetRawQueueDepth("test-backend")
+	depth = qm.GetRawQueueDepth(strTestBackend)
 	if depth != 0 {
 		t.Errorf("Expected queue depth 0 after close, got %d", depth)
 	}
 }
 
+// TestQueueTrackingBackend_GenerateStream_Error is part of the public API.
 func TestQueueTrackingBackend_GenerateStream_Error(t *testing.T) {
 	qm := NewQueueManager()
 
 	backend := &mockBackendWithStreamReader{
 		MockBackend: MockBackend{
-			id:      "test-backend",
+			id:      strTestBackend,
 			healthy: true,
 		},
 		streamReader: nil,
@@ -175,10 +183,10 @@ func TestQueueTrackingBackend_GenerateStream_Error(t *testing.T) {
 	}
 
 	// Start a request to track
-	qm.MarkRequestStart("test-backend", backends.PriorityNormal)
+	qm.MarkRequestStart(strTestBackend, backends.PriorityNormal)
 
 	// Verify initial queue depth
-	depth := qm.GetRawQueueDepth("test-backend")
+	depth := qm.GetRawQueueDepth(strTestBackend)
 	if depth != 1 {
 		t.Errorf("Expected queue depth 1, got %d", depth)
 	}
@@ -195,7 +203,7 @@ func TestQueueTrackingBackend_GenerateStream_Error(t *testing.T) {
 	}
 
 	// Verify queue depth decreased (marked end automatically)
-	depth = qm.GetRawQueueDepth("test-backend")
+	depth = qm.GetRawQueueDepth(strTestBackend)
 	if depth != 0 {
 		t.Errorf("Expected queue depth 0 after error, got %d", depth)
 	}
@@ -206,10 +214,12 @@ type MockStreamReader struct {
 	closeCalled bool
 }
 
+// Recv is part of the public API.
 func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return nil, nil
 }
 
+// Close is part of the public API.
 func (m *MockStreamReader) Close() error {
 	m.closeCalled = true
 	return nil
@@ -217,15 +227,17 @@ func (m *MockStreamReader) Close() error {
 
 // mockBackendWithStreamReader is a mock backend that can return specific stream readers/errors
 type mockBackendWithStreamReader struct {
-	MockBackend
 	streamReader backends.StreamReader
 	streamError  error
+	MockBackend
 }
 
-func (m *mockBackendWithStreamReader) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackendWithStreamReader) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return m.streamReader, m.streamError
 }
 
+// TestTrackingStreamReader_Close is part of the public API.
 func TestTrackingStreamReader_Close(t *testing.T) {
 	called := false
 	onClose := func() {
@@ -271,28 +283,29 @@ func TestTrackingStreamReader_Close(t *testing.T) {
 	}
 }
 
+// TestQueueManager_MarkRequestStart is part of the public API.
 func TestQueueManager_MarkRequestStart(t *testing.T) {
 	qm := NewQueueManager()
 
 	// Start a request
-	qm.MarkRequestStart("backend-1", backends.PriorityNormal)
+	qm.MarkRequestStart(strBackend1, backends.PriorityNormal)
 
 	// Check queue depth
-	depth := qm.GetRawQueueDepth("backend-1")
+	depth := qm.GetRawQueueDepth(strBackend1)
 	if depth != 1 {
 		t.Errorf("Expected depth 1, got %d", depth)
 	}
 
 	// Start another request with different priority
-	qm.MarkRequestStart("backend-1", backends.PriorityHigh)
+	qm.MarkRequestStart(strBackend1, backends.PriorityHigh)
 
-	depth = qm.GetRawQueueDepth("backend-1")
+	depth = qm.GetRawQueueDepth(strBackend1)
 	if depth != 2 {
 		t.Errorf("Expected depth 2, got %d", depth)
 	}
 
 	// Check priority breakdown
-	breakdown := qm.GetPriorityBreakdown("backend-1")
+	breakdown := qm.GetPriorityBreakdown(strBackend1)
 	if breakdown[backends.PriorityNormal] != 1 {
 		t.Errorf("Expected 1 normal priority request, got %d", breakdown[backends.PriorityNormal])
 	}
@@ -301,47 +314,50 @@ func TestQueueManager_MarkRequestStart(t *testing.T) {
 	}
 }
 
+// TestQueueManager_MarkRequestEnd_WithStart is part of the public API.
 func TestQueueManager_MarkRequestEnd_WithStart(t *testing.T) {
 	qm := NewQueueManager()
 
 	// Start then end a request
-	qm.MarkRequestStart("backend-1", backends.PriorityNormal)
-	qm.MarkRequestEnd("backend-1", backends.PriorityNormal)
+	qm.MarkRequestStart(strBackend1, backends.PriorityNormal)
+	qm.MarkRequestEnd(strBackend1, backends.PriorityNormal)
 
-	depth := qm.GetRawQueueDepth("backend-1")
+	depth := qm.GetRawQueueDepth(strBackend1)
 	if depth != 0 {
 		t.Errorf("Expected depth 0 after end, got %d", depth)
 	}
 }
 
+// TestQueueManager_MarkRequestEnd_NegativeSafety is part of the public API.
 func TestQueueManager_MarkRequestEnd_NegativeSafety(t *testing.T) {
 	qm := NewQueueManager()
 
 	// End without start (should handle gracefully with safety check)
-	qm.MarkRequestEnd("backend-1", backends.PriorityNormal)
-	qm.MarkRequestEnd("backend-1", backends.PriorityNormal)
+	qm.MarkRequestEnd(strBackend1, backends.PriorityNormal)
+	qm.MarkRequestEnd(strBackend1, backends.PriorityNormal)
 
 	// Should not go negative
-	depth := qm.GetRawQueueDepth("backend-1")
+	depth := qm.GetRawQueueDepth(strBackend1)
 	if depth < 0 {
 		t.Errorf("Depth went negative: %d", depth)
 	}
 }
 
+// TestQueueManager_GetQueueDepth_Weighted is part of the public API.
 func TestQueueManager_GetQueueDepth_Weighted(t *testing.T) {
 	qm := NewQueueManager()
 
 	// Add requests at different priorities
-	qm.MarkRequestStart("backend-1", backends.PriorityBestEffort)
-	qm.MarkRequestStart("backend-1", backends.PriorityNormal)
-	qm.MarkRequestStart("backend-1", backends.PriorityHigh)
-	qm.MarkRequestStart("backend-1", backends.PriorityCritical)
+	qm.MarkRequestStart(strBackend1, backends.PriorityBestEffort)
+	qm.MarkRequestStart(strBackend1, backends.PriorityNormal)
+	qm.MarkRequestStart(strBackend1, backends.PriorityHigh)
+	qm.MarkRequestStart(strBackend1, backends.PriorityCritical)
 
 	// Get weighted depth for different priorities
-	depthLow := qm.GetQueueDepth("backend-1", backends.PriorityBestEffort)
-	depthNormal := qm.GetQueueDepth("backend-1", backends.PriorityNormal)
-	depthHigh := qm.GetQueueDepth("backend-1", backends.PriorityHigh)
-	depthCritical := qm.GetQueueDepth("backend-1", backends.PriorityCritical)
+	depthLow := qm.GetQueueDepth(strBackend1, backends.PriorityBestEffort)
+	depthNormal := qm.GetQueueDepth(strBackend1, backends.PriorityNormal)
+	depthHigh := qm.GetQueueDepth(strBackend1, backends.PriorityHigh)
+	depthCritical := qm.GetQueueDepth(strBackend1, backends.PriorityCritical)
 
 	// Weighted depth should increase with priority level
 	if depthLow >= depthNormal {
@@ -358,6 +374,7 @@ func TestQueueManager_GetQueueDepth_Weighted(t *testing.T) {
 		depthLow, depthNormal, depthHigh, depthCritical)
 }
 
+// TestQueueManager_GetQueueDepth_NonExistent is part of the public API.
 func TestQueueManager_GetQueueDepth_NonExistent(t *testing.T) {
 	qm := NewQueueManager()
 
@@ -367,13 +384,14 @@ func TestQueueManager_GetQueueDepth_NonExistent(t *testing.T) {
 	}
 }
 
+// TestQueueManager_GetAllQueueStats_Multiple is part of the public API.
 func TestQueueManager_GetAllQueueStats_Multiple(t *testing.T) {
 	qm := NewQueueManager()
 
 	// Add requests to multiple backends
-	qm.MarkRequestStart("backend-1", backends.PriorityNormal)
-	qm.MarkRequestStart("backend-1", backends.PriorityHigh)
-	qm.MarkRequestStart("backend-2", backends.PriorityBestEffort)
+	qm.MarkRequestStart(strBackend1, backends.PriorityNormal)
+	qm.MarkRequestStart(strBackend1, backends.PriorityHigh)
+	qm.MarkRequestStart(strBackend22, backends.PriorityBestEffort)
 
 	stats := qm.GetAllQueueStats()
 
@@ -381,19 +399,19 @@ func TestQueueManager_GetAllQueueStats_Multiple(t *testing.T) {
 		t.Errorf("Expected 2 backends in stats, got %d", len(stats))
 	}
 
-	if stats["backend-1"].Pending != 2 {
-		t.Errorf("Expected backend-1 to have 2 pending, got %d", stats["backend-1"].Pending)
+	if stats[strBackend1].Pending != 2 {
+		t.Errorf("Expected backend-1 to have 2 pending, got %d", stats[strBackend1].Pending)
 	}
 
-	if stats["backend-2"].Pending != 1 {
-		t.Errorf("Expected backend-2 to have 1 pending, got %d", stats["backend-2"].Pending)
+	if stats[strBackend22].Pending != 1 {
+		t.Errorf("Expected backend-2 to have 1 pending, got %d", stats[strBackend22].Pending)
 	}
 
 	// Check priority counts
-	if stats["backend-1"].PriorityCounts[backends.PriorityNormal] != 1 {
+	if stats[strBackend1].PriorityCounts[backends.PriorityNormal] != 1 {
 		t.Error("Expected 1 normal priority request for backend-1")
 	}
-	if stats["backend-1"].PriorityCounts[backends.PriorityHigh] != 1 {
+	if stats[strBackend1].PriorityCounts[backends.PriorityHigh] != 1 {
 		t.Error("Expected 1 high priority request for backend-1")
 	}
 }
@@ -402,7 +420,7 @@ func TestQueueManager_GetAllQueueStats_Multiple(t *testing.T) {
 func TestQueueSafetyChecks(t *testing.T) {
 	qm := NewQueueManager()
 
-	backendID := "test-backend"
+	backendID := strTestBackend
 	priority := backends.PriorityNormal
 
 	// Add a request

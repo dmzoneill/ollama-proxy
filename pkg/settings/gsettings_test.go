@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/efficiency"
 )
 
@@ -46,18 +48,18 @@ func TestCheckAvailable(t *testing.T) {
 func TestParseMode(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected efficiency.EfficiencyMode
+		expected efficiency.Mode
 	}{
-		{"Performance", efficiency.ModePerformance},
-		{"Balanced", efficiency.ModeBalanced},
-		{"Efficiency", efficiency.ModeEfficiency},
-		{"Quiet", efficiency.ModeQuiet},
-		{"Auto", efficiency.ModeAuto},
-		{"UltraEfficiency", efficiency.ModeUltraEfficiency},
-		{"", efficiency.ModeBalanced},              // Default
-		{"InvalidMode", efficiency.ModeBalanced},   // Default
-		{"performance", efficiency.ModeBalanced},   // Case sensitive - defaults
-		{"PERFORMANCE", efficiency.ModeBalanced},   // Case sensitive - defaults
+		{input: strPerformance, expected: efficiency.ModePerformance},
+		{input: strBalanced, expected: efficiency.ModeBalanced},
+		{input: strEfficiency, expected: efficiency.ModeEfficiency},
+		{input: strQuiet, expected: efficiency.ModeQuiet},
+		{input: strAuto, expected: efficiency.ModeAuto},
+		{input: strUltraEfficiency, expected: efficiency.ModeUltraEfficiency},
+		{input: "", expected: efficiency.ModeBalanced},            // Default
+		{input: "InvalidMode", expected: efficiency.ModeBalanced}, // Default
+		{input: "performance", expected: efficiency.ModeBalanced}, // Case sensitive - defaults
+		{input: "PERFORMANCE", expected: efficiency.ModeBalanced}, // Case sensitive - defaults
 	}
 
 	for _, tt := range tests {
@@ -76,12 +78,12 @@ func TestParseModeStringRepresentation(t *testing.T) {
 		input  string
 		expect string
 	}{
-		{"Performance", "Performance"},
-		{"Balanced", "Balanced"},
-		{"Efficiency", "Efficiency"},
-		{"Quiet", "Quiet"},
-		{"Auto", "Auto"},
-		{"UltraEfficiency", "Ultra Efficiency"},
+		{input: strPerformance, expect: strPerformance},
+		{input: strBalanced, expect: strBalanced},
+		{input: strEfficiency, expect: strEfficiency},
+		{input: strQuiet, expect: strQuiet},
+		{input: strAuto, expect: strAuto},
+		{input: strUltraEfficiency, expect: "Ultra Efficiency"},
 	}
 
 	for _, tt := range tests {
@@ -105,7 +107,7 @@ func TestGetDefaultModeWhenUnavailable(t *testing.T) {
 	if mode != efficiency.ModeBalanced {
 		t.Errorf("GetDefaultMode should return ModeBalanced on error, got %v", mode)
 	}
-	if err.Error() != "GSettings not available" {
+	if err.Error() != strGSettingsNotAvailable {
 		t.Errorf("Expected 'GSettings not available' error, got %v", err)
 	}
 }
@@ -120,7 +122,7 @@ func TestGetLastModeWhenUnavailable(t *testing.T) {
 	if mode != efficiency.ModeBalanced {
 		t.Errorf("GetLastMode should return ModeBalanced on error, got %v", mode)
 	}
-	if err.Error() != "GSettings not available" {
+	if err.Error() != strGSettingsNotAvailable {
 		t.Errorf("Expected 'GSettings not available' error, got %v", err)
 	}
 }
@@ -144,7 +146,7 @@ func TestShouldRememberModeWhenUnavailable(t *testing.T) {
 	if result {
 		t.Errorf("ShouldRememberMode should return false on error, got %v", result)
 	}
-	if err.Error() != "GSettings not available" {
+	if err.Error() != strGSettingsNotAvailable {
 		t.Errorf("Expected 'GSettings not available' error, got %v", err)
 	}
 }
@@ -224,8 +226,8 @@ func TestLoadInitialModeWhenUnavailable(t *testing.T) {
 // TestShouldRememberModeBooleanParsing tests the parsing of "true"/"false" strings
 func TestShouldRememberModeBooleanParsing(t *testing.T) {
 	tests := []struct {
-		name        string
 		setupMock   func(*Settings)
+		name        string
 		expected    bool
 		shouldError bool
 	}{
@@ -275,15 +277,15 @@ func TestStructure(t *testing.T) {
 // TestModeStringRepresentations tests all efficiency modes
 func TestModeStringRepresentations(t *testing.T) {
 	tests := []struct {
-		mode     efficiency.EfficiencyMode
 		expected string
+		mode     efficiency.Mode
 	}{
-		{efficiency.ModePerformance, "Performance"},
-		{efficiency.ModeBalanced, "Balanced"},
-		{efficiency.ModeEfficiency, "Efficiency"},
-		{efficiency.ModeQuiet, "Quiet"},
-		{efficiency.ModeAuto, "Auto"},
-		{efficiency.ModeUltraEfficiency, "Ultra Efficiency"},
+		{mode: efficiency.ModePerformance, expected: strPerformance},
+		{mode: efficiency.ModeBalanced, expected: strBalanced},
+		{mode: efficiency.ModeEfficiency, expected: strEfficiency},
+		{mode: efficiency.ModeQuiet, expected: strQuiet},
+		{mode: efficiency.ModeAuto, expected: strAuto},
+		{mode: efficiency.ModeUltraEfficiency, expected: "Ultra Efficiency"},
 	}
 
 	for _, tt := range tests {
@@ -318,7 +320,7 @@ func TestErrorMessages(t *testing.T) {
 				_, err := s.GetDefaultMode()
 				return err
 			},
-			expected: "GSettings not available",
+			expected: strGSettingsNotAvailable,
 		},
 		{
 			name: "GetLastMode error",
@@ -326,7 +328,7 @@ func TestErrorMessages(t *testing.T) {
 				_, err := s.GetLastMode()
 				return err
 			},
-			expected: "GSettings not available",
+			expected: strGSettingsNotAvailable,
 		},
 		{
 			name: "ShouldRememberMode error",
@@ -334,7 +336,7 @@ func TestErrorMessages(t *testing.T) {
 				_, err := s.ShouldRememberMode()
 				return err
 			},
-			expected: "GSettings not available",
+			expected: strGSettingsNotAvailable,
 		},
 	}
 
@@ -423,8 +425,8 @@ func TestAvailabilityFlag(t *testing.T) {
 	tests := []struct {
 		available bool
 	}{
-		{true},
-		{false},
+		{available: true},
+		{available: false},
 	}
 
 	for _, tt := range tests {
@@ -439,15 +441,15 @@ func TestAvailabilityFlag(t *testing.T) {
 func TestParseModeCaseSensitivity(t *testing.T) {
 	tests := []struct {
 		input    string
-		wantMode efficiency.EfficiencyMode
 		desc     string
+		wantMode efficiency.Mode
 	}{
-		{"Performance", efficiency.ModePerformance, "exact case"},
-		{"performance", efficiency.ModeBalanced, "lowercase (should default)"},
-		{"PERFORMANCE", efficiency.ModeBalanced, "uppercase (should default)"},
-		{"PeRfOrMaNcE", efficiency.ModeBalanced, "mixed case (should default)"},
-		{"Balanced", efficiency.ModeBalanced, "exact case"},
-		{"balanced", efficiency.ModeBalanced, "lowercase (should default)"},
+		{input: strPerformance, wantMode: efficiency.ModePerformance, desc: "exact case"},
+		{input: "performance", wantMode: efficiency.ModeBalanced, desc: "lowercase (should default)"},
+		{input: "PERFORMANCE", wantMode: efficiency.ModeBalanced, desc: "uppercase (should default)"},
+		{input: "PeRfOrMaNcE", wantMode: efficiency.ModeBalanced, desc: "mixed case (should default)"},
+		{input: strBalanced, wantMode: efficiency.ModeBalanced, desc: "exact case"},
+		{input: "balanced", wantMode: efficiency.ModeBalanced, desc: "lowercase (should default)"},
 	}
 
 	for _, tt := range tests {
@@ -568,67 +570,47 @@ func TestNewSettingsType(t *testing.T) {
 func TestInterfaceConsistency(t *testing.T) {
 	s := &Settings{available: true}
 
-	// Test that all methods exist and are callable
-	// (even if they would fail due to unavailability)
-
-	// Methods that return (EfficiencyMode, error)
+	// Test that all methods exist and are callable.
+	// GSettings may reject the call when the schema is not installed.
 	if _, err := s.GetDefaultMode(); err != nil {
-		// Expected to error if gsettings unavailable
+		t.Log(err)
 	}
 	if _, err := s.GetLastMode(); err != nil {
-		// Expected to error if gsettings unavailable
+		t.Log(err)
 	}
-
-	// Methods that return error only
 	if err := s.SetLastMode(efficiency.ModeBalanced); err != nil {
-		// May error
+		t.Log(err)
 	}
-
-	// Methods that return (bool, error)
 	if _, err := s.ShouldRememberMode(); err != nil {
-		// Expected to error if gsettings unavailable
+		t.Log(err)
 	}
 	if _, err := s.GetQuietHoursEnabled(); err != nil {
-		// Expected (no error even if unavailable)
+		t.Log(err)
 	}
-
-	// Methods that return (int, error)
 	if _, err := s.GetQuietHoursStart(); err != nil {
-		// Expected (no error even if unavailable)
+		t.Log(err)
 	}
 	if _, err := s.GetQuietHoursEnd(); err != nil {
-		// Expected (no error even if unavailable)
+		t.Log(err)
 	}
-
-	// Methods that return bool only
-	if s.GetNotifyOnModeChange() {
-		// Returns bool
-	}
-	if s.GetNotifyOnBackendFailure() {
-		// Returns bool
-	}
-	if s.GetNotifyOnThermalThrottle() {
-		// Returns bool
-	}
-
-	// Methods that return EfficiencyMode only
-	if s.LoadInitialMode() == efficiency.ModeBalanced {
-		// Returns EfficiencyMode
-	}
+	_ = s.GetNotifyOnModeChange()
+	_ = s.GetNotifyOnBackendFailure()
+	_ = s.GetNotifyOnThermalThrottle()
+	_ = s.LoadInitialMode()
 }
 
 // TestParseAllModes ensures all standard modes can be parsed
 func TestParseAllModes(t *testing.T) {
 	tests := []struct {
 		parseStr string
-		mode     efficiency.EfficiencyMode
+		mode     efficiency.Mode
 	}{
-		{"Performance", efficiency.ModePerformance},
-		{"Balanced", efficiency.ModeBalanced},
-		{"Efficiency", efficiency.ModeEfficiency},
-		{"Quiet", efficiency.ModeQuiet},
-		{"Auto", efficiency.ModeAuto},
-		{"UltraEfficiency", efficiency.ModeUltraEfficiency},
+		{parseStr: strPerformance, mode: efficiency.ModePerformance},
+		{parseStr: strBalanced, mode: efficiency.ModeBalanced},
+		{parseStr: strEfficiency, mode: efficiency.ModeEfficiency},
+		{parseStr: strQuiet, mode: efficiency.ModeQuiet},
+		{parseStr: strAuto, mode: efficiency.ModeAuto},
+		{parseStr: strUltraEfficiency, mode: efficiency.ModeUltraEfficiency},
 	}
 
 	for _, tt := range tests {
@@ -642,7 +624,7 @@ func TestParseAllModes(t *testing.T) {
 // TestUltraEfficiencyRoundtrip tests that UltraEfficiency mode can be round-tripped
 func TestUltraEfficiencyRoundtrip(t *testing.T) {
 	// The code has "UltraEfficiency" as the case-sensitive string to parse
-	result := parseMode("UltraEfficiency")
+	result := parseMode(strUltraEfficiency)
 	if result != efficiency.ModeUltraEfficiency {
 		t.Errorf("parseMode(\"UltraEfficiency\") = %v, want %v", result, efficiency.ModeUltraEfficiency)
 	}
@@ -651,7 +633,7 @@ func TestUltraEfficiencyRoundtrip(t *testing.T) {
 // BenchmarkParseMode benchmarks the parseMode function
 func BenchmarkParseMode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		parseMode("Performance")
+		parseMode(strPerformance)
 	}
 }
 
@@ -660,12 +642,15 @@ func BenchmarkNewSettings(b *testing.B) {
 	// Disable the actual check by mocking behavior is not possible in this context
 	// Just benchmark the object creation
 	for i := 0; i < b.N; i++ {
-		_ = &Settings{available: false}
+		s := &Settings{available: false}
+		if s.available {
+			b.Fatal("expected settings to be unavailable")
+		}
 	}
 }
 
 // Helper function to validate boolean values
-func isValidBool(v bool) bool {
+func isValidBool(_ bool) bool {
 	return true // bool in Go can only be true or false
 }
 
@@ -684,7 +669,11 @@ func TestOSEnvDoesNotAffectDefaults(t *testing.T) {
 		t.Error("Default notification setting should be true")
 	}
 
-	if quiet, _ := s.GetQuietHoursStart(); quiet != 22 {
+	quiet, err := s.GetQuietHoursStart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quiet != 22 {
 		t.Error("Default quiet hours start should be 22")
 	}
 }
@@ -699,14 +688,27 @@ func TestGsettingsPanic(t *testing.T) {
 
 	s := &Settings{available: false}
 
-	// Call all methods - should not panic
-	s.GetDefaultMode()
-	s.GetLastMode()
-	s.SetLastMode(efficiency.ModeBalanced)
-	s.ShouldRememberMode()
-	s.GetQuietHoursEnabled()
-	s.GetQuietHoursStart()
-	s.GetQuietHoursEnd()
+	// Call all methods - should not panic.
+	// Unavailable settings return an error from the mode getters.
+	if _, err := s.GetDefaultMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := s.GetLastMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	testutil.Check(t, s.SetLastMode(efficiency.ModeBalanced))
+	if _, err := s.ShouldRememberMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := s.GetQuietHoursEnabled(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetQuietHoursStart(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetQuietHoursEnd(); err != nil {
+		t.Fatal(err)
+	}
 	s.GetNotifyOnModeChange()
 	s.GetNotifyOnBackendFailure()
 	s.GetNotifyOnThermalThrottle()
@@ -736,7 +738,7 @@ func TestSettingsAvailableInitialization(t *testing.T) {
 
 	if _, err := s.GetDefaultMode(); err != nil {
 		// If not available, error is expected
-		if err.Error() != "GSettings not available" {
+		if err.Error() != strGSettingsNotAvailable {
 			t.Logf("Note: GSettings is available on this system")
 		}
 	}
@@ -771,10 +773,10 @@ func TestAllMethodsWithUnavailable(t *testing.T) {
 	}
 }
 
-// TestModeIntValues tests that EfficiencyMode iota values work correctly
+// TestModeIntValues tests that Mode iota values work correctly
 func TestModeIntValues(t *testing.T) {
 	// Verify iota assignment by checking the order
-	modes := []efficiency.EfficiencyMode{
+	modes := []efficiency.Mode{
 		efficiency.ModePerformance,     // 0
 		efficiency.ModeBalanced,        // 1
 		efficiency.ModeEfficiency,      // 2
@@ -794,8 +796,14 @@ func TestModeIntValues(t *testing.T) {
 func TestGetQuietHoursStartEndDefaults(t *testing.T) {
 	s := &Settings{available: false}
 
-	start, _ := s.GetQuietHoursStart()
-	end, _ := s.GetQuietHoursEnd()
+	start, err := s.GetQuietHoursStart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	end, err := s.GetQuietHoursEnd()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if start != 22 {
 		t.Errorf("Quiet hours start default should be 22, got %d", start)

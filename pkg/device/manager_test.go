@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/godbus/dbus/v5"
 )
 
+// TestDeviceManager_NewDeviceManager is part of the public API.
 func TestDeviceManager_NewDeviceManager(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -19,7 +22,9 @@ func TestDeviceManager_NewDeviceManager(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	if dm.conn == nil {
 		t.Error("Connection should not be nil")
@@ -34,6 +39,7 @@ func TestDeviceManager_NewDeviceManager(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_RegisterDevice is part of the public API.
 func TestDeviceManager_RegisterDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -43,12 +49,14 @@ func TestDeviceManager_RegisterDevice(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	caps := map[string]dbus.Variant{
-		"sample_rate": dbus.MakeVariant(48000),
-		"channels":    dbus.MakeVariant(2),
-		"format":      dbus.MakeVariant("S16_LE"),
+		strSampleRate: dbus.MakeVariant(48000),
+		strChannels:   dbus.MakeVariant(2),
+		strFormat:     dbus.MakeVariant(strS16LE),
 	}
 
 	deviceID, dbusErr := dm.RegisterDevice(
@@ -89,6 +97,7 @@ func TestDeviceManager_RegisterDevice(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_UnregisterDevice is part of the public API.
 func TestDeviceManager_UnregisterDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -98,19 +107,24 @@ func TestDeviceManager_UnregisterDevice(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register a device first
-	deviceID, _ := dm.RegisterDevice(
+	deviceID, dbusErr := dm.RegisterDevice(
 		"camera",
-		"/dev/video0",
+		strDevVideo0,
 		"Test Camera",
 		map[string]dbus.Variant{},
 		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Unregister it
-	dbusErr := dm.UnregisterDevice(deviceID)
+	dbusErr = dm.UnregisterDevice(deviceID)
 	if dbusErr != nil {
 		t.Fatalf("UnregisterDevice failed: %v", dbusErr)
 	}
@@ -125,6 +139,7 @@ func TestDeviceManager_UnregisterDevice(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_UnregisterDevice_NotFound is part of the public API.
 func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -134,7 +149,9 @@ func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Try to unregister non-existent device
 	dbusErr := dm.UnregisterDevice("nonexistent-device-id")
@@ -143,6 +160,7 @@ func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_ListDevices is part of the public API.
 func TestDeviceManager_ListDevices(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -152,12 +170,20 @@ func TestDeviceManager_ListDevices(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register multiple devices
-	dm.RegisterDevice("microphone", "/dev/snd/pcmC0D0c", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	dm.RegisterDevice("microphone", "/dev/snd/pcmC1D0c", "Mic 2", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	dm.RegisterDevice("camera", "/dev/video0", "Camera 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if _, dbusErr := dm.RegisterDevice("microphone", "/dev/snd/pcmC0D0c", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	if _, dbusErr := dm.RegisterDevice("microphone", "/dev/snd/pcmC1D0c", "Mic 2", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	if _, dbusErr := dm.RegisterDevice("camera", strDevVideo0, "Camera 1", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// List all devices
 	allDevices, dbusErr := dm.ListDevices("")
@@ -190,6 +216,7 @@ func TestDeviceManager_ListDevices(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_GetDevice is part of the public API.
 func TestDeviceManager_GetDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -199,18 +226,23 @@ func TestDeviceManager_GetDevice(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register device
-	deviceID, _ := dm.RegisterDevice(
-		"speaker",
+	deviceID, dbusErr := dm.RegisterDevice(
+		string(DeviceTypeSpeaker),
 		"/dev/snd/pcmC0D0p",
 		"Test Speaker",
 		map[string]dbus.Variant{
-			"sample_rate": dbus.MakeVariant(44100),
+			strSampleRate: dbus.MakeVariant(44100),
 		},
 		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Get device
 	deviceInfo, dbusErr := dm.GetDevice(deviceID)
@@ -218,21 +250,37 @@ func TestDeviceManager_GetDevice(t *testing.T) {
 		t.Fatalf("GetDevice failed: %v", dbusErr)
 	}
 
-	if deviceInfo["Name"].Value().(string) != "Test Speaker" {
+	name, ok := deviceInfo["Name"].Value().(string)
+	if !ok {
+		t.Fatal("device name has unexpected type")
+	}
+	if name != "Test Speaker" {
 		t.Error("Device name mismatch")
 	}
 
-	if deviceInfo["Type"].Value().(string) != "speaker" {
+	deviceType, ok := deviceInfo["Type"].Value().(string)
+	if !ok {
+		t.Fatal("device type has unexpected type")
+	}
+	if deviceType != string(DeviceTypeSpeaker) {
 		t.Error("Device type mismatch")
 	}
 
 	// Check capabilities
-	caps := deviceInfo["Capabilities"].Value().(map[string]dbus.Variant)
-	if caps["sample_rate"].Value().(int) != 44100 {
+	caps, ok := deviceInfo["Capabilities"].Value().(map[string]dbus.Variant)
+	if !ok {
+		t.Fatal("capabilities have unexpected type")
+	}
+	sampleRate, ok := caps[strSampleRate].Value().(int)
+	if !ok {
+		t.Fatal("sample rate has unexpected type")
+	}
+	if sampleRate != 44100 {
 		t.Error("Capabilities not preserved")
 	}
 }
 
+// TestDeviceManager_GetDevice_NotFound is part of the public API.
 func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -242,7 +290,9 @@ func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	_, dbusErr := dm.GetDevice("nonexistent-device")
 	if dbusErr == nil {
@@ -250,6 +300,7 @@ func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_RequestDeviceAccess is part of the public API.
 func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -259,16 +310,21 @@ func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register device
-	deviceID, _ := dm.RegisterDevice(
+	deviceID, dbusErr := dm.RegisterDevice(
 		"microphone",
 		"/dev/snd/pcmC0D0c",
 		"Test Mic",
 		nil,
 		dbus.Sender("ie.fio.OllamaProxy.System"),
 	)
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Request access
 	grantID, shmPath, udsPath, dbusErr := dm.RequestDeviceAccess(deviceID, "test-client", dbus.Sender("ie.fio.OllamaProxy.System"))
@@ -307,6 +363,7 @@ func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_RequestDeviceAccess_DeviceNotFound is part of the public API.
 func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -316,7 +373,9 @@ func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	_, _, _, dbusErr := dm.RequestDeviceAccess("nonexistent", "client", dbus.Sender("ie.fio.OllamaProxy.System"))
 	if dbusErr == nil {
@@ -324,6 +383,7 @@ func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_ReleaseDeviceAccess is part of the public API.
 func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -333,14 +393,22 @@ func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register device and request access
-	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	grantID, _, _, _ := dm.RequestDeviceAccess(deviceID, "test-client", dbus.Sender("ie.fio.OllamaProxy.System"))
+	deviceID, dbusErr := dm.RegisterDevice("camera", strDevVideo0, "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	grantID, _, _, dbusErr := dm.RequestDeviceAccess(deviceID, "test-client", dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Release access
-	dbusErr := dm.ReleaseDeviceAccess(deviceID, "test-client")
+	dbusErr = dm.ReleaseDeviceAccess(deviceID, "test-client")
 	if dbusErr != nil {
 		t.Fatalf("ReleaseDeviceAccess failed: %v", dbusErr)
 	}
@@ -364,6 +432,7 @@ func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_ReleaseDeviceAccess_NotFound is part of the public API.
 func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -373,7 +442,9 @@ func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	dbusErr := dm.ReleaseDeviceAccess("device-id", "client-id")
 	if dbusErr == nil {
@@ -381,6 +452,7 @@ func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_ConcurrentAccess is part of the public API.
 func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -390,7 +462,9 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	var wg sync.WaitGroup
 	numGoroutines := 10
@@ -398,15 +472,17 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 	// Concurrent device registration
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
-		go func(idx int) {
+		go func(_ int) {
 			defer wg.Done()
-			dm.RegisterDevice(
+			if _, dbusErr := dm.RegisterDevice(
 				"microphone",
 				"/dev/null",
 				"Concurrent Mic",
 				nil,
 				dbus.Sender("ie.fio.OllamaProxy.System"),
-			)
+			); dbusErr != nil {
+				t.Error(dbusErr)
+			}
 		}(i)
 	}
 
@@ -422,6 +498,7 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_Properties is part of the public API.
 func TestDeviceManager_Properties(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -431,7 +508,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Initially no devices
 	if dm.getTotalDevices() != 0 {
@@ -443,9 +522,17 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Register 3 devices
-	id1, _ := dm.RegisterDevice("microphone", "/dev/null", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	id2, _ := dm.RegisterDevice("camera", "/dev/null", "Cam 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	_, _ = dm.RegisterDevice("speaker", "/dev/null", "Speaker 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	id1, dbusErr := dm.RegisterDevice("microphone", "/dev/null", "Mic 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	id2, dbusErr := dm.RegisterDevice("camera", "/dev/null", "Cam 1", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	if _, dbusErr = dm.RegisterDevice(string(DeviceTypeSpeaker), "/dev/null", "Speaker 1", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if dm.getTotalDevices() != 3 {
 		t.Errorf("Expected 3 total devices, got %d", dm.getTotalDevices())
@@ -456,7 +543,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Request access to one device
-	dm.RequestDeviceAccess(id1, "client", dbus.Sender("ie.fio.OllamaProxy.System"))
+	if _, _, _, dbusErr = dm.RequestDeviceAccess(id1, "client", dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if dm.getAvailableDevices() != 2 {
 		t.Errorf("Expected 2 available devices after access grant, got %d",
@@ -464,7 +553,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Unregister a device
-	dm.UnregisterDevice(id2)
+	if dbusErr = dm.UnregisterDevice(id2); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if dm.getTotalDevices() != 2 {
 		t.Errorf("Expected 2 total devices after unregister, got %d",
@@ -472,7 +563,9 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 
 	// Release access
-	dm.ReleaseDeviceAccess(id1, "client")
+	if dbusErr = dm.ReleaseDeviceAccess(id1, "client"); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if dm.getAvailableDevices() != 2 {
 		t.Errorf("Expected 2 available devices after release, got %d",
@@ -480,6 +573,7 @@ func TestDeviceManager_Properties(t *testing.T) {
 	}
 }
 
+// TestDeviceManager_StateTransitions is part of the public API.
 func TestDeviceManager_StateTransitions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -489,10 +583,15 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register device (should be Available)
-	deviceID, _ := dm.RegisterDevice("camera", "/dev/video0", "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	deviceID, dbusErr := dm.RegisterDevice("camera", strDevVideo0, "Test Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	dm.mu.RLock()
 	device := dm.devices[deviceID]
@@ -503,20 +602,25 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 	}
 
 	// Request access (should transition to InUse)
-	dm.RequestDeviceAccess(deviceID, "client1", dbus.Sender("ie.fio.OllamaProxy.System"))
+	if _, _, _, dbusErr = dm.RequestDeviceAccess(deviceID, "client1", dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if device.GetState() != DeviceStateInUse {
 		t.Errorf("Device should be InUse after access request, got %s", device.GetState())
 	}
 
 	// Release access (should transition back to Available)
-	dm.ReleaseDeviceAccess(deviceID, "client1")
+	if dbusErr = dm.ReleaseDeviceAccess(deviceID, "client1"); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	if device.GetState() != DeviceStateAvailable {
 		t.Errorf("Device should be Available after release, got %s", device.GetState())
 	}
 }
 
+// TestDeviceManager_MultipleClients is part of the public API.
 func TestDeviceManager_MultipleClients(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -526,10 +630,15 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 		t.Skipf("Skipping test (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, dm.Stop())
+	}()
 
 	// Register device
-	deviceID, _ := dm.RegisterDevice("microphone", "/dev/null", "Shared Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	deviceID, dbusErr := dm.RegisterDevice("microphone", "/dev/null", "Shared Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Multiple clients request access
 	_, _, _, err1 := dm.RequestDeviceAccess(deviceID, "client1", dbus.Sender("ie.fio.OllamaProxy.System"))
@@ -555,7 +664,9 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 	}
 
 	// Release access from one client
-	dm.ReleaseDeviceAccess(deviceID, "client1")
+	if dbusErr = dm.ReleaseDeviceAccess(deviceID, "client1"); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Device should still be in-use (other clients have access)
 	dm.mu.RLock()
@@ -567,6 +678,7 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 	// and only transition to Available when all clients release
 }
 
+// TestDeviceManager_Stop is part of the public API.
 func TestDeviceManager_Stop(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping device manager test in short mode")
@@ -578,59 +690,74 @@ func TestDeviceManager_Stop(t *testing.T) {
 	}
 
 	// Register some devices
-	dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
-	dm.RegisterDevice("camera", "/dev/null", "Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+	if _, dbusErr := dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
+	if _, dbusErr := dm.RegisterDevice("camera", "/dev/null", "Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+		t.Fatal(dbusErr)
+	}
 
 	// Stop should not error
 	if err := dm.Stop(); err != nil {
 		t.Errorf("Stop failed: %v", err)
 	}
 
-	// Context should be cancelled
+	// Context should be canceled
 	select {
 	case <-dm.ctx.Done():
 		// Expected
 	case <-time.After(100 * time.Millisecond):
-		t.Error("Context should be cancelled after Stop")
+		t.Error("Context should be canceled after Stop")
 	}
 }
 
 // Benchmark tests
 
+// BenchmarkDeviceManager_RegisterDevice is part of the public API.
 func BenchmarkDeviceManager_RegisterDevice(b *testing.B) {
 	dm, err := NewDeviceManager()
 	if err != nil {
 		b.Skipf("Skipping benchmark (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(b, dm.Stop())
+	}()
 
 	caps := map[string]dbus.Variant{
-		"sample_rate": dbus.MakeVariant(48000),
+		strSampleRate: dbus.MakeVariant(48000),
 	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		dm.RegisterDevice("microphone", "/dev/null", "Bench Mic", caps, dbus.Sender("ie.fio.OllamaProxy.System"))
+		if _, dbusErr := dm.RegisterDevice("microphone", "/dev/null", "Bench Mic", caps, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+			b.Fatal(dbusErr)
+		}
 	}
 
 	// Target: <2ms per registration
 }
 
+// BenchmarkDeviceManager_RequestAccess is part of the public API.
 func BenchmarkDeviceManager_RequestAccess(b *testing.B) {
 	dm, err := NewDeviceManager()
 	if err != nil {
 		b.Skipf("Skipping benchmark (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(b, dm.Stop())
+	}()
 
 	// Pre-register devices
 	deviceIDs := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
-		id, _ := dm.RegisterDevice("camera", "/dev/null", "Bench Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+		id, dbusErr := dm.RegisterDevice("camera", "/dev/null", "Bench Cam", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+		if dbusErr != nil {
+			b.Fatal(dbusErr)
+		}
 		deviceIDs[i] = id
 	}
 
@@ -638,29 +765,38 @@ func BenchmarkDeviceManager_RequestAccess(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		dm.RequestDeviceAccess(deviceIDs[i], "bench-client", dbus.Sender("ie.fio.OllamaProxy.System"))
+		if _, _, _, dbusErr := dm.RequestDeviceAccess(deviceIDs[i], "bench-client", dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+			b.Fatal(dbusErr)
+		}
 	}
 
 	// Target: <2ms per access request
 }
 
+// BenchmarkDeviceManager_ListDevices is part of the public API.
 func BenchmarkDeviceManager_ListDevices(b *testing.B) {
 	dm, err := NewDeviceManager()
 	if err != nil {
 		b.Skipf("Skipping benchmark (D-Bus not available): %v", err)
 		return
 	}
-	defer dm.Stop()
+	defer func() {
+		testutil.CheckCleanup(b, dm.Stop())
+	}()
 
 	// Register 100 devices
 	for i := 0; i < 100; i++ {
-		dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System"))
+		if _, dbusErr := dm.RegisterDevice("microphone", "/dev/null", "Mic", nil, dbus.Sender("ie.fio.OllamaProxy.System")); dbusErr != nil {
+			b.Fatal(dbusErr)
+		}
 	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		dm.ListDevices("")
+		if _, dbusErr := dm.ListDevices(""); dbusErr != nil {
+			b.Fatal(dbusErr)
+		}
 	}
 }

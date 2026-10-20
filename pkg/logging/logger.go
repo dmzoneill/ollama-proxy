@@ -1,3 +1,4 @@
+// Package logging provides the process-wide structured logger.
 package logging
 
 import (
@@ -5,6 +6,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Logger is an exported var.
 var Logger *zap.Logger
 
 // InitLogger initializes the global logger
@@ -22,13 +24,13 @@ func InitLogger(level string, production bool) error {
 
 	// Parse log level
 	switch level {
-	case "debug":
+	case strDebug:
 		config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
-	case "info":
+	case strInfo:
 		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	case "warn":
+	case strWarn:
 		config.Level = zap.NewAtomicLevelAt(zapcore.WarnLevel)
-	case "error":
+	case strError:
 		config.Level = zap.NewAtomicLevelAt(zapcore.ErrorLevel)
 	default:
 		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -45,8 +47,11 @@ func InitLogger(level string, production bool) error {
 
 // Sync flushes any buffered log entries
 func Sync() {
-	if Logger != nil {
-		Logger.Sync()
+	if Logger == nil {
+		return
+	}
+	if err := Logger.Sync(); err != nil {
+		Warn("failed to sync logger", zap.Error(err))
 	}
 }
 

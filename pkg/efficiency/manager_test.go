@@ -6,18 +6,19 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestEfficiencyMode_String is part of the public API.
 func TestEfficiencyMode_String(t *testing.T) {
 	tests := []struct {
-		mode     EfficiencyMode
 		expected string
+		mode     Mode
 	}{
-		{ModePerformance, "Performance"},
-		{ModeBalanced, "Balanced"},
-		{ModeEfficiency, "Efficiency"},
-		{ModeQuiet, "Quiet"},
-		{ModeAuto, "Auto"},
-		{ModeUltraEfficiency, "Ultra Efficiency"},
-		{EfficiencyMode(999), "Unknown"},
+		{mode: ModePerformance, expected: strPerformance},
+		{mode: ModeBalanced, expected: strBalanced},
+		{mode: ModeEfficiency, expected: strEfficiency},
+		{mode: ModeQuiet, expected: strQuiet},
+		{mode: ModeAuto, expected: strAuto},
+		{mode: ModeUltraEfficiency, expected: strUltraEfficiency2},
+		{mode: Mode(999), expected: strUnknown},
 	}
 
 	for _, tt := range tests {
@@ -29,18 +30,19 @@ func TestEfficiencyMode_String(t *testing.T) {
 	}
 }
 
+// TestGetModeConfig is part of the public API.
 func TestGetModeConfig(t *testing.T) {
 	tests := []struct {
-		mode                    EfficiencyMode
-		expectedMaxPower        int
-		expectedMaxFan          int
+		mode                      Mode
+		expectedMaxPower          int
+		expectedMaxFan            int
 		expectedUseClassification bool
 	}{
-		{ModePerformance, 999, 100, false},
-		{ModeBalanced, 60, 80, true},
-		{ModeEfficiency, 15, 60, true},
-		{ModeQuiet, 15, 40, true},
-		{ModeUltraEfficiency, 5, 30, true},
+		{mode: ModePerformance, expectedMaxPower: 999, expectedMaxFan: 100, expectedUseClassification: false},
+		{mode: ModeBalanced, expectedMaxPower: 60, expectedMaxFan: 80, expectedUseClassification: true},
+		{mode: ModeEfficiency, expectedMaxPower: 15, expectedMaxFan: 60, expectedUseClassification: true},
+		{mode: ModeQuiet, expectedMaxPower: 15, expectedMaxFan: 40, expectedUseClassification: true},
+		{mode: ModeUltraEfficiency, expectedMaxPower: 5, expectedMaxFan: 30, expectedUseClassification: true},
 	}
 
 	for _, tt := range tests {
@@ -74,8 +76,9 @@ func TestGetModeConfig(t *testing.T) {
 	}
 }
 
+// TestGetModeConfig_DefaultFallback is part of the public API.
 func TestGetModeConfig_DefaultFallback(t *testing.T) {
-	config := GetModeConfig(EfficiencyMode(999))
+	config := GetModeConfig(Mode(999))
 
 	// Should return Balanced as default
 	if config.MaxPowerWatts != 60 {
@@ -83,6 +86,7 @@ func TestGetModeConfig_DefaultFallback(t *testing.T) {
 	}
 }
 
+// TestNewEfficiencyManager is part of the public API.
 func TestNewEfficiencyManager(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
@@ -95,6 +99,7 @@ func TestNewEfficiencyManager(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_SetMode is part of the public API.
 func TestEfficiencyManager_SetMode(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
@@ -105,6 +110,7 @@ func TestEfficiencyManager_SetMode(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_GetEffectiveMode_NonAuto is part of the public API.
 func TestEfficiencyManager_GetEffectiveMode_NonAuto(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
@@ -115,17 +121,18 @@ func TestEfficiencyManager_GetEffectiveMode_NonAuto(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_GetEffectiveMode_Auto is part of the public API.
 func TestEfficiencyManager_GetEffectiveMode_Auto(t *testing.T) {
 	em := NewEfficiencyManager(ModeAuto)
 
 	tests := []struct {
-		name            string
-		batteryPercent  int
-		onBattery       bool
-		avgTemp         float64
-		avgFanSpeed     int
-		quietHours      bool
-		expectedMode    EfficiencyMode
+		name           string
+		batteryPercent int
+		avgTemp        float64
+		avgFanSpeed    int
+		expectedMode   Mode
+		onBattery      bool
+		quietHours     bool
 	}{
 		{
 			name:           "Critical battery",
@@ -211,6 +218,7 @@ func TestEfficiencyManager_GetEffectiveMode_Auto(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_UpdateSystemState is part of the public API.
 func TestEfficiencyManager_UpdateSystemState(t *testing.T) {
 	em := NewEfficiencyManager(ModeAuto)
 
@@ -225,6 +233,7 @@ func TestEfficiencyManager_UpdateSystemState(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_ApplyModeToAnnotations_Performance is part of the public API.
 func TestEfficiencyManager_ApplyModeToAnnotations_Performance(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
@@ -244,6 +253,7 @@ func TestEfficiencyManager_ApplyModeToAnnotations_Performance(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_ApplyModeToAnnotations_Efficiency is part of the public API.
 func TestEfficiencyManager_ApplyModeToAnnotations_Efficiency(t *testing.T) {
 	em := NewEfficiencyManager(ModeEfficiency)
 
@@ -268,6 +278,7 @@ func TestEfficiencyManager_ApplyModeToAnnotations_Efficiency(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_ApplyModeToAnnotations_Quiet is part of the public API.
 func TestEfficiencyManager_ApplyModeToAnnotations_Quiet(t *testing.T) {
 	em := NewEfficiencyManager(ModeQuiet)
 
@@ -287,6 +298,7 @@ func TestEfficiencyManager_ApplyModeToAnnotations_Quiet(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_ApplyModeToAnnotations_UltraEfficiency is part of the public API.
 func TestEfficiencyManager_ApplyModeToAnnotations_UltraEfficiency(t *testing.T) {
 	em := NewEfficiencyManager(ModeUltraEfficiency)
 
@@ -311,6 +323,7 @@ func TestEfficiencyManager_ApplyModeToAnnotations_UltraEfficiency(t *testing.T) 
 	}
 }
 
+// TestEfficiencyManager_ApplyModeToAnnotations_PowerLimit is part of the public API.
 func TestEfficiencyManager_ApplyModeToAnnotations_PowerLimit(t *testing.T) {
 	em := NewEfficiencyManager(ModeEfficiency)
 
@@ -327,7 +340,8 @@ func TestEfficiencyManager_ApplyModeToAnnotations_PowerLimit(t *testing.T) {
 	}
 }
 
-func TestEfficiencyManager_ConcurrentAccess(t *testing.T) {
+// TestEfficiencyManager_ConcurrentAccess is part of the public API.
+func TestEfficiencyManager_ConcurrentAccess(_ *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
 	done := make(chan bool)
@@ -335,7 +349,7 @@ func TestEfficiencyManager_ConcurrentAccess(t *testing.T) {
 	// Writer goroutine
 	go func() {
 		for i := 0; i < 100; i++ {
-			em.SetMode(EfficiencyMode(i % 6))
+			em.SetMode(Mode(i % 6))
 			em.UpdateSystemState(50+i%50, i%2 == 0, 60.0+float64(i%20), 30+i%40, i%3 == 0)
 		}
 		done <- true
@@ -359,16 +373,17 @@ func TestEfficiencyManager_ConcurrentAccess(t *testing.T) {
 	// If we get here without panicking, concurrent access works
 }
 
+// TestGetModeConfig_PreferredBackends is part of the public API.
 func TestGetModeConfig_PreferredBackends(t *testing.T) {
 	tests := []struct {
-		mode                     EfficiencyMode
-		expectedFirstBackend     string
+		expectedFirstBackend string
+		mode                 Mode
 	}{
-		{ModePerformance, "ollama-nvidia"},
-		{ModeBalanced, "ollama-igpu"},
-		{ModeEfficiency, "ollama-npu"},
-		{ModeQuiet, "ollama-npu"},
-		{ModeUltraEfficiency, "ollama-npu"},
+		{mode: ModePerformance, expectedFirstBackend: strOllamaNvidia},
+		{mode: ModeBalanced, expectedFirstBackend: strOllamaIgpu},
+		{mode: ModeEfficiency, expectedFirstBackend: strOllamaNpu},
+		{mode: ModeQuiet, expectedFirstBackend: strOllamaNpu},
+		{mode: ModeUltraEfficiency, expectedFirstBackend: strOllamaNpu},
 	}
 
 	for _, tt := range tests {
@@ -387,6 +402,7 @@ func TestGetModeConfig_PreferredBackends(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_GetModeDescription is part of the public API.
 func TestEfficiencyManager_GetModeDescription(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
@@ -406,16 +422,16 @@ func TestEfficiencyManager_GetModeDescription(t *testing.T) {
 	}
 }
 
-
+// TestEfficiencyManager_ShouldUseBackend is part of the public API.
 func TestEfficiencyManager_ShouldUseBackend(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
 	tests := []struct {
-		name      string
-		temp      float64
-		fanSpeed  int
-		expected  bool
-		desc      string
+		name     string
+		desc     string
+		temp     float64
+		fanSpeed int
+		expected bool
 	}{
 		{
 			name:     "Normal temp and fan",
@@ -450,6 +466,7 @@ func TestEfficiencyManager_ShouldUseBackend(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_GetPreferredBackends2 is part of the public API.
 func TestEfficiencyManager_GetPreferredBackends2(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
@@ -470,6 +487,7 @@ func TestEfficiencyManager_GetPreferredBackends2(t *testing.T) {
 	t.Logf("Efficiency mode backends: %v", backends)
 }
 
+// TestEfficiencyManager_GetSystemState2 is part of the public API.
 func TestEfficiencyManager_GetSystemState2(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
@@ -493,6 +511,7 @@ func TestEfficiencyManager_GetSystemState2(t *testing.T) {
 		state.BatteryPercent, state.OnBattery, state.AvgTemp, state.AvgFanSpeed, state.QuietHours)
 }
 
+// TestAllModes is part of the public API.
 func TestAllModes(t *testing.T) {
 	modes := AllModes()
 
@@ -500,7 +519,7 @@ func TestAllModes(t *testing.T) {
 		t.Fatal("AllModes should return non-empty list")
 	}
 
-	expectedModes := map[EfficiencyMode]bool{
+	expectedModes := map[Mode]bool{
 		ModePerformance:     false,
 		ModeBalanced:        false,
 		ModeEfficiency:      false,
@@ -525,10 +544,11 @@ func TestAllModes(t *testing.T) {
 	t.Logf("All modes (%d total): %v", len(modes), modes)
 }
 
+// TestEfficiencyManager_SetMode_AllModes is part of the public API.
 func TestEfficiencyManager_SetMode_AllModes(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -545,13 +565,14 @@ func TestEfficiencyManager_SetMode_AllModes(t *testing.T) {
 	}
 }
 
+// TestEfficiencyManager_GetEffectiveMode is part of the public API.
 func TestEfficiencyManager_GetEffectiveMode(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
 	// In Auto mode, effective mode should be calculated
 	em.SetMode(ModeAuto)
 	effective := em.GetEffectiveMode()
-	
+
 	if effective == ModeAuto {
 		t.Error("Effective mode should not be Auto, should be resolved")
 	}
@@ -559,12 +580,13 @@ func TestEfficiencyManager_GetEffectiveMode(t *testing.T) {
 	// In non-Auto mode, effective should equal actual
 	em.SetMode(ModePerformance)
 	effective = em.GetEffectiveMode()
-	
+
 	if effective != ModePerformance {
 		t.Errorf("Expected Performance, got %s", effective)
 	}
 }
 
+// TestGetModeConfig_AllModes is part of the public API.
 func TestGetModeConfig_AllModes(t *testing.T) {
 	modes := AllModes()
 
@@ -583,13 +605,13 @@ func TestGetModeConfig_AllModes(t *testing.T) {
 		if config.Description == "" {
 			t.Errorf("Mode %s has no description", mode)
 		}
-		
+
 		t.Logf("Mode %s: MaxTemp=%.0f°C MaxFan=%d%% Desc=%s",
 			mode, config.MaxTempCelsius, config.MaxFanPercent, config.Description)
 	}
 }
 
-
+// TestEfficiencyManager_UpdateState is part of the public API.
 func TestEfficiencyManager_UpdateState(t *testing.T) {
 	em := NewEfficiencyManager(ModeAuto)
 
@@ -608,7 +630,7 @@ func TestEfficiencyManager_UpdateState(t *testing.T) {
 
 // Test GetModeDescription for various modes
 func TestEfficiencyManager_GetModeDescription_AllModes(t *testing.T) {
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -635,21 +657,21 @@ func TestEfficiencyManager_GetModeDescription_Auto(t *testing.T) {
 
 	// Before setting state, should describe Auto
 	desc := em.GetModeDescription()
-	if !contains(desc, "Auto") {
+	if !contains(desc, strAuto) {
 		t.Errorf("Expected 'Auto' in description, got: %s", desc)
 	}
 
 	// Set state to high battery on AC - should resolve to Performance
 	em.UpdateSystemState(100, false, 55.0, 25, false)
 	desc = em.GetModeDescription()
-	if !contains(desc, "Performance") {
+	if !contains(desc, strPerformance) {
 		t.Errorf("Expected 'Performance' in description for ideal conditions, got: %s", desc)
 	}
 
 	// Set state to critical battery - should resolve to UltraEfficiency
 	em.UpdateSystemState(15, true, 65.0, 30, false)
 	desc = em.GetModeDescription()
-	if !contains(desc, "Ultra Efficiency") {
+	if !contains(desc, strUltraEfficiency2) {
 		t.Errorf("Expected 'Ultra Efficiency' in description for critical battery, got: %s", desc)
 	}
 }
@@ -715,21 +737,21 @@ func TestEfficiencyManager_ApplyModeToAnnotations_ZeroPowerLimit(t *testing.T) {
 // Test ShouldUseBackend thermal limit enforcement
 func TestEfficiencyManager_ShouldUseBackend_ThermalLimits(t *testing.T) {
 	tests := []struct {
-		mode        EfficiencyMode
+		desc        string
+		mode        Mode
 		temp        float64
 		shouldAllow bool
-		desc        string
 	}{
-		{ModePerformance, 90.0, true, "Performance allows 90C"},
-		{ModePerformance, 91.0, false, "Performance blocks >90C"},
-		{ModeBalanced, 85.0, true, "Balanced allows 85C"},
-		{ModeBalanced, 86.0, false, "Balanced blocks >85C"},
-		{ModeEfficiency, 75.0, true, "Efficiency allows 75C"},
-		{ModeEfficiency, 76.0, false, "Efficiency blocks >75C"},
-		{ModeQuiet, 70.0, true, "Quiet allows 70C"},
-		{ModeQuiet, 71.0, false, "Quiet blocks >70C"},
-		{ModeUltraEfficiency, 65.0, true, "UltraEfficiency allows 65C"},
-		{ModeUltraEfficiency, 66.0, false, "UltraEfficiency blocks >65C"},
+		{mode: ModePerformance, temp: 90.0, shouldAllow: true, desc: "Performance allows 90C"},
+		{mode: ModePerformance, temp: 91.0, shouldAllow: false, desc: "Performance blocks >90C"},
+		{mode: ModeBalanced, temp: 85.0, shouldAllow: true, desc: "Balanced allows 85C"},
+		{mode: ModeBalanced, temp: 86.0, shouldAllow: false, desc: "Balanced blocks >85C"},
+		{mode: ModeEfficiency, temp: 75.0, shouldAllow: true, desc: "Efficiency allows 75C"},
+		{mode: ModeEfficiency, temp: 76.0, shouldAllow: false, desc: "Efficiency blocks >75C"},
+		{mode: ModeQuiet, temp: 70.0, shouldAllow: true, desc: "Quiet allows 70C"},
+		{mode: ModeQuiet, temp: 71.0, shouldAllow: false, desc: "Quiet blocks >70C"},
+		{mode: ModeUltraEfficiency, temp: 65.0, shouldAllow: true, desc: "UltraEfficiency allows 65C"},
+		{mode: ModeUltraEfficiency, temp: 66.0, shouldAllow: false, desc: "UltraEfficiency blocks >65C"},
 	}
 
 	for _, tt := range tests {
@@ -744,21 +766,21 @@ func TestEfficiencyManager_ShouldUseBackend_ThermalLimits(t *testing.T) {
 // Test ShouldUseBackend fan speed limit enforcement
 func TestEfficiencyManager_ShouldUseBackend_FanLimits(t *testing.T) {
 	tests := []struct {
-		mode        EfficiencyMode
+		desc        string
+		mode        Mode
 		fanSpeed    int
 		shouldAllow bool
-		desc        string
 	}{
-		{ModePerformance, 100, true, "Performance allows 100% fan"},
-		{ModePerformance, 101, false, "Performance blocks >100% fan"},
-		{ModeBalanced, 80, true, "Balanced allows 80% fan"},
-		{ModeBalanced, 81, false, "Balanced blocks >80% fan"},
-		{ModeEfficiency, 60, true, "Efficiency allows 60% fan"},
-		{ModeEfficiency, 61, false, "Efficiency blocks >60% fan"},
-		{ModeQuiet, 40, true, "Quiet allows 40% fan"},
-		{ModeQuiet, 41, false, "Quiet blocks >40% fan"},
-		{ModeUltraEfficiency, 30, true, "UltraEfficiency allows 30% fan"},
-		{ModeUltraEfficiency, 31, false, "UltraEfficiency blocks >30% fan"},
+		{mode: ModePerformance, fanSpeed: 100, shouldAllow: true, desc: "Performance allows 100% fan"},
+		{mode: ModePerformance, fanSpeed: 101, shouldAllow: false, desc: "Performance blocks >100% fan"},
+		{mode: ModeBalanced, fanSpeed: 80, shouldAllow: true, desc: "Balanced allows 80% fan"},
+		{mode: ModeBalanced, fanSpeed: 81, shouldAllow: false, desc: "Balanced blocks >80% fan"},
+		{mode: ModeEfficiency, fanSpeed: 60, shouldAllow: true, desc: "Efficiency allows 60% fan"},
+		{mode: ModeEfficiency, fanSpeed: 61, shouldAllow: false, desc: "Efficiency blocks >60% fan"},
+		{mode: ModeQuiet, fanSpeed: 40, shouldAllow: true, desc: "Quiet allows 40% fan"},
+		{mode: ModeQuiet, fanSpeed: 41, shouldAllow: false, desc: "Quiet blocks >40% fan"},
+		{mode: ModeUltraEfficiency, fanSpeed: 30, shouldAllow: true, desc: "UltraEfficiency allows 30% fan"},
+		{mode: ModeUltraEfficiency, fanSpeed: 31, shouldAllow: false, desc: "UltraEfficiency blocks >30% fan"},
 	}
 
 	for _, tt := range tests {
@@ -914,15 +936,15 @@ func TestEfficiencyManager_ApplyModeToAnnotations_RespectLowerLimits(t *testing.
 // Test OverrideCriticalFlag configuration
 func TestEfficiencyManager_ApplyModeToAnnotations_CriticalFlag(t *testing.T) {
 	tests := []struct {
-		mode        EfficiencyMode
-		shouldClamp bool
 		desc        string
+		mode        Mode
+		shouldClamp bool
 	}{
-		{ModePerformance, false, "Performance should not override critical flag"},
-		{ModeBalanced, true, "Balanced should override critical flag"},
-		{ModeEfficiency, true, "Efficiency should override critical flag"},
-		{ModeQuiet, true, "Quiet should override critical flag"},
-		{ModeUltraEfficiency, true, "UltraEfficiency should override critical flag"},
+		{mode: ModePerformance, shouldClamp: false, desc: "Performance should not override critical flag"},
+		{mode: ModeBalanced, shouldClamp: true, desc: "Balanced should override critical flag"},
+		{mode: ModeEfficiency, shouldClamp: true, desc: "Efficiency should override critical flag"},
+		{mode: ModeQuiet, shouldClamp: true, desc: "Quiet should override critical flag"},
+		{mode: ModeUltraEfficiency, shouldClamp: true, desc: "UltraEfficiency should override critical flag"},
 	}
 
 	for _, tt := range tests {
@@ -942,15 +964,15 @@ func TestEfficiencyManager_ApplyModeToAnnotations_CriticalFlag(t *testing.T) {
 // Test ThrottleLatencyCritical configuration
 func TestEfficiencyManager_ThrottleLatencyCritical(t *testing.T) {
 	tests := []struct {
-		mode        EfficiencyMode
+		desc           string
+		mode           Mode
 		shouldThrottle bool
-		desc        string
 	}{
-		{ModePerformance, false, "Performance should not throttle latency-critical"},
-		{ModeBalanced, false, "Balanced should not throttle latency-critical"},
-		{ModeEfficiency, true, "Efficiency should throttle latency-critical"},
-		{ModeQuiet, true, "Quiet should throttle latency-critical"},
-		{ModeUltraEfficiency, true, "UltraEfficiency should throttle latency-critical"},
+		{mode: ModePerformance, shouldThrottle: false, desc: "Performance should not throttle latency-critical"},
+		{mode: ModeBalanced, shouldThrottle: false, desc: "Balanced should not throttle latency-critical"},
+		{mode: ModeEfficiency, shouldThrottle: true, desc: "Efficiency should throttle latency-critical"},
+		{mode: ModeQuiet, shouldThrottle: true, desc: "Quiet should throttle latency-critical"},
+		{mode: ModeUltraEfficiency, shouldThrottle: true, desc: "UltraEfficiency should throttle latency-critical"},
 	}
 
 	for _, tt := range tests {
@@ -1006,7 +1028,7 @@ func TestEfficiencyManager_AutoMode_ComplexScenario(t *testing.T) {
 func TestEfficiencyManager_GetMode_ExactValue(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -1050,13 +1072,13 @@ func TestEfficiencyManager_SystemState_Fields(t *testing.T) {
 // Test mode string edge cases
 func TestEfficiencyMode_String_EdgeCases(t *testing.T) {
 	// Test all known modes
-	knownModes := map[EfficiencyMode]string{
-		ModePerformance:     "Performance",
-		ModeBalanced:        "Balanced",
-		ModeEfficiency:      "Efficiency",
-		ModeQuiet:           "Quiet",
-		ModeAuto:            "Auto",
-		ModeUltraEfficiency: "Ultra Efficiency",
+	knownModes := map[Mode]string{
+		ModePerformance:     strPerformance,
+		ModeBalanced:        strBalanced,
+		ModeEfficiency:      strEfficiency,
+		ModeQuiet:           strQuiet,
+		ModeAuto:            strAuto,
+		ModeUltraEfficiency: strUltraEfficiency2,
 	}
 
 	for mode, expected := range knownModes {
@@ -1066,9 +1088,9 @@ func TestEfficiencyMode_String_EdgeCases(t *testing.T) {
 	}
 
 	// Test unknown mode values
-	unknownModes := []EfficiencyMode{-1, 100, 999, 1000}
+	unknownModes := []Mode{-1, 100, 999, 1000}
 	for _, mode := range unknownModes {
-		if got := mode.String(); got != "Unknown" {
+		if got := mode.String(); got != strUnknown {
 			t.Errorf("String() for unknown mode %d = %q, expected 'Unknown'", mode, got)
 		}
 	}
@@ -1176,7 +1198,7 @@ func TestEfficiencyManager_ShouldUseBackend_Boundaries(t *testing.T) {
 
 // Test GetPreferredBackends for each mode returns non-empty list
 func TestEfficiencyManager_GetPreferredBackends_NonEmpty(t *testing.T) {
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -1199,7 +1221,7 @@ func TestEfficiencyManager_GetPreferredBackends_NonEmpty(t *testing.T) {
 
 // Test GetModeDescription shows mode for non-Auto modes
 func TestEfficiencyManager_GetModeDescription_NonAuto(t *testing.T) {
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -1227,7 +1249,7 @@ func TestEfficiencyManager_ConcurrentModeSwitching(t *testing.T) {
 	// Thread 1: Keep switching modes
 	go func() {
 		for i := 0; i < 50; i++ {
-			em.SetMode(EfficiencyMode(i % 6))
+			em.SetMode(Mode(i % 6))
 		}
 		done <- 1
 	}()
@@ -1289,46 +1311,46 @@ func TestEfficiencyManager_AutoMode_ExtremeValues(t *testing.T) {
 	tests := []struct {
 		name         string
 		battery      int
-		onBattery    bool
 		temp         float64
 		fanSpeed     int
+		expectedMode Mode
+		onBattery    bool
 		quietHours   bool
-		expectedMode EfficiencyMode
 	}{
 		{
-			"0% battery",
-			0, true, 70.0, 50, false,
-			ModeUltraEfficiency,
+			name:    "0% battery",
+			battery: 0, onBattery: true, temp: 70.0, fanSpeed: 50, quietHours: false,
+			expectedMode: ModeUltraEfficiency,
 		},
 		{
-			"100% battery on AC",
-			100, false, 50.0, 20, false,
-			ModePerformance,
+			name:    "100% battery on AC",
+			battery: 100, onBattery: false, temp: 50.0, fanSpeed: 20, quietHours: false,
+			expectedMode: ModePerformance,
 		},
 		{
-			"100% battery on AC with high fan",
-			100, false, 50.0, 75, false,
-			ModeQuiet,
+			name:    "100% battery on AC with high fan",
+			battery: 100, onBattery: false, temp: 50.0, fanSpeed: 75, quietHours: false,
+			expectedMode: ModeQuiet,
 		},
 		{
-			"100% battery on AC with high temp",
-			100, false, 80.0, 30, false,
-			ModeEfficiency,
+			name:    "100% battery on AC with high temp",
+			battery: 100, onBattery: false, temp: 80.0, fanSpeed: 30, quietHours: false,
+			expectedMode: ModeEfficiency,
 		},
 		{
-			"Quiet hours override",
-			100, false, 50.0, 20, true,
-			ModeQuiet,
+			name:    "Quiet hours override",
+			battery: 100, onBattery: false, temp: 50.0, fanSpeed: 20, quietHours: true,
+			expectedMode: ModeQuiet,
 		},
 		{
-			"Very high temp",
-			50, false, 95.0, 50, false,
-			ModeEfficiency,
+			name:    "Very high temp",
+			battery: 50, onBattery: false, temp: 95.0, fanSpeed: 50, quietHours: false,
+			expectedMode: ModeEfficiency,
 		},
 		{
-			"Very high fan",
-			50, false, 55.0, 100, false,
-			ModeQuiet,
+			name:    "Very high fan",
+			battery: 50, onBattery: false, temp: 55.0, fanSpeed: 100, quietHours: false,
+			expectedMode: ModeQuiet,
 		},
 	}
 
@@ -1346,15 +1368,15 @@ func TestEfficiencyManager_AutoMode_ExtremeValues(t *testing.T) {
 // Test UseClassification field for all modes
 func TestEfficiencyManager_UseClassificationField(t *testing.T) {
 	tests := []struct {
-		mode               EfficiencyMode
-		shouldClassify     bool
-		desc               string
+		desc           string
+		mode           Mode
+		shouldClassify bool
 	}{
-		{ModePerformance, false, "Performance should not use classification"},
-		{ModeBalanced, true, "Balanced should use classification"},
-		{ModeEfficiency, true, "Efficiency should use classification"},
-		{ModeQuiet, true, "Quiet should use classification"},
-		{ModeUltraEfficiency, true, "UltraEfficiency should use classification"},
+		{mode: ModePerformance, shouldClassify: false, desc: "Performance should not use classification"},
+		{mode: ModeBalanced, shouldClassify: true, desc: "Balanced should use classification"},
+		{mode: ModeEfficiency, shouldClassify: true, desc: "Efficiency should use classification"},
+		{mode: ModeQuiet, shouldClassify: true, desc: "Quiet should use classification"},
+		{mode: ModeUltraEfficiency, shouldClassify: true, desc: "UltraEfficiency should use classification"},
 	}
 
 	for _, tt := range tests {
@@ -1428,16 +1450,16 @@ func TestEfficiencyManager_SystemState_AllFields(t *testing.T) {
 
 	testCases := []struct {
 		battery    int
-		onBattery  bool
 		temp       float64
 		fanSpeed   int
+		onBattery  bool
 		quietHours bool
 	}{
-		{100, false, 25.0, 10, false},
-		{50, true, 65.0, 40, false},
-		{10, true, 85.0, 90, true},
-		{75, false, 70.0, 50, true},
-		{0, true, 95.0, 100, false},
+		{battery: 100, onBattery: false, temp: 25.0, fanSpeed: 10, quietHours: false},
+		{battery: 50, onBattery: true, temp: 65.0, fanSpeed: 40, quietHours: false},
+		{battery: 10, onBattery: true, temp: 85.0, fanSpeed: 90, quietHours: true},
+		{battery: 75, onBattery: false, temp: 70.0, fanSpeed: 50, quietHours: true},
+		{battery: 0, onBattery: true, temp: 95.0, fanSpeed: 100, quietHours: false},
 	}
 
 	for i, tc := range testCases {

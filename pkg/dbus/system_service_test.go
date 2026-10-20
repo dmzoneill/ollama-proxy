@@ -76,8 +76,8 @@ func TestGetSystemStateMethod(t *testing.T) {
 	if state["battery_percent"].Value().(int32) != 75 {
 		t.Errorf("Expected battery_percent 75, got %v", state["battery_percent"].Value())
 	}
-	if state["on_battery"].Value().(bool) != true {
-		t.Errorf("Expected on_battery true, got %v", state["on_battery"].Value())
+	if state[strOnBattery].Value().(bool) != true {
+		t.Errorf("Expected on_battery true, got %v", state[strOnBattery].Value())
 	}
 	if state["avg_temp"].Value().(float64) != 65.5 {
 		t.Errorf("Expected avg_temp 65.5, got %v", state["avg_temp"].Value())
@@ -85,8 +85,8 @@ func TestGetSystemStateMethod(t *testing.T) {
 	if state["avg_fan_speed"].Value().(int32) != 50 {
 		t.Errorf("Expected avg_fan_speed 50, got %v", state["avg_fan_speed"].Value())
 	}
-	if state["quiet_hours"].Value().(bool) != false {
-		t.Errorf("Expected quiet_hours false, got %v", state["quiet_hours"].Value())
+	if state[strQuietHours].Value().(bool) != false {
+		t.Errorf("Expected quiet_hours false, got %v", state[strQuietHours].Value())
 	}
 }
 
@@ -108,8 +108,8 @@ func TestGetSystemStateZeroValues(t *testing.T) {
 	if state["battery_percent"].Value().(int32) != 0 {
 		t.Errorf("Expected battery_percent 0, got %v", state["battery_percent"].Value())
 	}
-	if state["on_battery"].Value().(bool) != false {
-		t.Errorf("Expected on_battery false, got %v", state["on_battery"].Value())
+	if state[strOnBattery].Value().(bool) != false {
+		t.Errorf("Expected on_battery false, got %v", state[strOnBattery].Value())
 	}
 	if state["avg_temp"].Value().(float64) != 0 {
 		t.Errorf("Expected avg_temp 0, got %v", state["avg_temp"].Value())
@@ -225,7 +225,7 @@ func TestIsQuietHoursMethod(t *testing.T) {
 }
 
 // TestEmitPowerSourceChanged tests the EmitPowerSourceChanged method
-func TestEmitPowerSourceChanged(t *testing.T) {
+func TestEmitPowerSourceChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -240,7 +240,7 @@ func TestEmitPowerSourceChanged(t *testing.T) {
 }
 
 // TestEmitBatteryLevelChanged tests the EmitBatteryLevelChanged method
-func TestEmitBatteryLevelChanged(t *testing.T) {
+func TestEmitBatteryLevelChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -256,7 +256,7 @@ func TestEmitBatteryLevelChanged(t *testing.T) {
 }
 
 // TestEmitQuietHoursChanged tests the EmitQuietHoursChanged method
-func TestEmitQuietHoursChanged(t *testing.T) {
+func TestEmitQuietHoursChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -331,7 +331,7 @@ func TestMakePropertyMapSystem(t *testing.T) {
 }
 
 // TestUpdatePropertiesSystem tests the UpdateProperties method
-func TestUpdatePropertiesSystem(t *testing.T) {
+func TestUpdatePropertiesSystem(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -353,7 +353,7 @@ func TestUpdatePropertiesSystem(t *testing.T) {
 }
 
 // TestStopSystemService tests the Stop method
-func TestStopSystemService(t *testing.T) {
+func TestStopSystemService(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -429,7 +429,7 @@ func TestGetAutoModeReasoningDifferentStates(t *testing.T) {
 
 // TestSystemStateDifferentModes tests GetSystemState with different efficiency modes
 func TestSystemStateDifferentModes(t *testing.T) {
-	modes := []efficiency.EfficiencyMode{
+	modes := []efficiency.Mode{
 		efficiency.ModePerformance,
 		efficiency.ModeBalanced,
 		efficiency.ModeEfficiency,
@@ -477,21 +477,21 @@ func TestEmitMethodsWithNilProps(t *testing.T) {
 
 	// All these should not panic
 	tests := []struct {
-		name string
 		fn   func()
+		name string
 	}{
-		{"EmitPowerSourceChanged true", func() { svc.EmitPowerSourceChanged(true) }},
-		{"EmitPowerSourceChanged false", func() { svc.EmitPowerSourceChanged(false) }},
-		{"EmitBatteryLevelChanged 0", func() { svc.EmitBatteryLevelChanged(0) }},
-		{"EmitBatteryLevelChanged 50", func() { svc.EmitBatteryLevelChanged(50) }},
-		{"EmitBatteryLevelChanged 100", func() { svc.EmitBatteryLevelChanged(100) }},
-		{"EmitQuietHoursChanged true", func() { svc.EmitQuietHoursChanged(true) }},
-		{"EmitQuietHoursChanged false", func() { svc.EmitQuietHoursChanged(false) }},
-		{"UpdateProperties", func() { svc.UpdateProperties() }},
+		{name: "EmitPowerSourceChanged true", fn: func() { svc.EmitPowerSourceChanged(true) }},
+		{name: "EmitPowerSourceChanged false", fn: func() { svc.EmitPowerSourceChanged(false) }},
+		{name: "EmitBatteryLevelChanged 0", fn: func() { svc.EmitBatteryLevelChanged(0) }},
+		{name: "EmitBatteryLevelChanged 50", fn: func() { svc.EmitBatteryLevelChanged(50) }},
+		{name: "EmitBatteryLevelChanged 100", fn: func() { svc.EmitBatteryLevelChanged(100) }},
+		{name: "EmitQuietHoursChanged true", fn: func() { svc.EmitQuietHoursChanged(true) }},
+		{name: "EmitQuietHoursChanged false", fn: func() { svc.EmitQuietHoursChanged(false) }},
+		{name: "UpdateProperties", fn: func() { svc.UpdateProperties() }},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Should not panic
 			tt.fn()
 		})
@@ -563,7 +563,7 @@ func TestSystemStateEdgeCases(t *testing.T) {
 			}
 
 			// Verify the state contains all required fields
-			requiredFields := []string{"battery_percent", "on_battery", "avg_temp", "avg_fan_speed", "quiet_hours"}
+			requiredFields := []string{"battery_percent", strOnBattery, "avg_temp", "avg_fan_speed", strQuietHours}
 			for _, field := range requiredFields {
 				if _, ok := state[field]; !ok {
 					t.Errorf("Missing required field: %s", field)

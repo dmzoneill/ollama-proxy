@@ -1,3 +1,4 @@
+// Package backends defines the backend interface shared by model providers.
 package backends
 
 import (
@@ -74,19 +75,21 @@ type Backend interface {
 // MediaType represents the type of workload
 type MediaType string
 
+// MediaTypeText is an exported const.
 const (
-	MediaTypeText     MediaType = "text"      // Text generation/chat
-	MediaTypeCode     MediaType = "code"      // Code generation
-	MediaTypeAudio    MediaType = "audio"     // Audio processing (transcription, TTS)
-	MediaTypeImage    MediaType = "image"     // Image generation/analysis
-	MediaTypeVideo    MediaType = "video"     // Video processing (transcription, generation)
-	MediaTypeRealtime MediaType = "realtime"  // Real-time interactive (audio/chat)
-	MediaTypeAuto     MediaType = "auto"      // Auto-detect from prompt
+	MediaTypeText     MediaType = "text"     // Text generation/chat
+	MediaTypeCode     MediaType = "code"     // Code generation
+	MediaTypeAudio    MediaType = "audio"    // Audio processing (transcription, TTS)
+	MediaTypeImage    MediaType = "image"    // Image generation/analysis
+	MediaTypeVideo    MediaType = "video"    // Video processing (transcription, generation)
+	MediaTypeRealtime MediaType = "realtime" // Real-time interactive (audio/chat)
+	MediaTypeAuto     MediaType = "auto"     // Auto-detect from prompt
 )
 
 // Priority levels for request prioritization
 type Priority int
 
+// PriorityBestEffort is an exported const.
 const (
 	PriorityBestEffort Priority = 0 // Batch jobs, non-critical
 	PriorityNormal     Priority = 1 // Default priority
@@ -96,43 +99,40 @@ const (
 
 // Annotations for job routing
 type Annotations struct {
-	Target                 string
-	LatencyCritical        bool
-	PreferPowerEfficiency  bool
-	CacheEnabled           bool
-	MaxLatencyMs           int32
-	MaxPowerWatts          int32
-	MediaType              MediaType         // Type of workload
-
-	// Priority queuing
-	Priority               Priority          // Request priority level
-	RequestID              string            // Unique request ID for tracking
-	DeadlineMs             int64             // Absolute deadline (Unix ms)
-
-	Custom                 map[string]string
+	Custom                map[string]string
+	Target                string
+	MediaType             MediaType
+	RequestID             string
+	Priority              Priority
+	DeadlineMs            int64
+	MaxLatencyMs          int32
+	MaxPowerWatts         int32
+	LatencyCritical       bool
+	PreferPowerEfficiency bool
+	CacheEnabled          bool
 }
 
 // GenerateRequest for text generation
 type GenerateRequest struct {
+	Options *GenerationOptions
 	Prompt  string
 	Model   string
-	Options *GenerationOptions
 }
 
 // GenerationOptions for inference
 type GenerationOptions struct {
+	Stop          []string
 	MaxTokens     int32
 	Temperature   float32
 	TopP          float32
 	TopK          int32
-	Stop          []string
 	ContextLength int32
 }
 
 // GenerateResponse from backend
 type GenerateResponse struct {
-	Response string
 	Stats    *GenerationStats
+	Response string
 }
 
 // GenerationStats for a generation
@@ -152,9 +152,9 @@ type StreamReader interface {
 
 // StreamChunk represents a chunk of streamed response
 type StreamChunk struct {
+	Stats *GenerationStats
 	Token string
 	Done  bool
-	Stats *GenerationStats
 }
 
 // EmbedRequest for embeddings
@@ -165,46 +165,42 @@ type EmbedRequest struct {
 
 // EmbedResponse with embeddings
 type EmbedResponse struct {
-	Embedding []float32
 	Stats     *GenerationStats
+	Embedding []float32
 }
 
 // BackendMetrics tracks backend performance
 type BackendMetrics struct {
-	RequestCount       int64
-	SuccessCount       int64
-	ErrorCount         int64
-	TotalLatencyMs     int64
-	AvgLatencyMs       int32
-	RequestsPerMinute  int32
-	ErrorRate          float32
-	LoadedModels       []string
+	LoadedModels      []string
+	RequestCount      int64
+	SuccessCount      int64
+	ErrorCount        int64
+	TotalLatencyMs    int64
+	AvgLatencyMs      int32
+	RequestsPerMinute int32
+	ErrorRate         float32
 }
 
 // ModelCapability defines what models a backend can run
 type ModelCapability struct {
-	MaxModelSizeGB         int      // Maximum model size in GB
-	SupportedModelPatterns []string // Glob patterns like "*:0.5b", "llama3:*"
-	PreferredModels        []string // Specific models that run well on this backend
-	ExcludedPatterns       []string // Models explicitly not supported
+	SupportedModelPatterns []string
+	PreferredModels        []string
+	ExcludedPatterns       []string
+	MaxModelSizeGB         int
 }
 
 // BackendConfig common configuration for all backends
 type BackendConfig struct {
-	ID       string
-	Type     string
-	Name     string
-	Hardware string
-	Enabled  bool
-
-	// Characteristics
-	PowerWatts       float64
-	AvgLatencyMs     int32
-	MaxTokensPerSec  int32
-	Priority         int
-
-	// Model capabilities
 	ModelCapability *ModelCapability
+	ID              string
+	Type            string
+	Name            string
+	Hardware        string
+	PowerWatts      float64
+	Priority        int
+	AvgLatencyMs    int32
+	MaxTokensPerSec int32
+	Enabled         bool
 }
 
 // ============================================================
@@ -214,35 +210,36 @@ type BackendConfig struct {
 // AudioFormat defines audio encoding format
 type AudioFormat string
 
+// AudioFormatPCM is an exported const.
 const (
-	AudioFormatPCM  AudioFormat = "pcm"   // Raw PCM (fastest, no encoding overhead)
-	AudioFormatWAV  AudioFormat = "wav"   // WAV container
-	AudioFormatMP3  AudioFormat = "mp3"   // Compressed MP3
-	AudioFormatOPUS AudioFormat = "opus"  // Low-latency OPUS codec
-	AudioFormatFLAC AudioFormat = "flac"  // Lossless compression
+	AudioFormatPCM  AudioFormat = "pcm"  // Raw PCM (fastest, no encoding overhead)
+	AudioFormatWAV  AudioFormat = "wav"  // WAV container
+	AudioFormatMP3  AudioFormat = "mp3"  // Compressed MP3
+	AudioFormatOPUS AudioFormat = "opus" // Low-latency OPUS codec
+	AudioFormatFLAC AudioFormat = "flac" // Lossless compression
 )
 
 // TranscribeRequest for speech-to-text
 type TranscribeRequest struct {
-	AudioData      []byte            // Raw audio bytes (use for non-streaming)
-	AudioStream    io.Reader         // Streaming audio input (preferred for low latency)
-	Model          string            // "whisper-tiny", "whisper-base", etc.
-	Language       string            // Optional: "en", "es", "fr", auto-detect if empty
-	Format         AudioFormat       // Audio format
-	SampleRate     int32             // Sample rate in Hz (e.g., 16000, 48000)
-	Channels       int32             // Number of audio channels (1=mono, 2=stereo)
-	EnableVAD      bool              // Voice Activity Detection for streaming
-	EnableTimestamps bool            // Return word-level timestamps
-	Options        map[string]string // Model-specific options
+	AudioStream      io.Reader
+	Options          map[string]string
+	Model            string
+	Language         string
+	Format           AudioFormat
+	AudioData        []byte
+	SampleRate       int32
+	Channels         int32
+	EnableVAD        bool
+	EnableTimestamps bool
 }
 
 // TranscribeResponse from speech recognition
 type TranscribeResponse struct {
-	Text       string              // Transcribed text
-	Language   string              // Detected/specified language
-	Confidence float32             // Overall confidence (0-1)
-	Segments   []TranscriptSegment // Word/sentence segments with timestamps
-	Stats      *GenerationStats    // Processing stats
+	Stats      *GenerationStats
+	Text       string
+	Language   string
+	Segments   []TranscriptSegment
+	Confidence float32
 }
 
 // TranscriptSegment represents a timed segment of transcription
@@ -261,34 +258,34 @@ type AudioStreamReader interface {
 
 // TranscriptChunk represents a chunk of streaming transcription
 type TranscriptChunk struct {
-	Text       string  // Partial or complete text
-	IsFinal    bool    // True if this is final transcription for segment
-	Confidence float32 // Confidence for this chunk
-	StartMs    int64   // Segment start time
-	EndMs      int64   // Segment end time
-	Done       bool    // True if transcription complete
+	Text       string
+	StartMs    int64
+	EndMs      int64
+	Confidence float32
+	IsFinal    bool
+	Done       bool
 }
 
 // SynthesizeRequest for text-to-speech
 type SynthesizeRequest struct {
-	Text       string            // Text to synthesize
-	Model      string            // "piper", "bark", "coqui-tts", etc.
-	Voice      string            // Voice ID or name
-	Language   string            // Language code
-	Format     AudioFormat       // Output audio format
-	SampleRate int32             // Output sample rate (16000, 22050, 48000)
-	Speed      float32           // Speech speed multiplier (0.5-2.0, default 1.0)
-	Pitch      float32           // Pitch adjustment (-1.0 to 1.0, default 0)
-	Options    map[string]string // Model-specific options
+	Options    map[string]string
+	Text       string
+	Model      string
+	Voice      string
+	Language   string
+	Format     AudioFormat
+	SampleRate int32
+	Speed      float32
+	Pitch      float32
 }
 
 // SynthesizeResponse from TTS
 type SynthesizeResponse struct {
-	AudioData  []byte           // Generated audio bytes
-	Format     AudioFormat      // Audio format
-	SampleRate int32            // Sample rate in Hz
-	Duration   int32            // Audio duration in milliseconds
-	Stats      *GenerationStats // Processing stats
+	Stats      *GenerationStats
+	Format     AudioFormat
+	AudioData  []byte
+	SampleRate int32
+	Duration   int32
 }
 
 // AudioStreamWriter for streaming TTS output
@@ -299,11 +296,11 @@ type AudioStreamWriter interface {
 
 // AudioChunk represents a chunk of streaming audio
 type AudioChunk struct {
-	Data       []byte      // Audio data chunk (optimized for zero-copy)
-	Format     AudioFormat // Audio format
-	SampleRate int32       // Sample rate
-	Done       bool        // True if synthesis complete
-	DurationMs int32       // Chunk duration in milliseconds
+	Format     AudioFormat
+	Data       []byte
+	SampleRate int32
+	DurationMs int32
+	Done       bool
 }
 
 // ============================================================
@@ -313,6 +310,7 @@ type AudioChunk struct {
 // ImageFormat defines image encoding format
 type ImageFormat string
 
+// ImageFormatPNG is an exported const.
 const (
 	ImageFormatPNG  ImageFormat = "png"  // PNG (lossless)
 	ImageFormatJPEG ImageFormat = "jpeg" // JPEG (lossy)
@@ -321,21 +319,21 @@ const (
 
 // ImageAnalysisRequest for image-to-text (OCR, captioning)
 type ImageAnalysisRequest struct {
-	ImageData   []byte            // Image bytes
-	ImageURL    string            // Alternative: image URL
-	Model       string            // "llava", "blip2", "cogvlm", etc.
-	Task        string            // "caption", "ocr", "vqa" (visual question answering)
-	Prompt      string            // Optional prompt for VQA
-	Format      ImageFormat       // Image format
-	Options     map[string]string // Model-specific options
+	Options   map[string]string
+	ImageURL  string
+	Model     string
+	Task      string
+	Prompt    string
+	Format    ImageFormat
+	ImageData []byte
 }
 
 // ImageAnalysisResponse from image analysis
 type ImageAnalysisResponse struct {
-	Text        string           // Caption, OCR text, or answer
-	Confidence  float32          // Overall confidence
-	Detections  []Detection      // Optional: detected objects/regions
-	Stats       *GenerationStats // Processing stats
+	Stats      *GenerationStats
+	Text       string
+	Detections []Detection
+	Confidence float32
 }
 
 // Detection represents detected object or region in image
@@ -350,32 +348,32 @@ type Detection struct {
 
 // ImageGenRequest for text-to-image generation
 type ImageGenRequest struct {
-	Prompt         string            // Text prompt
-	NegativePrompt string            // What to avoid in image
-	Model          string            // "stable-diffusion", "dall-e", etc.
-	Width          int32             // Image width in pixels
-	Height         int32             // Image height in pixels
-	Format         ImageFormat       // Output format
-	Steps          int32             // Diffusion steps (quality vs speed tradeoff)
-	GuidanceScale  float32           // Prompt adherence (1-20, default 7.5)
-	Seed           int64             // Random seed for reproducibility
-	BatchSize      int32             // Number of images to generate
-	Options        map[string]string // Model-specific options
+	Options        map[string]string
+	Prompt         string
+	NegativePrompt string
+	Model          string
+	Format         ImageFormat
+	Seed           int64
+	Width          int32
+	Height         int32
+	Steps          int32
+	GuidanceScale  float32
+	BatchSize      int32
 }
 
 // ImageGenResponse from image generation
 type ImageGenResponse struct {
-	Images []GeneratedImage // Generated images
-	Stats  *GenerationStats // Processing stats
+	Stats  *GenerationStats
+	Images []GeneratedImage
 }
 
 // GeneratedImage represents one generated image
 type GeneratedImage struct {
-	ImageData []byte      // Image bytes
-	Format    ImageFormat // Image format
-	Width     int32       // Width in pixels
-	Height    int32       // Height in pixels
-	Seed      int64       // Seed used for generation
+	Format    ImageFormat
+	ImageData []byte
+	Seed      int64
+	Width     int32
+	Height    int32
 }
 
 // ImageStreamReader for progressive image generation
@@ -386,11 +384,11 @@ type ImageStreamReader interface {
 
 // ImageChunk represents progressive image generation update
 type ImageChunk struct {
-	ImageData   []byte      // Partial or complete image
-	Progress    float32     // Generation progress (0-1)
-	CurrentStep int32       // Current diffusion step
-	TotalSteps  int32       // Total diffusion steps
-	Done        bool        // True if generation complete
+	ImageData   []byte  // Partial or complete image
+	Progress    float32 // Generation progress (0-1)
+	CurrentStep int32   // Current diffusion step
+	TotalSteps  int32   // Total diffusion steps
+	Done        bool    // True if generation complete
 }
 
 // ============================================================
@@ -400,6 +398,7 @@ type ImageChunk struct {
 // VideoFormat defines video encoding format
 type VideoFormat string
 
+// VideoFormatMP4 is an exported const.
 const (
 	VideoFormatMP4  VideoFormat = "mp4"  // MP4 container (H.264)
 	VideoFormatWEBM VideoFormat = "webm" // WebM container (VP9)
@@ -408,21 +407,21 @@ const (
 
 // VideoAnalysisRequest for video-to-text (transcription, captioning)
 type VideoAnalysisRequest struct {
-	VideoData   []byte            // Video bytes (non-streaming)
-	VideoStream io.Reader         // Streaming video input
-	VideoURL    string            // Alternative: video URL
-	Model       string            // Model name
-	Task        string            // "transcribe", "caption", "describe", "track"
-	Format      VideoFormat       // Video format
-	Options     map[string]string // Model-specific options
+	VideoStream io.Reader
+	Options     map[string]string
+	VideoURL    string
+	Model       string
+	Task        string
+	Format      VideoFormat
+	VideoData   []byte
 }
 
 // VideoAnalysisResponse from video analysis
 type VideoAnalysisResponse struct {
-	Text        string              // Transcription or description
-	Captions    []VideoCaption      // Time-aligned captions
-	Objects     []TrackedObject     // Tracked objects
-	Stats       *GenerationStats    // Processing stats
+	Stats    *GenerationStats
+	Text     string
+	Captions []VideoCaption
+	Objects  []TrackedObject
 }
 
 // VideoCaption represents time-aligned caption
@@ -435,10 +434,10 @@ type VideoCaption struct {
 
 // TrackedObject represents tracked object in video
 type TrackedObject struct {
-	Label      string        // Object label
-	TrackID    int32         // Unique track ID
-	Confidence float32       // Detection confidence
-	Frames     []ObjectFrame // Object locations per frame
+	Label      string
+	Frames     []ObjectFrame
+	TrackID    int32
+	Confidence float32
 }
 
 // ObjectFrame represents object location in a specific frame
@@ -459,34 +458,34 @@ type VideoStreamReader interface {
 
 // VideoChunk represents streaming video analysis or generation
 type VideoChunk struct {
-	FrameData  []byte      // Video frame or segment data
-	Text       string      // Associated text (caption, transcription)
-	Progress   float32     // Progress (0-1)
-	FrameNum   int32       // Current frame number
-	TimeMs     int64       // Time in milliseconds
-	Done       bool        // True if complete
+	Text      string
+	FrameData []byte
+	TimeMs    int64
+	Progress  float32
+	FrameNum  int32
+	Done      bool
 }
 
 // VideoGenRequest for text-to-video generation
 type VideoGenRequest struct {
-	Prompt      string            // Text prompt
-	Model       string            // Model name
-	Width       int32             // Video width in pixels
-	Height      int32             // Video height in pixels
-	FPS         int32             // Frames per second
-	Duration    int32             // Duration in seconds
-	Format      VideoFormat       // Output format
-	Seed        int64             // Random seed
-	Options     map[string]string // Model-specific options
+	Options  map[string]string
+	Prompt   string
+	Model    string
+	Format   VideoFormat
+	Seed     int64
+	Width    int32
+	Height   int32
+	FPS      int32
+	Duration int32
 }
 
 // VideoGenResponse from video generation
 type VideoGenResponse struct {
-	VideoData []byte           // Generated video bytes
-	Format    VideoFormat      // Video format
-	Width     int32            // Width in pixels
-	Height    int32            // Height in pixels
-	FPS       int32            // Frames per second
-	Duration  int32            // Duration in milliseconds
-	Stats     *GenerationStats // Processing stats
+	Stats     *GenerationStats
+	Format    VideoFormat
+	VideoData []byte
+	Width     int32
+	Height    int32
+	FPS       int32
+	Duration  int32
 }

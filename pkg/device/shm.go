@@ -1,36 +1,39 @@
 package device
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
-	"unsafe"
 
 	"go.uber.org/zap"
+
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // RingHeader defines the shared memory ring buffer header
 // Aligned to 64 bytes (cache line size) to avoid false sharing
 type RingHeader struct {
-	WritePos  uint64 // Atomic write position
-	ReadPos   uint64 // Atomic read position (per-reader)
-	TotalSize uint64 // Total buffer size in bytes
-	FrameSize uint64 // Size of each frame in bytes
-	NumFrames uint64 // Number of frames in buffer
+	WritePos  uint64   // Atomic write position
+	ReadPos   uint64   // Atomic read position (per-reader)
+	TotalSize uint64   // Total buffer size in bytes
+	FrameSize uint64   // Size of each frame in bytes
+	NumFrames uint64   // Number of frames in buffer
 	Padding   [24]byte // Pad to 64 bytes
 }
 
 // SharedMemoryRing represents a lock-free ring buffer in shared memory
 type SharedMemoryRing struct {
-	name      string
-	size      int
-	fd        int
-	data      []byte
-	header    *RingHeader
-	logger    *zap.Logger
-	readPos   uint64 // Local read position for this reader
+	header  *RingHeader
+	logger  *zap.Logger
+	name    string
+	data    []byte
+	size    int
+	fd      int
+	readPos uint64
 }
 
+// DefaultFrameSize is an exported const.
 const (
 	// DefaultFrameSize is the default size for each frame (1MB)
 	DefaultFrameSize = 1024 * 1024
@@ -58,32 +61,33 @@ func CreateSharedMemoryRing(name string, numFrames, frameSize uint64, logger *za
 	fd, err := syscall.Open(shmName, syscall.O_RDWR|syscall.O_CREAT|syscall.O_EXCL, 0600)
 	if err != nil {
 		// Try to unlink if it already exists
-		syscall.Unlink(shmName)
+		if unlinkErr := syscall.Unlink(shmName); unlinkErr != nil && !errors.Is(unlinkErr, syscall.ENOENT) {
+			warnErr("failed to unlink shared memory", unlinkErr, zap.String("name", shmName))
+		}
 		fd, err = syscall.Open(shmName, syscall.O_RDWR|syscall.O_CREAT|syscall.O_EXCL, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create shared memory: %w", err)
 		}
 	}
 
+	mappedSize := safeconv.IntFromUint64(totalSize)
 	// Set size
-	if err := syscall.Ftruncate(fd, int64(totalSize)); err != nil {
-		syscall.Close(fd)
-		syscall.Unlink(shmName)
+	if err := syscall.Ftruncate(fd, safeconv.Int64FromUint64(totalSize)); err != nil {
+		releaseSHM(fd, shmName)
 		return nil, fmt.Errorf("failed to set shm size: %w", err)
 	}
 
 	// Map into memory
-	data, err := syscall.Mmap(fd, 0, int(totalSize),
+	data, err := syscall.Mmap(fd, 0, mappedSize,
 		syscall.PROT_READ|syscall.PROT_WRITE,
 		syscall.MAP_SHARED)
 	if err != nil {
-		syscall.Close(fd)
-		syscall.Unlink(shmName)
+		releaseSHM(fd, shmName)
 		return nil, fmt.Errorf("failed to mmap: %w", err)
 	}
 
 	// Initialize header
-	header := (*RingHeader)(unsafe.Pointer(&data[0]))
+	header := overlayStruct[RingHeader](data)
 	header.WritePos = 0
 	header.ReadPos = 0
 	header.TotalSize = totalSize
@@ -92,7 +96,7 @@ func CreateSharedMemoryRing(name string, numFrames, frameSize uint64, logger *za
 
 	ring := &SharedMemoryRing{
 		name:    shmName,
-		size:    int(totalSize),
+		size:    mappedSize,
 		fd:      fd,
 		data:    data,
 		header:  header,
@@ -123,7 +127,7 @@ func OpenSharedMemoryRing(name string, logger *zap.Logger) (*SharedMemoryRing, e
 	// Get size
 	var stat syscall.Stat_t
 	if err := syscall.Fstat(fd, &stat); err != nil {
-		syscall.Close(fd)
+		warnErr("failed to close shared memory fd", syscall.Close(fd), zap.String("name", shmName))
 		return nil, fmt.Errorf("failed to stat shm: %w", err)
 	}
 
@@ -132,12 +136,12 @@ func OpenSharedMemoryRing(name string, logger *zap.Logger) (*SharedMemoryRing, e
 		syscall.PROT_READ|syscall.PROT_WRITE,
 		syscall.MAP_SHARED)
 	if err != nil {
-		syscall.Close(fd)
+		warnErr("failed to close shared memory fd", syscall.Close(fd), zap.String("name", shmName))
 		return nil, fmt.Errorf("failed to mmap: %w", err)
 	}
 
 	// Read header
-	header := (*RingHeader)(unsafe.Pointer(&data[0]))
+	header := overlayStruct[RingHeader](data)
 
 	ring := &SharedMemoryRing{
 		name:    shmName,
@@ -255,6 +259,11 @@ func (r *SharedMemoryRing) AvailableFrames() uint64 {
 	return available
 }
 
+func releaseSHM(fd int, name string) {
+	warnErr("failed to close shared memory fd", syscall.Close(fd), zap.String("name", name))
+	warnErr("failed to unlink shared memory", syscall.Unlink(name), zap.String("name", name))
+}
+
 // Close closes the shared memory ring
 func (r *SharedMemoryRing) Close() error {
 	if r.data != nil {
@@ -291,7 +300,7 @@ func (r *SharedMemoryRing) Destroy() error {
 	return nil
 }
 
-// Stats returns statistics about the ring buffer
+// RingStats reports shared-memory ring buffer statistics.
 type RingStats struct {
 	Name          string
 	TotalSize     uint64

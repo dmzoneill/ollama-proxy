@@ -1,5 +1,6 @@
 //go:build linux
 
+// Package main runs the efficiency-mode helper on Linux.
 package main
 
 import (
@@ -27,7 +28,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to connect to D-Bus: %v\n", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "close dbus connection: %v\n", err)
+		}
+	}()
 
 	obj := conn.Object(dbusInterface, dbusPath)
 

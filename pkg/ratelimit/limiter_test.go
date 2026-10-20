@@ -7,9 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"golang.org/x/time/rate"
 )
 
+// TestNewIPRateLimiter is part of the public API.
 func TestNewIPRateLimiter(t *testing.T) {
 	rl := NewIPRateLimiter(10, 20)
 
@@ -26,11 +29,12 @@ func TestNewIPRateLimiter(t *testing.T) {
 	}
 }
 
+// TestIPRateLimiter_Allow is part of the public API.
 func TestIPRateLimiter_Allow(t *testing.T) {
 	// Create limiter with 5 requests per second, burst of 5
 	rl := NewIPRateLimiter(5, 5)
 
-	ip := "192.168.1.1"
+	ip := str19216811
 
 	// Should allow first 5 requests (burst)
 	for i := 0; i < 5; i++ {
@@ -53,10 +57,11 @@ func TestIPRateLimiter_Allow(t *testing.T) {
 	}
 }
 
+// TestIPRateLimiter_MultipleIPs is part of the public API.
 func TestIPRateLimiter_MultipleIPs(t *testing.T) {
 	rl := NewIPRateLimiter(2, 2)
 
-	ip1 := "192.168.1.1"
+	ip1 := str19216811
 	ip2 := "192.168.1.2"
 
 	// Exhaust ip1's burst
@@ -74,12 +79,16 @@ func TestIPRateLimiter_MultipleIPs(t *testing.T) {
 	}
 }
 
+// TestIPRateLimiter_Middleware is part of the public API.
 func TestIPRateLimiter_Middleware(t *testing.T) {
 	rl := NewIPRateLimiter(2, 2)
 
-	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	// Create test server
@@ -95,7 +104,7 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected status 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 3rd request should be rate limited
@@ -103,50 +112,53 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request 3 failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		testutil.CheckCleanup(t, resp.Body.Close())
+	}()
 
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: expected status 429, got %d", resp.StatusCode)
 	}
 }
 
+// TestGetIP is part of the public API.
 func TestGetIP(t *testing.T) {
 	tests := []struct {
-		name           string
-		remoteAddr     string
-		xForwardedFor  string
-		xRealIP        string
-		expectedIP     string
+		name          string
+		remoteAddr    string
+		xForwardedFor string
+		xRealIP       string
+		expectedIP    string
 	}{
 		{
 			name:       "direct connection",
 			remoteAddr: "192.168.1.1:12345",
-			expectedIP: "192.168.1.1",
+			expectedIP: str19216811,
 		},
 		{
 			name:          "X-Forwarded-For single",
-			remoteAddr:    "10.0.0.1:12345",
-			xForwardedFor: "203.0.113.1",
-			expectedIP:    "203.0.113.1",
+			remoteAddr:    str1000112345,
+			xForwardedFor: str20301131,
+			expectedIP:    str20301131,
 		},
 		{
 			name:          "X-Forwarded-For multiple",
-			remoteAddr:    "10.0.0.1:12345",
+			remoteAddr:    str1000112345,
 			xForwardedFor: "203.0.113.1, 198.51.100.1",
-			expectedIP:    "203.0.113.1",
+			expectedIP:    str20301131,
 		},
 		{
 			name:       "X-Real-IP",
-			remoteAddr: "10.0.0.1:12345",
-			xRealIP:    "203.0.113.1",
-			expectedIP: "203.0.113.1",
+			remoteAddr: str1000112345,
+			xRealIP:    str20301131,
+			expectedIP: str20301131,
 		},
 		{
 			name:          "X-Forwarded-For takes precedence over X-Real-IP",
-			remoteAddr:    "10.0.0.1:12345",
-			xForwardedFor: "203.0.113.1",
-			xRealIP:       "198.51.100.1",
-			expectedIP:    "203.0.113.1",
+			remoteAddr:    str1000112345,
+			xForwardedFor: str20301131,
+			xRealIP:       str198511001,
+			expectedIP:    str20301131,
 		},
 	}
 
@@ -169,6 +181,7 @@ func TestGetIP(t *testing.T) {
 	}
 }
 
+// TestParseForwardedFor is part of the public API.
 func TestParseForwardedFor(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -177,18 +190,18 @@ func TestParseForwardedFor(t *testing.T) {
 	}{
 		{
 			name:     "single IP",
-			header:   "203.0.113.1",
-			expected: []string{"203.0.113.1"},
+			header:   str20301131,
+			expected: []string{str20301131},
 		},
 		{
 			name:     "multiple IPs",
 			header:   "203.0.113.1, 198.51.100.1, 192.0.2.1",
-			expected: []string{"203.0.113.1", "198.51.100.1", "192.0.2.1"},
+			expected: []string{str20301131, str198511001, "192.0.2.1"},
 		},
 		{
 			name:     "IPs with spaces",
 			header:   "203.0.113.1 , 198.51.100.1 , 192.0.2.1",
-			expected: []string{"203.0.113.1", "198.51.100.1", "192.0.2.1"},
+			expected: []string{str20301131, str198511001, "192.0.2.1"},
 		},
 		{
 			name:     "empty string",
@@ -213,12 +226,13 @@ func TestParseForwardedFor(t *testing.T) {
 	}
 }
 
+// TestCleanup is part of the public API.
 func TestCleanup(t *testing.T) {
 	rl := NewIPRateLimiter(10, 10)
 	rl.expiryDuration = 100 * time.Millisecond
 
 	// Add a limiter
-	ip := "192.168.1.1"
+	ip := str19216811
 	rl.Allow(ip)
 
 	// Verify it exists
@@ -242,19 +256,20 @@ func TestCleanup(t *testing.T) {
 	rl.mu.RUnlock()
 }
 
+// TestTrimSpace is part of the public API.
 func TestTrimSpace(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
 	}{
-		{"test", "test"},
-		{" test", "test"},
-		{"test ", "test"},
-		{" test ", "test"},
-		{"  test  ", "test"},
-		{"\ttest\t", "test"},
-		{"", ""},
-		{"   ", ""},
+		{input: strTest, expected: strTest},
+		{input: " test", expected: strTest},
+		{input: "test ", expected: strTest},
+		{input: " test ", expected: strTest},
+		{input: "  test  ", expected: strTest},
+		{input: "\ttest\t", expected: strTest},
+		{input: "", expected: ""},
+		{input: "   ", expected: ""},
 	}
 
 	for _, tt := range tests {
@@ -268,7 +283,7 @@ func TestTrimSpace(t *testing.T) {
 // TestIPRateLimiter_BurstHandling tests burst capacity behavior
 func TestIPRateLimiter_BurstHandling(t *testing.T) {
 	rl := NewIPRateLimiter(1, 3) // 1 req/sec with burst of 3
-	ip := "192.168.1.1"
+	ip := str19216811
 
 	// Exhaust burst capacity
 	for i := 0; i < 3; i++ {
@@ -536,10 +551,10 @@ func TestIPRateLimiter_CleanupOnlyAffectsExpired(t *testing.T) {
 // TestGetIP_RemoteAddrWithoutPort tests getIP with RemoteAddr that has no port
 func TestGetIP_RemoteAddrWithoutPort(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "192.168.1.1" // No port
+	req.RemoteAddr = str19216811 // No port
 
 	ip := getIP(req)
-	if ip != "192.168.1.1" {
+	if ip != str19216811 {
 		t.Errorf("Expected IP 192.168.1.1, got %s", ip)
 	}
 }
@@ -547,7 +562,7 @@ func TestGetIP_RemoteAddrWithoutPort(t *testing.T) {
 // TestGetIP_EmptyForwardedFor tests getIP with empty X-Forwarded-For value
 func TestGetIP_EmptyForwardedFor(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "10.0.0.1:12345"
+	req.RemoteAddr = str1000112345
 	req.Header.Set("X-Forwarded-For", "") // Empty header
 
 	ip := getIP(req)
@@ -566,29 +581,29 @@ func TestGetIP_XForwardedForWithWhitespace(t *testing.T) {
 		{
 			name:       "leading whitespace",
 			forwarded:  "  203.0.113.1",
-			expectedIP: "203.0.113.1",
+			expectedIP: str20301131,
 		},
 		{
 			name:       "trailing whitespace",
 			forwarded:  "203.0.113.1  ",
-			expectedIP: "203.0.113.1",
+			expectedIP: str20301131,
 		},
 		{
 			name:       "tabs and spaces",
 			forwarded:  " \t 203.0.113.1 \t ",
-			expectedIP: "203.0.113.1",
+			expectedIP: str20301131,
 		},
 		{
 			name:       "multiple IPs with varying whitespace",
 			forwarded:  "203.0.113.1 , 198.51.100.1,  192.0.2.1",
-			expectedIP: "203.0.113.1",
+			expectedIP: str20301131,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
-			req.RemoteAddr = "10.0.0.1:12345"
+			req.RemoteAddr = str1000112345
 			req.Header.Set("X-Forwarded-For", tt.forwarded)
 
 			ip := getIP(req)
@@ -608,23 +623,23 @@ func TestSplitCommaSeparated(t *testing.T) {
 	}{
 		{
 			name:     "single item",
-			input:    "item1",
-			expected: []string{"item1"},
+			input:    strItem1,
+			expected: []string{strItem1},
 		},
 		{
 			name:     "multiple items",
 			input:    "item1,item2,item3",
-			expected: []string{"item1", "item2", "item3"},
+			expected: []string{strItem1, strItem2, "item3"},
 		},
 		{
 			name:     "trailing comma",
 			input:    "item1,item2,",
-			expected: []string{"item1", "item2"},
+			expected: []string{strItem1, strItem2},
 		},
 		{
 			name:     "leading comma",
 			input:    ",item1,item2",
-			expected: []string{"", "item1", "item2"},
+			expected: []string{"", strItem1, strItem2},
 		},
 		{
 			name:     "empty string",
@@ -706,7 +721,7 @@ func TestIPRateLimiter_ConcurrentAccess(t *testing.T) {
 	const requestsPerGoroutine = 5
 
 	for i := 0; i < numGoroutines; i++ {
-		go func(goroutineID int) {
+		go func(_ int) {
 			for j := 0; j < requestsPerGoroutine; j++ {
 				allowed := rl.Allow(ip)
 				// We don't store results directly due to race conditions
@@ -759,9 +774,12 @@ func TestIPRateLimiter_ConcurrentMultipleIPs(t *testing.T) {
 func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 	rl := NewIPRateLimiter(5, 5)
 
-	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	server := httptest.NewServer(handler)
@@ -776,7 +794,7 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 6th request should be rate limited
@@ -787,14 +805,14 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 6: expected 429, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	testutil.CheckCleanup(t, resp.Body.Close())
 }
 
 // TestIPRateLimiter_Middleware_CustomIP tests middleware with custom IP headers
 func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 	rl := NewIPRateLimiter(2, 2)
 
-	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -809,7 +827,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
 		}
-		req.Header.Set("X-Forwarded-For", "203.0.113.1")
+		req.Header.Set("X-Forwarded-For", str20301131)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -818,7 +836,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 3rd request should be rate limited
@@ -826,7 +844,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
-	req.Header.Set("X-Forwarded-For", "203.0.113.1")
+	req.Header.Set("X-Forwarded-For", str20301131)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -835,7 +853,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: expected 429, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	testutil.CheckCleanup(t, resp.Body.Close())
 }
 
 // TestIPRateLimiter_VerySmallRate tests with very small rate (< 1 req/sec)

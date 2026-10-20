@@ -7,6 +7,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestMain is part of the public API.
 func TestMain(m *testing.M) {
 	// Initialize logger for tests
 	if err := logging.InitLogger("info", false); err != nil {
@@ -18,6 +19,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestApplyEnvOverrides_GRPCPort is part of the public API.
 func TestApplyEnvOverrides_GRPCPort(t *testing.T) {
 	// Set environment variable
 	os.Setenv("OLLAMA_PROXY_GRPC_PORT", "9999")
@@ -26,7 +28,7 @@ func TestApplyEnvOverrides_GRPCPort(t *testing.T) {
 	cfg := &Config{}
 	cfg.Server.GRPCPort = 50051
 	cfg.Server.HTTPPort = 8080
-	cfg.Server.Host = "localhost"
+	cfg.Server.Host = strLocalhost
 
 	ApplyEnvOverrides(cfg)
 
@@ -35,6 +37,7 @@ func TestApplyEnvOverrides_GRPCPort(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_HTTPPort is part of the public API.
 func TestApplyEnvOverrides_HTTPPort(t *testing.T) {
 	os.Setenv("OLLAMA_PROXY_HTTP_PORT", "8888")
 	defer os.Unsetenv("OLLAMA_PROXY_HTTP_PORT")
@@ -42,7 +45,7 @@ func TestApplyEnvOverrides_HTTPPort(t *testing.T) {
 	cfg := &Config{}
 	cfg.Server.GRPCPort = 50051
 	cfg.Server.HTTPPort = 8080
-	cfg.Server.Host = "localhost"
+	cfg.Server.Host = strLocalhost
 
 	ApplyEnvOverrides(cfg)
 
@@ -51,12 +54,13 @@ func TestApplyEnvOverrides_HTTPPort(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_Host is part of the public API.
 func TestApplyEnvOverrides_Host(t *testing.T) {
 	os.Setenv("OLLAMA_PROXY_HOST", "0.0.0.0")
 	defer os.Unsetenv("OLLAMA_PROXY_HOST")
 
 	cfg := &Config{}
-	cfg.Server.Host = "localhost"
+	cfg.Server.Host = strLocalhost
 
 	ApplyEnvOverrides(cfg)
 
@@ -65,6 +69,7 @@ func TestApplyEnvOverrides_Host(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_LogLevel is part of the public API.
 func TestApplyEnvOverrides_LogLevel(t *testing.T) {
 	os.Setenv("OLLAMA_PROXY_LOG_LEVEL", "debug")
 	defer os.Unsetenv("OLLAMA_PROXY_LOG_LEVEL")
@@ -79,6 +84,7 @@ func TestApplyEnvOverrides_LogLevel(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_TLSEnabled is part of the public API.
 func TestApplyEnvOverrides_TLSEnabled(t *testing.T) {
 	os.Setenv("OLLAMA_PROXY_TLS_ENABLED", "true")
 	defer os.Unsetenv("OLLAMA_PROXY_TLS_ENABLED")
@@ -93,6 +99,7 @@ func TestApplyEnvOverrides_TLSEnabled(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_InvalidPort is part of the public API.
 func TestApplyEnvOverrides_InvalidPort(t *testing.T) {
 	os.Setenv("OLLAMA_PROXY_GRPC_PORT", "invalid")
 	defer os.Unsetenv("OLLAMA_PROXY_GRPC_PORT")
@@ -108,6 +115,7 @@ func TestApplyEnvOverrides_InvalidPort(t *testing.T) {
 	}
 }
 
+// TestApplyEnvOverrides_BackendEndpoint is part of the public API.
 func TestApplyEnvOverrides_BackendEndpoint(t *testing.T) {
 	os.Setenv("OLLAMA_NPU_ENDPOINT", "http://new-npu:11434")
 	defer os.Unsetenv("OLLAMA_NPU_ENDPOINT")
@@ -116,30 +124,27 @@ func TestApplyEnvOverrides_BackendEndpoint(t *testing.T) {
 	// Create a backend using the Config's Backends type
 	backend := cfg.Backends
 	backend = append(backend, struct {
-		ID       string `yaml:"id"`
-		Type     string `yaml:"type"`
-		Name     string `yaml:"name"`
-		Hardware string `yaml:"hardware"`
-		Enabled  bool   `yaml:"enabled"`
-		Endpoint string `yaml:"endpoint"`
-
-		// OpenVINO-specific fields
-		Device    string `yaml:"device"`     // "CPU", "GPU", "NPU" for OpenVINO backends
-		ModelPath string `yaml:"model_path"` // Path to OpenVINO model directory
-		ModelName string `yaml:"model_name"` // Model name/identifier
-
+		ID              string `yaml:"id"`
+		Type            string `yaml:"type"`
+		Name            string `yaml:"name"`
+		Hardware        string `yaml:"hardware"`
+		Endpoint        string `yaml:"endpoint"`
+		Device          string `yaml:"device"`
+		ModelPath       string `yaml:"model_path"`
+		ModelName       string `yaml:"model_name"`
+		ModelCapability struct {
+			SupportedModelPatterns []string `yaml:"supported_model_patterns"`
+			PreferredModels        []string `yaml:"preferred_models"`
+			ExcludedPatterns       []string `yaml:"excluded_patterns"`
+			MaxModelSizeGB         int      `yaml:"max_model_size_gb"`
+		} `yaml:"model_capability"`
 		Characteristics struct {
 			PowerWatts         float64 `yaml:"power_watts"`
 			AvgLatencyMs       int32   `yaml:"avg_latency_ms"`
 			MaxTokensPerSecond int32   `yaml:"max_tokens_per_second"`
 			Priority           int     `yaml:"priority"`
 		} `yaml:"characteristics"`
-		ModelCapability struct {
-			MaxModelSizeGB         int      `yaml:"max_model_size_gb"`
-			SupportedModelPatterns []string `yaml:"supported_model_patterns"`
-			PreferredModels        []string `yaml:"preferred_models"`
-			ExcludedPatterns       []string `yaml:"excluded_patterns"`
-		} `yaml:"model_capability"`
+		Enabled bool `yaml:"enabled"`
 	}{
 		ID:       "ollama-npu",
 		Endpoint: "http://old-npu:11434",

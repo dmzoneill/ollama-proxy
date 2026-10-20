@@ -4,20 +4,25 @@ import (
 	"os"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestV4L2Device_OpenClose is part of the public API.
 func TestV4L2Device_OpenClose(t *testing.T) {
 	// Skip if no video device available
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	if device.fd < 0 {
 		t.Error("Expected valid file descriptor")
@@ -29,16 +34,19 @@ func TestV4L2Device_OpenClose(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_QueryCapabilities is part of the public API.
 func TestV4L2Device_QueryCapabilities(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	caps := device.GetCapabilities()
 
@@ -53,22 +61,25 @@ func TestV4L2Device_QueryCapabilities(t *testing.T) {
 	t.Logf("V4L2 Device Capabilities: %+v", caps)
 }
 
+// TestV4L2Device_SetFormat is part of the public API.
 func TestV4L2Device_SetFormat(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Try to set 640x480 YUYV format
-	err = device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV)
+	err = device.SetFormat(640, 480, V4l2PixFmtYuyv)
 	if err != nil {
 		// Some devices may not support YUYV, try MJPEG
-		err = device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+		err = device.SetFormat(640, 480, V4l2PixFmtMjpeg)
 		if err != nil {
 			t.Fatalf("Failed to set format: %v", err)
 		}
@@ -83,20 +94,23 @@ func TestV4L2Device_SetFormat(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_RequestBuffers is part of the public API.
 func TestV4L2Device_RequestBuffers(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Set format first
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	// Request 4 buffers
@@ -106,20 +120,23 @@ func TestV4L2Device_RequestBuffers(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_MapBuffers is part of the public API.
 func TestV4L2Device_MapBuffers(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Set format
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	// Request buffers
@@ -147,20 +164,23 @@ func TestV4L2Device_MapBuffers(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_StreamingLifecycle is part of the public API.
 func TestV4L2Device_StreamingLifecycle(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Setup
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -192,20 +212,23 @@ func TestV4L2Device_StreamingLifecycle(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_CaptureFrames is part of the public API.
 func TestV4L2Device_CaptureFrames(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Setup
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -219,7 +242,9 @@ func TestV4L2Device_CaptureFrames(t *testing.T) {
 	if err := device.StartStreaming(); err != nil {
 		t.Fatalf("Failed to start streaming: %v", err)
 	}
-	defer device.StopStreaming()
+	defer func() {
+		testutil.CheckCleanup(t, device.StopStreaming())
+	}()
 
 	// Try to capture a few frames
 	for i := 0; i < 5; i++ {
@@ -241,8 +266,9 @@ func TestV4L2Device_CaptureFrames(t *testing.T) {
 	}
 }
 
+// TestV4L2Device_IntegrationWithSHM is part of the public API.
 func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		t.Skip("No /dev/video0 device available")
 	}
 
@@ -251,18 +277,22 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create shared memory ring: %v", err)
 	}
-	defer shmRing.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, shmRing.Destroy())
+	}()
 
 	// Open V4L2 device
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(t, device.Close())
+	}()
 
 	// Setup device
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -276,7 +306,9 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 	if err := device.StartStreaming(); err != nil {
 		t.Fatalf("Failed to start streaming: %v", err)
 	}
-	defer device.StopStreaming()
+	defer func() {
+		testutil.CheckCleanup(t, device.StopStreaming())
+	}()
 
 	// Capture a few frames and write to SHM
 	framesWritten := 0
@@ -295,7 +327,9 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 			framesWritten++
 		}
 
-		device.QueueBuffer(buf.Index)
+		if err = device.QueueBuffer(buf.Index); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if framesWritten == 0 {
@@ -307,7 +341,9 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open SHM as reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	framesRead := 0
 	for i := 0; i < framesWritten; i++ {
@@ -328,19 +364,22 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 	t.Logf("Successfully captured %d frames from V4L2 and transferred via SHM", framesWritten)
 }
 
+// BenchmarkV4L2_CaptureFrame is part of the public API.
 func BenchmarkV4L2_CaptureFrame(b *testing.B) {
-	if _, err := os.Stat("/dev/video0"); os.IsNotExist(err) {
+	if _, err := os.Stat(strDevVideo0); os.IsNotExist(err) {
 		b.Skip("No /dev/video0 device available")
 	}
 
-	device, err := OpenV4L2Device("/dev/video0", logging.Logger)
+	device, err := OpenV4L2Device(strDevVideo0, logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to open V4L2 device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		testutil.CheckCleanup(b, device.Close())
+	}()
 
-	if err := device.SetFormat(640, 480, V4L2_PIX_FMT_YUYV); err != nil {
-		device.SetFormat(640, 480, V4L2_PIX_FMT_MJPEG)
+	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
+		testutil.Check(b, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -354,7 +393,9 @@ func BenchmarkV4L2_CaptureFrame(b *testing.B) {
 	if err := device.StartStreaming(); err != nil {
 		b.Fatalf("Failed to start streaming: %v", err)
 	}
-	defer device.StopStreaming()
+	defer func() {
+		testutil.CheckCleanup(b, device.StopStreaming())
+	}()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -364,6 +405,8 @@ func BenchmarkV4L2_CaptureFrame(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		device.QueueBuffer(buf.Index)
+		if err = device.QueueBuffer(buf.Index); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

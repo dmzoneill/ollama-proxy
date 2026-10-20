@@ -60,14 +60,14 @@ func HandleChatCompletion(r *router.Router) http.HandlerFunc {
 
 		// Handle streaming vs non-streaming
 		if chatReq.Stream {
-			handleChatCompletionStreaming(w, req.Context(), decision, internalReq, &chatReq)
+			handleChatCompletionStreaming(req.Context(), w, decision, internalReq, &chatReq)
 		} else {
-			handleChatCompletionNonStreaming(w, req.Context(), decision, internalReq, &chatReq)
+			handleChatCompletionNonStreaming(req.Context(), w, decision, internalReq, &chatReq)
 		}
 	}
 }
 
-func handleChatCompletionNonStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) {
+func handleChatCompletionNonStreaming(ctx context.Context, w http.ResponseWriter, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) {
 	// Execute request
 	resp, err := decision.Backend.Generate(ctx, internalReq)
 	if err != nil {
@@ -82,12 +82,10 @@ func handleChatCompletionNonStreaming(w http.ResponseWriter, ctx context.Context
 	WriteRoutingHeaders(w, decision)
 
 	// Write response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(openaiResp)
+	writeJSON(w, openaiResp)
 }
 
-func handleChatCompletionStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) {
+func handleChatCompletionStreaming(ctx context.Context, w http.ResponseWriter, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, chatReq *ChatCompletionRequest) {
 	// Check if backend supports streaming
 	if !decision.Backend.SupportsStream() {
 		writeError(w, http.StatusBadRequest, "Backend does not support streaming", "invalid_request_error")
@@ -164,14 +162,14 @@ func HandleCompletion(r *router.Router) http.HandlerFunc {
 
 		// Handle streaming vs non-streaming
 		if compReq.Stream {
-			handleCompletionStreaming(w, req.Context(), decision, internalReq, &compReq)
+			handleCompletionStreaming(req.Context(), w, decision, internalReq, &compReq)
 		} else {
-			handleCompletionNonStreaming(w, req.Context(), decision, internalReq, &compReq)
+			handleCompletionNonStreaming(req.Context(), w, decision, internalReq, &compReq)
 		}
 	}
 }
 
-func handleCompletionNonStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) {
+func handleCompletionNonStreaming(ctx context.Context, w http.ResponseWriter, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) {
 	// Execute request
 	resp, err := decision.Backend.Generate(ctx, internalReq)
 	if err != nil {
@@ -186,12 +184,10 @@ func handleCompletionNonStreaming(w http.ResponseWriter, ctx context.Context, de
 	WriteRoutingHeaders(w, decision)
 
 	// Write response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(openaiResp)
+	writeJSON(w, openaiResp)
 }
 
-func handleCompletionStreaming(w http.ResponseWriter, ctx context.Context, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) {
+func handleCompletionStreaming(ctx context.Context, w http.ResponseWriter, decision *router.RoutingDecision, internalReq *backends.GenerateRequest, compReq *CompletionRequest) {
 	// Check if backend supports streaming
 	if !decision.Backend.SupportsStream() {
 		writeError(w, http.StatusBadRequest, "Backend does not support streaming", "invalid_request_error")
@@ -283,9 +279,7 @@ func HandleEmbedding(r *router.Router) http.HandlerFunc {
 		WriteRoutingHeaders(w, decision)
 
 		// Write response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(openaiResp)
+		writeJSON(w, openaiResp)
 	}
 }
 
@@ -331,7 +325,7 @@ func HandleModels(r *router.Router) http.HandlerFunc {
 		for modelID := range modelsMap {
 			modelsList = append(modelsList, Model{
 				ID:      modelID,
-				Object:  "model",
+				Object:  strModel,
 				Created: timestamp,
 				OwnedBy: "ollama-proxy",
 			})
@@ -339,14 +333,12 @@ func HandleModels(r *router.Router) http.HandlerFunc {
 
 		// Build response
 		response := ModelsResponse{
-			Object: "list",
+			Object: strList,
 			Data:   modelsList,
 		}
 
 		// Write response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		writeJSON(w, response)
 	}
 }
 
@@ -363,5 +355,15 @@ func writeError(w http.ResponseWriter, statusCode int, message string, errorType
 		},
 	}
 
-	json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		logging.Warn("write error response", zap.Error(err))
+	}
+}
+
+func writeJSON(w http.ResponseWriter, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		logging.Warn("encode json response", zap.Error(err))
+	}
 }

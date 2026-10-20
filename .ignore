@@ -1,0 +1,6 @@
+# Super-linter GO_MODULES runs golangci-lint on every directory that
+# contains a changed Go file. examples/ only contains //go:build ignore
+# programs, so that invocation fails with "build constraints exclude all
+# Go files" and lints nothing. checks.sh turns the paths below into
+# FILTER_REGEX_EXCLUDE. The files stay in the repository; lint skips them.
+examples/

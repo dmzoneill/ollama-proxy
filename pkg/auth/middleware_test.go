@@ -6,13 +6,14 @@ import (
 	"testing"
 )
 
+// TestAPIKeyMiddleware_Disabled is part of the public API.
 func TestAPIKeyMiddleware_Disabled(t *testing.T) {
 	cfg := Config{
 		Enabled: false,
 	}
 
 	middleware := APIKeyMiddleware(cfg)
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -26,6 +27,7 @@ func TestAPIKeyMiddleware_Disabled(t *testing.T) {
 	}
 }
 
+// TestAPIKeyMiddleware_MissingHeader is part of the public API.
 func TestAPIKeyMiddleware_MissingHeader(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
@@ -33,7 +35,7 @@ func TestAPIKeyMiddleware_MissingHeader(t *testing.T) {
 	}
 
 	middleware := APIKeyMiddleware(cfg)
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -47,20 +49,21 @@ func TestAPIKeyMiddleware_MissingHeader(t *testing.T) {
 	}
 }
 
+// TestAPIKeyMiddleware_ValidKey is part of the public API.
 func TestAPIKeyMiddleware_ValidKey(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
 		APIKeys: map[string]APIKeyInfo{
 			"test-key-123": {
 				Name:        "Test Key",
-				Permissions: []string{"read", "write"},
+				Permissions: []string{strRead, strWrite},
 				Enabled:     true,
 			},
 		},
 	}
 
 	middleware := APIKeyMiddleware(cfg)
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -75,11 +78,12 @@ func TestAPIKeyMiddleware_ValidKey(t *testing.T) {
 	}
 }
 
+// TestAPIKeyMiddleware_InvalidKey is part of the public API.
 func TestAPIKeyMiddleware_InvalidKey(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
 		APIKeys: map[string]APIKeyInfo{
-			"valid-key": {
+			strValidKey: {
 				Name:    "Valid Key",
 				Enabled: true,
 			},
@@ -87,7 +91,7 @@ func TestAPIKeyMiddleware_InvalidKey(t *testing.T) {
 	}
 
 	middleware := APIKeyMiddleware(cfg)
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -102,11 +106,12 @@ func TestAPIKeyMiddleware_InvalidKey(t *testing.T) {
 	}
 }
 
+// TestAPIKeyMiddleware_DisabledKey is part of the public API.
 func TestAPIKeyMiddleware_DisabledKey(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
 		APIKeys: map[string]APIKeyInfo{
-			"disabled-key": {
+			strDisabledKey: {
 				Name:    "Disabled Key",
 				Enabled: false,
 			},
@@ -114,7 +119,7 @@ func TestAPIKeyMiddleware_DisabledKey(t *testing.T) {
 	}
 
 	middleware := APIKeyMiddleware(cfg)
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -129,11 +134,12 @@ func TestAPIKeyMiddleware_DisabledKey(t *testing.T) {
 	}
 }
 
+// TestAPIKeyMiddleware_BearerFormats is part of the public API.
 func TestAPIKeyMiddleware_BearerFormats(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
 		APIKeys: map[string]APIKeyInfo{
-			"test-key": {
+			strTestKey: {
 				Name:    "Test Key",
 				Enabled: true,
 			},
@@ -145,15 +151,15 @@ func TestAPIKeyMiddleware_BearerFormats(t *testing.T) {
 		header string
 		status int
 	}{
-		{"Bearer uppercase", "Bearer test-key", http.StatusOK},
-		{"bearer lowercase", "bearer test-key", http.StatusOK},
-		{"plain key", "test-key", http.StatusOK},
+		{name: "Bearer uppercase", header: "Bearer test-key", status: http.StatusOK},
+		{name: "bearer lowercase", header: "bearer test-key", status: http.StatusOK},
+		{name: "plain key", header: strTestKey, status: http.StatusOK},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			middleware := APIKeyMiddleware(cfg)
-			handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 
@@ -170,16 +176,17 @@ func TestAPIKeyMiddleware_BearerFormats(t *testing.T) {
 	}
 }
 
+// TestSecureCompareAPIKey is part of the public API.
 func TestSecureCompareAPIKey(t *testing.T) {
 	tests := []struct {
 		key1     string
 		key2     string
 		expected bool
 	}{
-		{"test-key", "test-key", true},
-		{"test-key", "different-key", false},
-		{"", "", true},
-		{"key", "", false},
+		{key1: strTestKey, key2: strTestKey, expected: true},
+		{key1: strTestKey, key2: "different-key", expected: false},
+		{key1: "", key2: "", expected: true},
+		{key1: "key", key2: "", expected: false},
 	}
 
 	for _, tt := range tests {
@@ -191,15 +198,16 @@ func TestSecureCompareAPIKey(t *testing.T) {
 	}
 }
 
+// TestValidateAPIKey is part of the public API.
 func TestValidateAPIKey(t *testing.T) {
 	cfg := Config{
 		Enabled: true,
 		APIKeys: map[string]APIKeyInfo{
-			"valid-key": {
+			strValidKey: {
 				Name:    "Valid Key",
 				Enabled: true,
 			},
-			"disabled-key": {
+			strDisabledKey: {
 				Name:    "Disabled Key",
 				Enabled: false,
 			},
@@ -211,9 +219,9 @@ func TestValidateAPIKey(t *testing.T) {
 		key       string
 		wantValid bool
 	}{
-		{"valid key", "valid-key", true},
-		{"disabled key", "disabled-key", false},
-		{"invalid key", "nonexistent-key", false},
+		{name: "valid key", key: strValidKey, wantValid: true},
+		{name: "disabled key", key: strDisabledKey, wantValid: false},
+		{name: "invalid key", key: "nonexistent-key", wantValid: false},
 	}
 
 	for _, tt := range tests {
@@ -226,6 +234,7 @@ func TestValidateAPIKey(t *testing.T) {
 	}
 }
 
+// TestValidateAPIKey_Disabled is part of the public API.
 func TestValidateAPIKey_Disabled(t *testing.T) {
 	cfg := Config{
 		Enabled: false,
@@ -237,27 +246,28 @@ func TestValidateAPIKey_Disabled(t *testing.T) {
 	}
 }
 
+// TestHasPermission is part of the public API.
 func TestHasPermission(t *testing.T) {
 	tests := []struct {
 		name       string
-		keyInfo    APIKeyInfo
 		permission string
+		keyInfo    APIKeyInfo
 		expected   bool
 	}{
 		{
 			name: "has specific permission",
 			keyInfo: APIKeyInfo{
-				Permissions: []string{"read", "write"},
+				Permissions: []string{strRead, strWrite},
 			},
-			permission: "read",
+			permission: strRead,
 			expected:   true,
 		},
 		{
 			name: "no permission",
 			keyInfo: APIKeyInfo{
-				Permissions: []string{"read"},
+				Permissions: []string{strRead},
 			},
-			permission: "write",
+			permission: strWrite,
 			expected:   false,
 		},
 		{
@@ -273,7 +283,7 @@ func TestHasPermission(t *testing.T) {
 			keyInfo: APIKeyInfo{
 				Permissions: []string{},
 			},
-			permission: "read",
+			permission: strRead,
 			expected:   false,
 		},
 	}

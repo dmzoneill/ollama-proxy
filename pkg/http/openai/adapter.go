@@ -1,3 +1,4 @@
+// Package openai serves the OpenAI-compatible HTTP API.
 package openai
 
 import (
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // ConvertChatCompletionRequest converts OpenAI chat completion request to internal format
@@ -107,10 +109,10 @@ func ConvertToOpenAIChatResponse(req *ChatCompletionRequest, resp *backends.Gene
 			{
 				Index: 0,
 				Message: ChatCompletionMessage{
-					Role:    "assistant",
+					Role:    strAssistant,
 					Content: resp.Response,
 				},
-				FinishReason: "stop",
+				FinishReason: strStop,
 			},
 		},
 		Usage: ChatCompletionUsage{
@@ -145,7 +147,7 @@ func ConvertToOpenAICompletionResponse(req *CompletionRequest, resp *backends.Ge
 			{
 				Text:         resp.Response,
 				Index:        0,
-				FinishReason: "stop",
+				FinishReason: strStop,
 			},
 		},
 		Usage: CompletionUsage{
@@ -162,7 +164,7 @@ func ConvertToOpenAIEmbeddingResponse(req *EmbeddingRequest, resp *backends.Embe
 	promptTokens := estimateTokens(extractPrompt(req.Input))
 
 	return &EmbeddingResponse{
-		Object: "list",
+		Object: strList,
 		Data: []EmbeddingData{
 			{
 				Object:    "embedding",
@@ -185,11 +187,11 @@ func buildPromptFromMessages(messages []ChatCompletionMessage) string {
 	for _, msg := range messages {
 		var prefix string
 		switch strings.ToLower(msg.Role) {
-		case "system":
+		case strSystem:
 			prefix = "System"
-		case "user":
+		case strUser:
 			prefix = "User"
-		case "assistant":
+		case strAssistant:
 			prefix = "Assistant"
 		default:
 			prefix = msg.Role
@@ -201,7 +203,7 @@ func buildPromptFromMessages(messages []ChatCompletionMessage) string {
 	}
 
 	// Add assistant prompt at the end if the last message wasn't from assistant
-	if len(messages) > 0 && strings.ToLower(messages[len(messages)-1].Role) != "assistant" {
+	if len(messages) > 0 && strings.ToLower(messages[len(messages)-1].Role) != strAssistant {
 		parts = append(parts, "Assistant:")
 	}
 
@@ -247,5 +249,5 @@ func estimateTokens(text string) int32 {
 		return 0
 	}
 	// Rough approximation: divide character count by 4
-	return int32((len(text) + 3) / 4)
+	return safeconv.Int32FromInt((len(text) + 3) / 4)
 }

@@ -5,17 +5,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/thermal"
 )
 
+// TestNewThermalRouter is part of the public API.
 func TestNewThermalRouter(t *testing.T) {
 	config := Config{
-		DefaultBackendID: "test",
+		DefaultBackendID: strTest,
 		PowerAware:       true,
 	}
 
-	thermalConfig := &thermal.ThermalConfig{
+	thermalConfig := &thermal.Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		FanQuiet:     30,
@@ -42,6 +45,7 @@ func TestNewThermalRouter(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_FilterByModelSupport_NoModel is part of the public API.
 func TestThermalRouter_FilterByModelSupport_NoModel(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
@@ -51,9 +55,9 @@ func TestThermalRouter_FilterByModelSupport_NoModel(t *testing.T) {
 	backend2 := &MockBackend{id: "b2", healthy: true}
 	backend3 := &MockBackend{id: "b3", healthy: false}
 
-	tr.RegisterBackend(backend1)
-	tr.RegisterBackend(backend2)
-	tr.RegisterBackend(backend3)
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
+	testutil.Check(t, tr.RegisterBackend(backend3))
 
 	// Test with no model (should return all healthy)
 	filtered := tr.filterByModelSupport("")
@@ -62,6 +66,7 @@ func TestThermalRouter_FilterByModelSupport_NoModel(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_FilterByModelSupport_WithModel is part of the public API.
 func TestThermalRouter_FilterByModelSupport_WithModel(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
@@ -70,24 +75,25 @@ func TestThermalRouter_FilterByModelSupport_WithModel(t *testing.T) {
 	backend1 := &MockBackend{id: "b1", healthy: true}
 	backend2 := &MockBackend{id: "b2", healthy: true}
 
-	tr.RegisterBackend(backend1)
-	tr.RegisterBackend(backend2)
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	// Test with model (MockBackend.SupportsModel always returns true)
-	filtered := tr.filterByModelSupport("llama3:7b")
+	filtered := tr.filterByModelSupport(strLlama37b)
 	if len(filtered) != 2 {
 		t.Errorf("Expected 2 backends supporting model, got %d", len(filtered))
 	}
 }
 
+// TestThermalRouter_FilterByConstraints_Latency is part of the public API.
 func TestThermalRouter_FilterByConstraints_Latency(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
-	backend1 := &MockBackend{id: "fast", avgLatencyMs: 100, powerWatts: 50.0}
-	backend2 := &MockBackend{id: "slow", avgLatencyMs: 500, powerWatts: 10.0}
-	backend3 := &MockBackend{id: "mid", avgLatencyMs: 200, powerWatts: 100.0}
+	backend1 := &MockBackend{id: strFast, avgLatencyMs: 100, powerWatts: 50.0}
+	backend2 := &MockBackend{id: strSlow, avgLatencyMs: 500, powerWatts: 10.0}
+	backend3 := &MockBackend{id: strMid, avgLatencyMs: 200, powerWatts: 100.0}
 
 	candidates := []backends.Backend{backend1, backend2, backend3}
 
@@ -103,20 +109,21 @@ func TestThermalRouter_FilterByConstraints_Latency(t *testing.T) {
 
 	// Verify slow backend filtered out
 	for _, b := range filtered {
-		if b.ID() == "slow" {
+		if b.ID() == strSlow {
 			t.Error("slow backend should have been filtered out")
 		}
 	}
 }
 
+// TestThermalRouter_FilterByConstraints_Power is part of the public API.
 func TestThermalRouter_FilterByConstraints_Power(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
-	backend1 := &MockBackend{id: "fast", avgLatencyMs: 100, powerWatts: 50.0}
-	backend2 := &MockBackend{id: "slow", avgLatencyMs: 500, powerWatts: 10.0}
-	backend3 := &MockBackend{id: "hungry", avgLatencyMs: 200, powerWatts: 100.0}
+	backend1 := &MockBackend{id: strFast, avgLatencyMs: 100, powerWatts: 50.0}
+	backend2 := &MockBackend{id: strSlow, avgLatencyMs: 500, powerWatts: 10.0}
+	backend3 := &MockBackend{id: strHungry, avgLatencyMs: 200, powerWatts: 100.0}
 
 	candidates := []backends.Backend{backend1, backend2, backend3}
 
@@ -132,20 +139,21 @@ func TestThermalRouter_FilterByConstraints_Power(t *testing.T) {
 
 	// Verify hungry backend filtered out
 	for _, b := range filtered {
-		if b.ID() == "hungry" {
+		if b.ID() == strHungry {
 			t.Error("hungry backend should have been filtered out")
 		}
 	}
 }
 
+// TestThermalRouter_FilterByConstraints_Both is part of the public API.
 func TestThermalRouter_FilterByConstraints_Both(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
-	backend1 := &MockBackend{id: "fast", avgLatencyMs: 100, powerWatts: 50.0}
-	backend2 := &MockBackend{id: "slow", avgLatencyMs: 500, powerWatts: 10.0}
-	backend3 := &MockBackend{id: "hungry", avgLatencyMs: 200, powerWatts: 100.0}
+	backend1 := &MockBackend{id: strFast, avgLatencyMs: 100, powerWatts: 50.0}
+	backend2 := &MockBackend{id: strSlow, avgLatencyMs: 500, powerWatts: 10.0}
+	backend3 := &MockBackend{id: strHungry, avgLatencyMs: 200, powerWatts: 100.0}
 
 	candidates := []backends.Backend{backend1, backend2, backend3}
 
@@ -160,11 +168,12 @@ func TestThermalRouter_FilterByConstraints_Both(t *testing.T) {
 		t.Errorf("Expected 1 backend meeting both constraints, got %d", len(filtered))
 	}
 
-	if len(filtered) > 0 && filtered[0].ID() != "fast" {
+	if len(filtered) > 0 && filtered[0].ID() != strFast {
 		t.Errorf("Expected fast backend, got %s", filtered[0].ID())
 	}
 }
 
+// TestThermalRouter_FilterByConstraints_NoConstraints is part of the public API.
 func TestThermalRouter_FilterByConstraints_NoConstraints(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
@@ -185,29 +194,30 @@ func TestThermalRouter_FilterByConstraints_NoConstraints(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_FilterCandidatesThermal_HealthCheck is part of the public API.
 func TestThermalRouter_FilterCandidatesThermal_HealthCheck(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend1 := &MockBackend{
-		id:           "healthy",
-		hardware:     "nvidia",
+		id:           strHealthy,
+		hardware:     strNvidia,
 		healthy:      true,
 		avgLatencyMs: 150,
 		powerWatts:   40.0,
 	}
 
 	backend2 := &MockBackend{
-		id:           "unhealthy",
-		hardware:     "igpu",
+		id:           strUnhealthy,
+		hardware:     strIgpu,
 		healthy:      false,
 		avgLatencyMs: 200,
 		powerWatts:   15.0,
 	}
 
-	tr.RegisterBackend(backend1)
-	tr.RegisterBackend(backend2)
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	annotations := &backends.Annotations{}
 
@@ -221,29 +231,30 @@ func TestThermalRouter_FilterCandidatesThermal_HealthCheck(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_FilterCandidatesThermal_WithConstraints is part of the public API.
 func TestThermalRouter_FilterCandidatesThermal_WithConstraints(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend1 := &MockBackend{
-		id:           "fast",
-		hardware:     "nvidia",
+		id:           strFast,
+		hardware:     strNvidia,
 		healthy:      true,
 		avgLatencyMs: 100,
 		powerWatts:   50.0,
 	}
 
 	backend2 := &MockBackend{
-		id:           "slow",
-		hardware:     "cpu",
+		id:           strSlow,
+		hardware:     strCPU,
 		healthy:      true,
 		avgLatencyMs: 800,
 		powerWatts:   10.0,
 	}
 
-	tr.RegisterBackend(backend1)
-	tr.RegisterBackend(backend2)
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	annotations := &backends.Annotations{
 		MaxLatencyMs: 500,
@@ -259,6 +270,7 @@ func TestThermalRouter_FilterCandidatesThermal_WithConstraints(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_GetThermalStatus is part of the public API.
 func TestThermalRouter_GetThermalStatus(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
@@ -274,15 +286,16 @@ func TestThermalRouter_GetThermalStatus(t *testing.T) {
 	t.Logf("Thermal status has %d entries", len(status))
 }
 
+// TestSortScored is part of the public API.
 func TestSortScored(t *testing.T) {
 	backend1 := &MockBackend{id: "low", priority: 1}
-	backend2 := &MockBackend{id: "high", priority: 10}
-	backend3 := &MockBackend{id: "mid", priority: 5}
+	backend2 := &MockBackend{id: strHigh, priority: 10}
+	backend3 := &MockBackend{id: strMid, priority: 5}
 
 	scored := []candidateScore{
 		{backend: backend1, score: 100.0, reason: "low"},
-		{backend: backend2, score: 500.0, reason: "high"},
-		{backend: backend3, score: 300.0, reason: "mid"},
+		{backend: backend2, score: 500.0, reason: strHigh},
+		{backend: backend3, score: 300.0, reason: strMid},
 	}
 
 	sortScored(scored)
@@ -301,11 +314,12 @@ func TestSortScored(t *testing.T) {
 	}
 
 	// Verify correct backends
-	if scored[0].backend.ID() != "high" {
+	if scored[0].backend.ID() != strHigh {
 		t.Errorf("Expected high backend first, got %s", scored[0].backend.ID())
 	}
 }
 
+// TestSortScored_AlreadySorted is part of the public API.
 func TestSortScored_AlreadySorted(t *testing.T) {
 	backend1 := &MockBackend{id: "first"}
 	backend2 := &MockBackend{id: "second"}
@@ -322,6 +336,7 @@ func TestSortScored_AlreadySorted(t *testing.T) {
 	}
 }
 
+// TestSortScored_Empty is part of the public API.
 func TestSortScored_Empty(t *testing.T) {
 	scored := []candidateScore{}
 	sortScored(scored)
@@ -331,6 +346,7 @@ func TestSortScored_Empty(t *testing.T) {
 	}
 }
 
+// TestSortScored_SingleElement is part of the public API.
 func TestSortScored_SingleElement(t *testing.T) {
 	backend := &MockBackend{id: "only"}
 	scored := []candidateScore{
@@ -344,21 +360,22 @@ func TestSortScored_SingleElement(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_RouteRequestThermal is part of the public API.
 func TestThermalRouter_RouteRequestThermal(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend := &MockBackend{
-		id:           "test",
-		hardware:     "nvidia",
+		id:           strTest,
+		hardware:     strNvidia,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 200,
 		priority:     5,
 	}
 
-	tr.RegisterBackend(backend)
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -380,31 +397,32 @@ func TestThermalRouter_RouteRequestThermal(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_RouteRequestWithModel is part of the public API.
 func TestThermalRouter_RouteRequestWithModel(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend := &MockBackend{
-		id:           "test",
-		hardware:     "igpu",
+		id:           strTest,
+		hardware:     strIgpu,
 		healthy:      true,
 		powerWatts:   15.0,
 		avgLatencyMs: 300,
 		priority:     5,
 	}
 
-	tr.RegisterBackend(backend)
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
 
 	// This will likely fail due to thermal checks
-	decision, err := tr.RouteRequestWithModel(ctx, "test prompt", "llama3:7b", annotations)
+	decision, err := tr.RouteRequestWithModel(ctx, "test prompt", strLlama37b, annotations)
 
 	if err == nil {
 		// If successful, verify model tracking
-		if decision.ModelRequested != "llama3:7b" {
+		if decision.ModelRequested != strLlama37b {
 			t.Errorf("Expected ModelRequested=llama3:7b, got %s", decision.ModelRequested)
 		}
 	} else {
@@ -412,22 +430,23 @@ func TestThermalRouter_RouteRequestWithModel(t *testing.T) {
 	}
 }
 
+// TestThermalRouter_ScoreCandidatesThermal_LatencyCritical is part of the public API.
 func TestThermalRouter_ScoreCandidatesThermal_LatencyCritical(t *testing.T) {
 	config := Config{PowerAware: true, AutoOptimize: true}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend1 := &MockBackend{
-		id:           "fast",
-		hardware:     "nvidia",
+		id:           strFast,
+		hardware:     strNvidia,
 		avgLatencyMs: 100,
 		powerWatts:   50.0,
 		priority:     5,
 	}
 
 	backend2 := &MockBackend{
-		id:           "slow",
-		hardware:     "cpu",
+		id:           strSlow,
+		hardware:     strCPU,
 		avgLatencyMs: 400,
 		powerWatts:   10.0,
 		priority:     5,
@@ -455,22 +474,23 @@ func TestThermalRouter_ScoreCandidatesThermal_LatencyCritical(t *testing.T) {
 		scored[1].backend.ID(), scored[1].score)
 }
 
+// TestThermalRouter_ScoreCandidatesThermal_PowerEfficient is part of the public API.
 func TestThermalRouter_ScoreCandidatesThermal_PowerEfficient(t *testing.T) {
 	config := Config{PowerAware: true}
 	monitor := thermal.NewThermalMonitor(nil, 0)
 	tr := NewThermalRouter(config, monitor)
 
 	backend1 := &MockBackend{
-		id:           "hungry",
-		hardware:     "nvidia",
+		id:           strHungry,
+		hardware:     strNvidia,
 		avgLatencyMs: 100,
 		powerWatts:   100.0,
 		priority:     5,
 	}
 
 	backend2 := &MockBackend{
-		id:           "efficient",
-		hardware:     "npu",
+		id:           strEfficient,
+		hardware:     strNpu,
 		avgLatencyMs: 400,
 		powerWatts:   5.0,
 		priority:     5,
@@ -493,11 +513,12 @@ func TestThermalRouter_ScoreCandidatesThermal_PowerEfficient(t *testing.T) {
 		scored[1].backend.ID(), scored[1].score)
 
 	// Efficient backend should score higher with power preference
-	if scored[0].backend.ID() != "efficient" {
+	if scored[0].backend.ID() != strEfficient {
 		t.Logf("Note: Expected efficient backend first, but scoring may vary")
 	}
 }
 
+// TestThermalRouter_ScoreCandidatesThermal_Balanced is part of the public API.
 func TestThermalRouter_ScoreCandidatesThermal_Balanced(t *testing.T) {
 	config := Config{}
 	monitor := thermal.NewThermalMonitor(nil, 0)
@@ -551,16 +572,16 @@ func TestThermalRouter_RouteRequestWithModel_ModelSubstitution(t *testing.T) {
 
 	// Create a backend that supports llama3:7b but not the requested gpt-4
 	backend := &MockBackend{
-		id:           "local-backend",
-		hardware:     "cpu",
-		healthy:      true,
-		powerWatts:   50.0,
-		avgLatencyMs: 200,
-		priority:     5,
+		id:            "local-backend",
+		hardware:      strCPU,
+		healthy:       true,
+		powerWatts:    50.0,
+		avgLatencyMs:  200,
+		priority:      5,
 		modelPatterns: []string{"llama3*"},
 	}
 
-	tr.RegisterBackend(backend)
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -599,7 +620,7 @@ func TestThermalRouter_RouteRequestWithModel_NoBackends(t *testing.T) {
 	// Create a backend that only supports gpt models
 	backend := &MockBackend{
 		id:            "gpt-only-backend",
-		hardware:      "cpu",
+		hardware:      strCPU,
 		healthy:       true,
 		powerWatts:    50.0,
 		avgLatencyMs:  200,
@@ -607,13 +628,13 @@ func TestThermalRouter_RouteRequestWithModel_NoBackends(t *testing.T) {
 		modelPatterns: []string{"gpt-*"},
 	}
 
-	tr.RegisterBackend(backend)
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
 
 	// Request llama3 model which isn't supported
-	_, err := tr.RouteRequestWithModel(ctx, "test prompt", "llama3:7b", annotations)
+	_, err := tr.RouteRequestWithModel(ctx, "test prompt", strLlama37b, annotations)
 
 	if err == nil {
 		t.Error("Expected error when no backend supports the model")
@@ -632,7 +653,7 @@ func TestThermalRouter_RouteRequestWithModel_WithWorkloadHints(t *testing.T) {
 	// Create multiple backends with different characteristics
 	fastBackend := &MockBackend{
 		id:           "fast-gpu",
-		hardware:     "nvidia",
+		hardware:     strNvidia,
 		healthy:      true,
 		powerWatts:   200.0,
 		avgLatencyMs: 50,
@@ -641,15 +662,15 @@ func TestThermalRouter_RouteRequestWithModel_WithWorkloadHints(t *testing.T) {
 
 	efficientBackend := &MockBackend{
 		id:           "efficient-cpu",
-		hardware:     "cpu",
+		hardware:     strCPU,
 		healthy:      true,
 		powerWatts:   30.0,
 		avgLatencyMs: 300,
 		priority:     3,
 	}
 
-	tr.RegisterBackend(fastBackend)
-	tr.RegisterBackend(efficientBackend)
+	testutil.Check(t, tr.RegisterBackend(fastBackend))
+	testutil.Check(t, tr.RegisterBackend(efficientBackend))
 
 	ctx := context.Background()
 
@@ -658,7 +679,7 @@ func TestThermalRouter_RouteRequestWithModel_WithWorkloadHints(t *testing.T) {
 		LatencyCritical: true,
 	}
 
-	decision, err := tr.RouteRequestWithModel(ctx, "Quick question", "llama3:7b", latencyCritical)
+	decision, err := tr.RouteRequestWithModel(ctx, "Quick question", strLlama37b, latencyCritical)
 
 	if err == nil {
 		if decision.Backend.ID() == "fast-gpu" {
@@ -677,7 +698,7 @@ func TestThermalRouter_RouteRequestWithModel_WithWorkloadHints(t *testing.T) {
 		PreferPowerEfficiency: true,
 	}
 
-	decision, err = tr.RouteRequestWithModel(ctx, "Background task", "llama3:7b", powerEfficient)
+	decision, err = tr.RouteRequestWithModel(ctx, "Background task", strLlama37b, powerEfficient)
 
 	if err == nil {
 		if decision.Backend.ID() == "efficient-cpu" {
