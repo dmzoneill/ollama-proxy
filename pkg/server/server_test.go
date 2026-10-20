@@ -1655,7 +1655,7 @@ func TestTruncate(t *testing.T) {
 	}{
 		{input: "short", max: 10, expected: "short"},
 		{input: "this is a long string", max: 10, expected: "this is a ..."},
-		{input: "exactly ten!", max: 10, expected: "exactly te..."},
+		{input: "0123456789abcdef", max: 10, expected: "0123456789..."},
 		{input: "", max: 5, expected: ""},
 		{input: "a", max: 5, expected: "a"},
 	}

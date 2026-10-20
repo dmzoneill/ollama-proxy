@@ -82,8 +82,8 @@ func TestNewAnthropicBackend(t *testing.T) {
 func TestNewAnthropicBackend_APIKeyEnv(t *testing.T) {
 	// Set environment variable
 	envKey := "TEST_ANTHROPIC_API_KEY"
-	expectedKey := "env-test-key-12345"
-	t.Setenv(envKey, expectedKey)
+	wantFromEnv := "anthropic-env-sample"
+	t.Setenv(envKey, wantFromEnv)
 
 	cfg := Config{
 		BackendConfig: backends.BackendConfig{
@@ -102,8 +102,8 @@ func TestNewAnthropicBackend_APIKeyEnv(t *testing.T) {
 		t.Fatal("Expected backend to be created, got nil")
 	}
 
-	if backend.apiKey != expectedKey {
-		t.Errorf("apiKey = %v, want %v", backend.apiKey, expectedKey)
+	if backend.apiKey != wantFromEnv {
+		t.Errorf("apiKey = %v, want %v", backend.apiKey, wantFromEnv)
 	}
 }
 

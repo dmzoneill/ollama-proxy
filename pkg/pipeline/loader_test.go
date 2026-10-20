@@ -824,26 +824,25 @@ func TestLoadFromFileValidYAML(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	// Write valid pipeline YAML
-	yamlContent := `pipelines:
-  - id: test-pipeline-1
-    name: Test Pipeline 1
-    description: First test pipeline
-    stages:
-      - id: stage1
-        type: text_generation
-        model: llama3:7b
-    options:
-      enable_streaming: true
-  - id: test-pipeline-2
-    name: Test Pipeline 2
-    description: Second test pipeline
-    stages:
-      - id: stage2
-        type: embedding
-        model: nomic-embed-text
-    options:
-      collect_metrics: true
-`
+	yamlContent := "pipelines:\n" +
+		"- id: test-pipeline-1\n" +
+		"  name: Test Pipeline 1\n" +
+		"  description: First test pipeline\n" +
+		"  stages:\n" +
+		"  - id: stage1\n" +
+		"    type: text_generation\n" +
+		"    model: llama3:7b\n" +
+		"  options:\n" +
+		"    enable_streaming: true\n" +
+		"- id: test-pipeline-2\n" +
+		"  name: Test Pipeline 2\n" +
+		"  description: Second test pipeline\n" +
+		"  stages:\n" +
+		"  - id: stage2\n" +
+		"    type: embedding\n" +
+		"    model: nomic-embed-text\n" +
+		"  options:\n" +
+		"    collect_metrics: true\n"
 	if _, err := tmpfile.WriteString(yamlContent); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
