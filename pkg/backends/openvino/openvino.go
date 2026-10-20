@@ -3,34 +3,32 @@ package openvino
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"sync"
+	"os"
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"go.uber.org/zap"
 )
 
-// OpenVINOBackend implements audio processing via OpenVINO on NPU
+// Backend implements audio processing via OpenVINO on NPU
 // Uses whisper.cpp with OpenVINO backend for STT
 // Uses Piper ONNX with OpenVINO runtime for TTS
-type OpenVINOBackend struct {
-	id       string
-	name     string
-	hardware string
-	device   string // "NPU", "GPU", "CPU"
-
-	// Models
-	whisperModel string // Path to Whisper ONNX model
-	piperModel   string // Path to Piper ONNX model
-
-	mu     sync.RWMutex
-	logger *zap.Logger
+type Backend struct {
+	logger       *zap.Logger
+	id           string
+	name         string
+	hardware     string
+	device       string
+	whisperModel string
+	piperModel   string
 }
 
 // NewOpenVINOBackend creates a new OpenVINO backend for NPU audio processing
-func NewOpenVINOBackend(id, name, hardware, device string, logger *zap.Logger) (*OpenVINOBackend, error) {
-	return &OpenVINOBackend{
+func NewOpenVINOBackend(id, name, hardware, device string, logger *zap.Logger) (*Backend, error) {
+	return &Backend{
 		id:           id,
 		name:         name,
 		hardware:     hardware,
@@ -42,32 +40,32 @@ func NewOpenVINOBackend(id, name, hardware, device string, logger *zap.Logger) (
 }
 
 // ID returns backend identifier
-func (b *OpenVINOBackend) ID() string {
+func (b *Backend) ID() string {
 	return b.id
 }
 
 // Name returns human-readable name
-func (b *OpenVINOBackend) Name() string {
+func (b *Backend) Name() string {
 	return b.name
 }
 
 // Hardware returns hardware type
-func (b *OpenVINOBackend) Hardware() string {
+func (b *Backend) Hardware() string {
 	return b.hardware
 }
 
 // SupportsAudioToText returns true (Whisper on OpenVINO)
-func (b *OpenVINOBackend) SupportsAudioToText() bool {
+func (b *Backend) SupportsAudioToText() bool {
 	return true
 }
 
 // SupportsTextToAudio returns true (Piper on OpenVINO)
-func (b *OpenVINOBackend) SupportsTextToAudio() bool {
+func (b *Backend) SupportsTextToAudio() bool {
 	return true
 }
 
 // TranscribeAudio performs STT using Whisper via OpenVINO NPU
-func (b *OpenVINOBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+func (b *Backend) TranscribeAudio(ctx context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 	start := time.Now()
 
 	// For now, use whisper.cpp CLI with OpenVINO backend
@@ -75,21 +73,22 @@ func (b *OpenVINOBackend) TranscribeAudio(ctx context.Context, req *backends.Tra
 
 	// Write audio to temp file
 	tmpFile := fmt.Sprintf("/tmp/whisper_input_%d.wav", time.Now().UnixNano())
-	defer func() {
-		exec.Command("rm", "-f", tmpFile).Run()
-	}()
+	defer removeTemp(tmpFile)
 
 	// Convert PCM to WAV format for whisper.cpp
 	// TODO: Implement proper WAV writing
 
 	// Run whisper.cpp with OpenVINO backend
-	cmd := exec.CommandContext(ctx,
+	cmd, err := cmdexec.CommandContext(ctx,
 		"whisper-cpp",
 		"--model", b.whisperModel,
 		"--device", b.device,
 		"--output-txt",
 		tmpFile,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("whisper-cpp: %w", err)
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -111,33 +110,34 @@ func (b *OpenVINOBackend) TranscribeAudio(ctx context.Context, req *backends.Tra
 		Text:     text,
 		Language: "en",
 		Stats: &backends.GenerationStats{
-			TotalTimeMs: int32(elapsed.Milliseconds()),
+			TotalTimeMs: safeconv.Int32FromInt64(elapsed.Milliseconds()),
 		},
 	}, nil
 }
 
 // TranscribeAudioStream - not implemented
-func (b *OpenVINOBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+func (b *Backend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
 	return nil, fmt.Errorf("streaming STT not implemented")
 }
 
 // SynthesizeSpeech performs TTS using Piper via OpenVINO
-func (b *OpenVINOBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+func (b *Backend) SynthesizeSpeech(ctx context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
 	start := time.Now()
 
 	// Use piper binary with OpenVINO backend
 	// TODO: Use direct ONNX runtime Go bindings
 
 	tmpOutput := fmt.Sprintf("/tmp/piper_output_%d.wav", time.Now().UnixNano())
-	defer func() {
-		exec.Command("rm", "-f", tmpOutput).Run()
-	}()
+	defer removeTemp(tmpOutput)
 
-	cmd := exec.CommandContext(ctx,
+	cmd, err := cmdexec.CommandContext(ctx,
 		"piper",
 		"--model", b.piperModel,
 		"--output_file", tmpOutput,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("piper: %w", err)
+	}
 
 	cmd.Stdin = nil // TODO: Pipe text input
 
@@ -154,16 +154,23 @@ func (b *OpenVINOBackend) SynthesizeSpeech(ctx context.Context, req *backends.Sy
 	)
 
 	return &backends.SynthesizeResponse{
-		AudioData: []byte{}, // TODO: Read WAV file
-		Format:    backends.AudioFormatPCM,
+		AudioData:  []byte{}, // TODO: Read WAV file
+		Format:     backends.AudioFormatPCM,
 		SampleRate: 22050,
 		Stats: &backends.GenerationStats{
-			TotalTimeMs: int32(elapsed.Milliseconds()),
+			TotalTimeMs: safeconv.Int32FromInt64(elapsed.Milliseconds()),
 		},
 	}, nil
 }
 
 // SynthesizeSpeechStream - not implemented
-func (b *OpenVINOBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+func (b *Backend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
 	return nil, fmt.Errorf("streaming TTS not implemented")
+}
+
+// removeTemp deletes a best-effort temporary file.
+func removeTemp(path string) {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		logging.Warn("remove temp file", zap.Error(err))
+	}
 }

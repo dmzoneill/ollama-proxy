@@ -1,3 +1,4 @@
+// Package openai implements an OpenAI-compatible backend.
 package openai
 
 import (
@@ -14,49 +15,40 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
+	"go.uber.org/zap"
 )
 
-// OpenAIBackend implements Backend interface for OpenAI API
-type OpenAIBackend struct {
-	mu sync.RWMutex
-
-	// Config
-	id       string
-	name     string
-	apiKey   string
-	endpoint string
-
-	// Characteristics
-	powerWatts   float64 // 0 for cloud services
-	avgLatencyMs int32
-	priority     int
-
-	// Model capabilities
+// Backend implements Backend interface for OpenAI API
+type Backend struct {
+	lastCheck       time.Time
+	metrics         *backends.BackendMetrics
 	modelCapability *backends.ModelCapability
-
-	// Health
-	healthy      atomic.Bool
-	lastCheck    time.Time
-	checkTimeout time.Duration
-
-	// Metrics
-	metrics *backends.BackendMetrics
-
-	// HTTP client
-	client *http.Client
+	client          *http.Client
+	id              string
+	name            string
+	apiKey          string
+	endpoint        string
+	powerWatts      float64
+	priority        int
+	checkTimeout    time.Duration
+	mu              sync.RWMutex
+	avgLatencyMs    int32
+	healthy         atomic.Bool
 }
 
 // Config for OpenAI backend
 type Config struct {
+	APIKey    string
+	APIKeyEnv string
+	Endpoint  string
+	OrgID     string
 	backends.BackendConfig
-	APIKey      string // Direct API key
-	APIKeyEnv   string // Or env var name
-	Endpoint    string // Optional: custom endpoint (default: api.openai.com)
-	OrgID       string // Optional: OpenAI organization ID
 }
 
 // NewOpenAIBackend creates a new OpenAI API backend
-func NewOpenAIBackend(cfg Config) (*OpenAIBackend, error) {
+func NewOpenAIBackend(cfg Config) (*Backend, error) {
 	// Get API key from env if specified
 	apiKey := cfg.APIKey
 	if cfg.APIKeyEnv != "" {
@@ -73,12 +65,12 @@ func NewOpenAIBackend(cfg Config) (*OpenAIBackend, error) {
 		endpoint = "https://api.openai.com/v1"
 	}
 
-	backend := &OpenAIBackend{
+	backend := &Backend{
 		id:              cfg.ID,
 		name:            cfg.Name,
 		apiKey:          apiKey,
 		endpoint:        endpoint,
-		powerWatts:      cfg.PowerWatts,      // 0 for cloud
+		powerWatts:      cfg.PowerWatts, // 0 for cloud
 		avgLatencyMs:    cfg.AvgLatencyMs,
 		priority:        cfg.Priority,
 		modelCapability: cfg.ModelCapability,
@@ -96,32 +88,32 @@ func NewOpenAIBackend(cfg Config) (*OpenAIBackend, error) {
 }
 
 // ID returns backend identifier
-func (b *OpenAIBackend) ID() string {
+func (b *Backend) ID() string {
 	return b.id
 }
 
 // Type returns backend type
-func (b *OpenAIBackend) Type() string {
+func (b *Backend) Type() string {
 	return "openai"
 }
 
 // Name returns human-readable name
-func (b *OpenAIBackend) Name() string {
+func (b *Backend) Name() string {
 	return b.name
 }
 
 // Hardware returns hardware type (cloud for API services)
-func (b *OpenAIBackend) Hardware() string {
+func (b *Backend) Hardware() string {
 	return "cloud"
 }
 
 // IsHealthy returns current health status
-func (b *OpenAIBackend) IsHealthy() bool {
+func (b *Backend) IsHealthy() bool {
 	return b.healthy.Load()
 }
 
 // HealthCheck performs health check against OpenAI API
-func (b *OpenAIBackend) HealthCheck(ctx context.Context) error {
+func (b *Backend) HealthCheck(ctx context.Context) error {
 	checkCtx, cancel := context.WithTimeout(ctx, b.checkTimeout)
 	defer cancel()
 
@@ -139,7 +131,11 @@ func (b *OpenAIBackend) HealthCheck(ctx context.Context) error {
 		b.healthy.Store(false)
 		return fmt.Errorf("health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		b.healthy.Store(false)
@@ -155,12 +151,12 @@ func (b *OpenAIBackend) HealthCheck(ctx context.Context) error {
 }
 
 // PowerWatts returns estimated power consumption (0 for cloud)
-func (b *OpenAIBackend) PowerWatts() float64 {
+func (b *Backend) PowerWatts() float64 {
 	return b.powerWatts // 0 for cloud services
 }
 
 // AvgLatencyMs returns average latency
-func (b *OpenAIBackend) AvgLatencyMs() int32 {
+func (b *Backend) AvgLatencyMs() int32 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -171,27 +167,27 @@ func (b *OpenAIBackend) AvgLatencyMs() int32 {
 }
 
 // Priority returns backend priority
-func (b *OpenAIBackend) Priority() int {
+func (b *Backend) Priority() int {
 	return b.priority
 }
 
 // SupportsGenerate returns true
-func (b *OpenAIBackend) SupportsGenerate() bool {
+func (b *Backend) SupportsGenerate() bool {
 	return true
 }
 
 // SupportsStream returns true
-func (b *OpenAIBackend) SupportsStream() bool {
+func (b *Backend) SupportsStream() bool {
 	return true
 }
 
 // SupportsEmbed returns true
-func (b *OpenAIBackend) SupportsEmbed() bool {
+func (b *Backend) SupportsEmbed() bool {
 	return true
 }
 
 // ListModels fetches available models from OpenAI
-func (b *OpenAIBackend) ListModels(ctx context.Context) ([]string, error) {
+func (b *Backend) ListModels(ctx context.Context) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", b.endpoint+"/models", nil)
 	if err != nil {
 		return nil, err
@@ -203,7 +199,11 @@ func (b *OpenAIBackend) ListModels(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	var result struct {
 		Data []struct {
@@ -224,7 +224,7 @@ func (b *OpenAIBackend) ListModels(ctx context.Context) ([]string, error) {
 }
 
 // SupportsModel checks if this backend can run the specified model
-func (b *OpenAIBackend) SupportsModel(modelName string) bool {
+func (b *Backend) SupportsModel(modelName string) bool {
 	if b.modelCapability == nil {
 		// Default OpenAI models
 		return strings.HasPrefix(modelName, "gpt-") || strings.HasPrefix(modelName, "o1-")
@@ -252,35 +252,35 @@ func (b *OpenAIBackend) SupportsModel(modelName string) bool {
 }
 
 // GetMaxModelSizeGB returns maximum model size (N/A for cloud)
-func (b *OpenAIBackend) GetMaxModelSizeGB() int {
+func (b *Backend) GetMaxModelSizeGB() int {
 	return 999 // Cloud services have no size limit
 }
 
 // GetSupportedModelPatterns returns patterns of supported models
-func (b *OpenAIBackend) GetSupportedModelPatterns() []string {
+func (b *Backend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
-		return []string{"gpt-*", "o1-*"}
+		return []string{strGpt, "o1-*"}
 	}
 	return b.modelCapability.SupportedModelPatterns
 }
 
 // GetPreferredModels returns list of preferred models
-func (b *OpenAIBackend) GetPreferredModels() []string {
+func (b *Backend) GetPreferredModels() []string {
 	if b.modelCapability == nil {
-		return []string{"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"}
+		return []string{strGpt42, strGpt4Turbo, strGpt35Turbo}
 	}
 	return b.modelCapability.PreferredModels
 }
 
 // Generate performs text generation via OpenAI API
-func (b *OpenAIBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+func (b *Backend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	start := time.Now()
 
 	// Build OpenAI API request
 	openaiReq := map[string]interface{}{
 		"model": req.Model,
 		"messages": []map[string]string{
-			{"role": "user", "content": req.Prompt},
+			{"role": "user", strContent: req.Prompt},
 		},
 	}
 
@@ -311,14 +311,21 @@ func (b *OpenAIBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 
 	resp, err := b.client.Do(httpReq)
 	if err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read response body: %w", err)
+		}
 		return nil, fmt.Errorf("OpenAI API error: %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -334,12 +341,12 @@ func (b *OpenAIBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&openaiResp); err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 
 	b.UpdateMetrics(latencyMs, true)
 
@@ -355,7 +362,7 @@ func (b *OpenAIBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 		Response: response,
 		Stats: &backends.GenerationStats{
 			TotalTimeMs:     latencyMs,
-			TokensGenerated: int32(openaiResp.Usage.TotalTokens),
+			TokensGenerated: safeconv.Int32FromInt(openaiResp.Usage.TotalTokens),
 			TokensPerSecond: float32(openaiResp.Usage.TotalTokens) / float32(elapsed.Seconds()),
 			EnergyWh:        energyWh,
 		},
@@ -363,13 +370,13 @@ func (b *OpenAIBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 }
 
 // GenerateStream performs streaming text generation (placeholder)
-func (b *OpenAIBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+func (b *Backend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	// TODO: Implement streaming support
 	return nil, fmt.Errorf("streaming not yet implemented for OpenAI backend")
 }
 
 // Embed generates embeddings via OpenAI API
-func (b *OpenAIBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+func (b *Backend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	start := time.Now()
 
 	openaiReq := map[string]interface{}{
@@ -394,7 +401,11 @@ func (b *OpenAIBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	var openaiResp struct {
 		Data []struct {
@@ -406,7 +417,7 @@ func (b *OpenAIBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (
 		return nil, err
 	}
 
-	latencyMs := int32(time.Since(start).Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(time.Since(start).Milliseconds())
 	b.UpdateMetrics(latencyMs, true)
 
 	embedding := []float32{}
@@ -423,7 +434,7 @@ func (b *OpenAIBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (
 }
 
 // UpdateMetrics updates backend metrics
-func (b *OpenAIBackend) UpdateMetrics(latencyMs int32, success bool) {
+func (b *Backend) UpdateMetrics(latencyMs int32, success bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -434,7 +445,7 @@ func (b *OpenAIBackend) UpdateMetrics(latencyMs int32, success bool) {
 		atomic.AddInt64(&b.metrics.TotalLatencyMs, int64(latencyMs))
 
 		if b.metrics.RequestCount > 0 {
-			b.metrics.AvgLatencyMs = int32(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
+			b.metrics.AvgLatencyMs = safeconv.Int32FromInt64(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
 		}
 	} else {
 		atomic.AddInt64(&b.metrics.ErrorCount, 1)
@@ -446,7 +457,7 @@ func (b *OpenAIBackend) UpdateMetrics(latencyMs int32, success bool) {
 }
 
 // GetMetrics returns current metrics
-func (b *OpenAIBackend) GetMetrics() *backends.BackendMetrics {
+func (b *Backend) GetMetrics() *backends.BackendMetrics {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -462,12 +473,12 @@ func (b *OpenAIBackend) GetMetrics() *backends.BackendMetrics {
 }
 
 // Start initializes the backend
-func (b *OpenAIBackend) Start(ctx context.Context) error {
+func (b *Backend) Start(ctx context.Context) error {
 	return b.HealthCheck(ctx)
 }
 
 // Stop shuts down the backend
-func (b *OpenAIBackend) Stop(ctx context.Context) error {
+func (b *Backend) Stop(_ context.Context) error {
 	return nil
 }
 
