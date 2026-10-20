@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/router"
 )
@@ -282,9 +284,7 @@ func TestHandleChatCompletion_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -326,9 +326,7 @@ func TestHandleCompletion_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -359,9 +357,7 @@ func TestHandleEmbedding_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -400,9 +396,7 @@ func TestHandleModels_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleModels(r)
 
@@ -657,9 +651,7 @@ func TestHandleChatCompletion_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -693,9 +685,7 @@ func TestHandleChatCompletion_GenerationError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -729,9 +719,7 @@ func TestHandleChatCompletion_StreamingNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -767,9 +755,7 @@ func TestHandleChatCompletion_StreamingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -879,9 +865,7 @@ func TestHandleCompletion_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -913,9 +897,7 @@ func TestHandleCompletion_GenerationError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -947,9 +929,7 @@ func TestHandleCompletion_StreamingNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -983,9 +963,7 @@ func TestHandleCompletion_StreamingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -1093,9 +1071,7 @@ func TestHandleEmbedding_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -1216,9 +1192,7 @@ func TestHandleEmbedding_BackendSupportsEmbed(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -1250,9 +1224,7 @@ func TestHandleEmbedding_EmbeddingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -1401,9 +1373,7 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1452,9 +1422,7 @@ func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -1549,9 +1517,7 @@ func TestHandleChatCompletion_ResponseHeaders(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1664,9 +1630,7 @@ func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1724,9 +1688,7 @@ func TestHandleCompletion_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -1770,9 +1732,7 @@ func TestHandleEmbedding_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -1854,9 +1814,7 @@ func TestHandleChatCompletion_ModelNotFound(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1947,9 +1905,7 @@ func TestHandleChatCompletion_MultipleMessages(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -1994,9 +1950,7 @@ func TestHandleCompletion_ArrayPrompt(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 
@@ -2028,9 +1982,7 @@ func TestHandleEmbedding_ArrayInput(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleEmbedding(r)
 
@@ -2064,12 +2016,8 @@ func TestHandleModels_MultipleBackends(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	handler := HandleModels(r)
 
@@ -2100,9 +2048,7 @@ func TestHandleChatCompletion_WithParameters(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleChatCompletion(r)
 
@@ -2142,9 +2088,7 @@ func TestHandleCompletion_WithParameters(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	handler := HandleCompletion(r)
 

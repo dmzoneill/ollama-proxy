@@ -6,6 +6,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/router"
 )
@@ -292,12 +294,8 @@ func TestListBackendsMethod(t *testing.T) {
 		avgLatencyMs: 200,
 	}
 
-	if err := r.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	// Create service without D-Bus connection (just for method testing)
 	svc := &BackendsService{
@@ -376,9 +374,7 @@ func TestGetBackendDetailsMethod(t *testing.T) {
 		preferredModels:   []string{strLlama38b, strMistral7b},
 	}
 
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
@@ -456,9 +452,7 @@ func TestGetBackendMetricsMethod(t *testing.T) {
 		metrics: metrics,
 	}
 
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
@@ -513,9 +507,7 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 		preferredModels: []string{strLlama38b},
 	}
 
-	if err := r.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	svc := &BackendsService{
 		router: r,
@@ -550,9 +542,7 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 		modelsErr:       io.ErrUnexpectedEOF,
 		preferredModels: []string{"fallback:model"},
 	}
-	if err := r.RegisterBackend(backendWithError); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backendWithError))
 
 	models, dbusErr = svc.GetSupportedModels("error-backend")
 	if dbusErr == nil {
@@ -583,12 +573,8 @@ func TestRefreshBackendStatusMethod(t *testing.T) {
 		healthy: false,
 	}
 
-	if err := r.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	svc := &BackendsService{
 		router: r,
@@ -613,15 +599,9 @@ func TestMakePropertyMap(t *testing.T) {
 	backend2 := &mockBackend{id: strBackend2, healthy: false}
 	backend3 := &mockBackend{id: strBackend3, healthy: true}
 
-	if err := r.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend3); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
+	testutil.Check(t, r.RegisterBackend(backend3))
 
 	svc := &BackendsService{
 		router: r,
@@ -671,12 +651,8 @@ func TestUpdateProperties(t *testing.T) {
 	backend1 := &mockBackend{id: strBackend1, healthy: true}
 	backend2 := &mockBackend{id: strBackend2, healthy: true}
 
-	if err := r.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	svc := &BackendsService{
 		router: r,

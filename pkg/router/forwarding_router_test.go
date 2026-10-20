@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/thermal"
 )
@@ -218,15 +220,9 @@ func TestForwardingRouter_BasicForwarding(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(nvidiaBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	// Create forwarding router
 	forwardingCfg := &ForwardingConfig{
@@ -312,15 +308,9 @@ func TestForwardingRouter_ModelCompatibility(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(nvidiaBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -410,12 +400,8 @@ func TestForwardingRouter_ThermalRespect(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -483,9 +469,7 @@ func TestForwardingRouter_EscalationPath(t *testing.T) {
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		if err := baseRouter.RegisterBackend(b); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	forwardingCfg := &ForwardingConfig{
@@ -543,12 +527,8 @@ func TestForwardingRouter_MaxRetries(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -740,15 +720,9 @@ func TestForwardingRouter_BuildEscalationPath(t *testing.T) {
 		healthy:  true,
 	}
 
-	if err := router.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := router.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := router.RegisterBackend(nvidiaBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, router.RegisterBackend(npuBackend))
+	testutil.Check(t, router.RegisterBackend(intelBackend))
+	testutil.Check(t, router.RegisterBackend(nvidiaBackend))
 
 	ctx := context.Background()
 
@@ -781,9 +755,7 @@ func TestForwardingRouter_FindBackend(t *testing.T) {
 		healthy:  true,
 	}
 
-	if err := router.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, router.RegisterBackend(backend1))
 
 	fr := NewForwardingRouter(router, nil, DefaultForwardingConfig())
 
@@ -840,9 +812,7 @@ func TestForwardingRouter_FindBackend_WithThermalRouter(t *testing.T) {
 		hardware: strCPU,
 		healthy:  true,
 	}
-	if err := baseRouter.RegisterBackend(baseBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(baseBackend))
 
 	// Create thermal router with different backend
 	thermalConfig := &thermal.Config{
@@ -863,9 +833,7 @@ func TestForwardingRouter_FindBackend_WithThermalRouter(t *testing.T) {
 		hardware: strGpu,
 		healthy:  true,
 	}
-	if err := thermalRouter.RegisterBackend(thermalBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, thermalRouter.RegisterBackend(thermalBackend))
 
 	// Create forwarding router with both routers
 	forwardingCfg := DefaultForwardingConfig()
@@ -960,12 +928,8 @@ func TestGenerateWithForwardingStream_Success(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1049,12 +1013,8 @@ func TestGenerateWithForwardingStream_ThermalRespect(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1140,15 +1100,9 @@ func TestGenerateWithForwardingStream_ModelCompatibility(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(nvidiaBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1236,9 +1190,7 @@ func TestGenerateWithForwardingStream_NoSuitableBackend(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1304,12 +1256,8 @@ func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(npuBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(intelBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1386,9 +1334,7 @@ func TestGenerateWithForwardingStream_EscalationPath(t *testing.T) {
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		if err := baseRouter.RegisterBackend(b); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	forwardingCfg := &ForwardingConfig{
@@ -1454,9 +1400,7 @@ func TestForwardingRouter_BackendNotFound(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
 
 	// Create forwarding config with non-existent backends in escalation path
 	forwardingCfg := &ForwardingConfig{
@@ -1529,12 +1473,8 @@ func TestForwardingRouter_GenerateFailure(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(failingBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(workingBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(failingBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(workingBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1615,12 +1555,8 @@ func TestForwardingRouter_LowConfidenceForwarding(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	// Set very high confidence threshold so all responses have low confidence
 	forwardingCfg := &ForwardingConfig{
@@ -1693,12 +1629,8 @@ func TestForwardingRouter_BestAttemptFallback(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	// High confidence threshold with ReturnBestAttempt enabled
 	forwardingCfg := &ForwardingConfig{
@@ -1781,12 +1713,8 @@ func TestForwardingRouter_AllBackendsFailed(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	if err := baseRouter.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := baseRouter.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
@@ -1853,9 +1781,7 @@ func TestForwardingRouter_MaxRetriesEnforced(t *testing.T) {
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		if err := baseRouter.RegisterBackend(b); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	// Set MaxRetries to 2, but have 5 backends in escalation path

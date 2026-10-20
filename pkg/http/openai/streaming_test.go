@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
@@ -1026,17 +1028,13 @@ func TestStreamChat_vs_Completion_ObjectTypes(t *testing.T) {
 	// Test chat completion
 	reader1 := NewMockStreamReader(chunks)
 	recorder1 := httptest.NewRecorder()
-	if err := StreamChatCompletion(recorder1, reader1, "gpt-4", "id1"); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, StreamChatCompletion(recorder1, reader1, "gpt-4", "id1"))
 	body1 := recorder1.Body.String()
 
 	// Test completion
 	reader2 := NewMockStreamReader(chunks)
 	recorder2 := httptest.NewRecorder()
-	if err := StreamCompletion(recorder2, reader2, "text-davinci-003", "id2"); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, StreamCompletion(recorder2, reader2, "text-davinci-003", "id2"))
 	body2 := recorder2.Body.String()
 
 	// Chat should have "chat.completion.chunk"

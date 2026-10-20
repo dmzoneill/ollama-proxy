@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
 )
 
 // TestUdevEvent_GetDeviceType is part of the public API.
@@ -273,9 +275,7 @@ func TestUdevMonitor_Creation(t *testing.T) {
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
 	defer func() {
-		if err := um.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, um.Stop())
 	}()
 
 	if um.socket == 0 {
@@ -343,9 +343,7 @@ func TestUdevMonitor_EventChannel(t *testing.T) {
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
 	defer func() {
-		if err := um.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, um.Stop())
 	}()
 
 	um.Start()
@@ -381,9 +379,7 @@ func TestUdevMonitor_Integration(t *testing.T) {
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
 	defer func() {
-		if err := um.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, um.Stop())
 	}()
 
 	um.Start()

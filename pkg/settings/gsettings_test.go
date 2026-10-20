@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/efficiency"
 )
 
@@ -694,9 +696,7 @@ func TestGsettingsPanic(t *testing.T) {
 	if _, err := s.GetLastMode(); err == nil {
 		t.Fatal("expected error")
 	}
-	if err := s.SetLastMode(efficiency.ModeBalanced); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, s.SetLastMode(efficiency.ModeBalanced))
 	if _, err := s.ShouldRememberMode(); err == nil {
 		t.Fatal("expected error")
 	}

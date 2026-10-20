@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
@@ -19,9 +21,7 @@ func TestV4L2Device_OpenClose(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	if device.fd < 0 {
@@ -45,9 +45,7 @@ func TestV4L2Device_QueryCapabilities(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	caps := device.GetCapabilities()
@@ -74,9 +72,7 @@ func TestV4L2Device_SetFormat(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Try to set 640x480 YUYV format
@@ -109,16 +105,12 @@ func TestV4L2Device_RequestBuffers(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Set format first
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	// Request 4 buffers
@@ -139,16 +131,12 @@ func TestV4L2Device_MapBuffers(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Set format
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	// Request buffers
@@ -187,16 +175,12 @@ func TestV4L2Device_StreamingLifecycle(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Setup
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -239,16 +223,12 @@ func TestV4L2Device_CaptureFrames(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Setup
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -263,9 +243,7 @@ func TestV4L2Device_CaptureFrames(t *testing.T) {
 		t.Fatalf("Failed to start streaming: %v", err)
 	}
 	defer func() {
-		if err := device.StopStreaming(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.StopStreaming())
 	}()
 
 	// Try to capture a few frames
@@ -300,9 +278,7 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to create shared memory ring: %v", err)
 	}
 	defer func() {
-		if err := shmRing.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, shmRing.Destroy())
 	}()
 
 	// Open V4L2 device
@@ -311,16 +287,12 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Setup device
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -335,9 +307,7 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to start streaming: %v", err)
 	}
 	defer func() {
-		if err := device.StopStreaming(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.StopStreaming())
 	}()
 
 	// Capture a few frames and write to SHM
@@ -372,9 +342,7 @@ func TestV4L2Device_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to open SHM as reader: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	framesRead := 0
@@ -407,15 +375,11 @@ func BenchmarkV4L2_CaptureFrame(b *testing.B) {
 		b.Fatalf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, device.Close())
 	}()
 
 	if err := device.SetFormat(640, 480, V4l2PixFmtYuyv); err != nil {
-		if err := device.SetFormat(640, 480, V4l2PixFmtMjpeg); err != nil {
-			b.Fatal(err)
-		}
+		testutil.Check(b, device.SetFormat(640, 480, V4l2PixFmtMjpeg))
 	}
 
 	if err := device.RequestBuffers(4); err != nil {
@@ -430,9 +394,7 @@ func BenchmarkV4L2_CaptureFrame(b *testing.B) {
 		b.Fatalf("Failed to start streaming: %v", err)
 	}
 	defer func() {
-		if err := device.StopStreaming(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, device.StopStreaming())
 	}()
 
 	b.ResetTimer()

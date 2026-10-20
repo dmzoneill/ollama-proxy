@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
@@ -579,9 +581,7 @@ func TestOllamaBackend_GenerateStream(t *testing.T) {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
 	defer func() {
-		if err := stream.Close(); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, stream.Close())
 	}()
 
 	var fullResponse strings.Builder
@@ -1154,9 +1154,7 @@ func TestOllamaBackend_GenerateStream_Success(t *testing.T) {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, reader.Close())
 	}()
 
 	// Read chunks
@@ -1254,9 +1252,7 @@ func TestOllamaBackend_StreamReader_Recv(t *testing.T) {
 		t.Error("Expected done=true on last chunk")
 	}
 
-	if err := reader.Close(); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, reader.Close())
 }
 
 // TestOllamaBackend_UpdateMetrics_Success is part of the public API.
@@ -1600,9 +1596,7 @@ func TestOllamaBackend_GenerateStream_WithOptions(t *testing.T) {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Fatal(err)
-		}
+		testutil.Check(t, reader.Close())
 	}()
 
 	// Read chunks

@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
@@ -19,9 +21,7 @@ func TestALSADevice_OpenClose(t *testing.T) {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	if device.fd < 0 {
@@ -48,9 +48,7 @@ func TestALSADevice_GetCapabilities(t *testing.T) {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	caps := device.GetCapabilities()
@@ -81,9 +79,7 @@ func TestALSADevice_Prepare(t *testing.T) {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	err = device.Prepare()
@@ -103,9 +99,7 @@ func TestALSADevice_StartStopCapture(t *testing.T) {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
 	defer func() {
-		if err := device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, device.Close())
 	}()
 
 	// Start capture
@@ -136,9 +130,7 @@ func TestSimplifiedALSACapture_Create(t *testing.T) {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
 	defer func() {
-		if err := capture.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, capture.Close())
 	}()
 
 	if capture.sampleRate != 48000 {
@@ -161,9 +153,7 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
 	defer func() {
-		if err := capture.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, capture.Close())
 	}()
 
 	caps := capture.GetCapabilities()
@@ -198,9 +188,7 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to create shared memory ring: %v", err)
 	}
 	defer func() {
-		if err := shmRing.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, shmRing.Destroy())
 	}()
 
 	// Use simplified capture (doesn't require actual hardware)
@@ -209,9 +197,7 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
 	defer func() {
-		if err := capture.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, capture.Close())
 	}()
 
 	// Test that we can write audio data to SHM
@@ -235,9 +221,7 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 		t.Fatalf("Failed to open SHM as reader: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	readData, idx, err := reader.Read()
@@ -271,9 +255,7 @@ func BenchmarkSimplifiedALSACapture_Write(b *testing.B) {
 		b.Fatalf("Failed to create SHM: %v", err)
 	}
 	defer func() {
-		if err := shmRing.Destroy(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, shmRing.Destroy())
 	}()
 
 	data := make([]byte, 1920)

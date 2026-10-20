@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
@@ -19,9 +21,7 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	if ring.GetNumFrames() != 4 {
@@ -38,9 +38,7 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	if reader.GetNumFrames() != 4 {
@@ -58,9 +56,7 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	// Open as reader
@@ -69,9 +65,7 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	// Write some data
@@ -120,9 +114,7 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	reader, err := OpenSharedMemoryRing("test-multi-frame", logging.Logger)
@@ -130,9 +122,7 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	// Write multiple frames
@@ -177,9 +167,7 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	reader, err := OpenSharedMemoryRing("test-wrap", logging.Logger)
@@ -187,9 +175,7 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	// Write more frames than capacity to test wrapping
@@ -230,9 +216,7 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	reader, err := OpenSharedMemoryRing("test-concurrent", logging.Logger)
@@ -240,9 +224,7 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	var wg sync.WaitGroup
@@ -319,9 +301,7 @@ func TestSharedMemoryRing_Stats(t *testing.T) {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, ring.Destroy())
 	}()
 
 	// Write some frames
@@ -353,9 +333,7 @@ func BenchmarkSharedMemoryRing_Write(b *testing.B) {
 		b.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, ring.Destroy())
 	}()
 
 	data := make([]byte, 4096)
@@ -382,9 +360,7 @@ func BenchmarkSharedMemoryRing_Read(b *testing.B) {
 		b.Fatalf("Failed to create ring: %v", err)
 	}
 	defer func() {
-		if err := ring.Destroy(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, ring.Destroy())
 	}()
 
 	reader, err := OpenSharedMemoryRing("bench-read", logging.Logger)
@@ -392,9 +368,7 @@ func BenchmarkSharedMemoryRing_Read(b *testing.B) {
 		b.Fatalf("Failed to open ring: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, reader.Close())
 	}()
 
 	// Pre-fill with data

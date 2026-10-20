@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/thermal"
 )
@@ -53,15 +55,9 @@ func TestThermalRouter_FilterByModelSupport_NoModel(t *testing.T) {
 	backend2 := &MockBackend{id: "b2", healthy: true}
 	backend3 := &MockBackend{id: "b3", healthy: false}
 
-	if err := tr.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(backend3); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
+	testutil.Check(t, tr.RegisterBackend(backend3))
 
 	// Test with no model (should return all healthy)
 	filtered := tr.filterByModelSupport("")
@@ -79,12 +75,8 @@ func TestThermalRouter_FilterByModelSupport_WithModel(t *testing.T) {
 	backend1 := &MockBackend{id: "b1", healthy: true}
 	backend2 := &MockBackend{id: "b2", healthy: true}
 
-	if err := tr.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	// Test with model (MockBackend.SupportsModel always returns true)
 	filtered := tr.filterByModelSupport(strLlama37b)
@@ -224,12 +216,8 @@ func TestThermalRouter_FilterCandidatesThermal_HealthCheck(t *testing.T) {
 		powerWatts:   15.0,
 	}
 
-	if err := tr.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	annotations := &backends.Annotations{}
 
@@ -265,12 +253,8 @@ func TestThermalRouter_FilterCandidatesThermal_WithConstraints(t *testing.T) {
 		powerWatts:   10.0,
 	}
 
-	if err := tr.RegisterBackend(backend1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(backend2); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend1))
+	testutil.Check(t, tr.RegisterBackend(backend2))
 
 	annotations := &backends.Annotations{
 		MaxLatencyMs: 500,
@@ -391,9 +375,7 @@ func TestThermalRouter_RouteRequestThermal(t *testing.T) {
 		priority:     5,
 	}
 
-	if err := tr.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -430,9 +412,7 @@ func TestThermalRouter_RouteRequestWithModel(t *testing.T) {
 		priority:     5,
 	}
 
-	if err := tr.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -601,9 +581,7 @@ func TestThermalRouter_RouteRequestWithModel_ModelSubstitution(t *testing.T) {
 		modelPatterns: []string{"llama3*"},
 	}
 
-	if err := tr.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -650,9 +628,7 @@ func TestThermalRouter_RouteRequestWithModel_NoBackends(t *testing.T) {
 		modelPatterns: []string{"gpt-*"},
 	}
 
-	if err := tr.RegisterBackend(backend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(backend))
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
@@ -693,12 +669,8 @@ func TestThermalRouter_RouteRequestWithModel_WithWorkloadHints(t *testing.T) {
 		priority:     3,
 	}
 
-	if err := tr.RegisterBackend(fastBackend); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.RegisterBackend(efficientBackend); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, tr.RegisterBackend(fastBackend))
+	testutil.Check(t, tr.RegisterBackend(efficientBackend))
 
 	ctx := context.Background()
 

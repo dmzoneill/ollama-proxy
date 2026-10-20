@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
@@ -42,14 +44,10 @@ func TestNewOpenAIBackend(t *testing.T) {
 				APIKeyEnv: "TEST_OPENAI_KEY",
 			},
 			setup: func(t *testing.T) {
-				if err := os.Setenv("TEST_OPENAI_KEY", "env-api-key"); err != nil {
-					t.Fatal(err)
-				}
+				testutil.Check(t, os.Setenv("TEST_OPENAI_KEY", "env-api-key"))
 			},
 			cleanup: func(t *testing.T) {
-				if err := os.Unsetenv("TEST_OPENAI_KEY"); err != nil {
-					t.Fatal(err)
-				}
+				testutil.Check(t, os.Unsetenv("TEST_OPENAI_KEY"))
 			},
 			wantErr: false,
 		},

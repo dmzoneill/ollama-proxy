@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/godbus/dbus/v5"
 )
 
@@ -21,9 +23,7 @@ func TestDeviceManager_NewDeviceManager(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	if dm.conn == nil {
@@ -50,9 +50,7 @@ func TestDeviceManager_RegisterDevice(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	caps := map[string]dbus.Variant{
@@ -110,9 +108,7 @@ func TestDeviceManager_UnregisterDevice(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register a device first
@@ -154,9 +150,7 @@ func TestDeviceManager_UnregisterDevice_NotFound(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Try to unregister non-existent device
@@ -177,9 +171,7 @@ func TestDeviceManager_ListDevices(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register multiple devices
@@ -235,9 +227,7 @@ func TestDeviceManager_GetDevice(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register device
@@ -301,9 +291,7 @@ func TestDeviceManager_GetDevice_NotFound(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	_, dbusErr := dm.GetDevice("nonexistent-device")
@@ -323,9 +311,7 @@ func TestDeviceManager_RequestDeviceAccess(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register device
@@ -388,9 +374,7 @@ func TestDeviceManager_RequestDeviceAccess_DeviceNotFound(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	_, _, _, dbusErr := dm.RequestDeviceAccess("nonexistent", "client", dbus.Sender("ie.fio.OllamaProxy.System"))
@@ -410,9 +394,7 @@ func TestDeviceManager_ReleaseDeviceAccess(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register device and request access
@@ -461,9 +443,7 @@ func TestDeviceManager_ReleaseDeviceAccess_NotFound(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	dbusErr := dm.ReleaseDeviceAccess("device-id", "client-id")
@@ -483,9 +463,7 @@ func TestDeviceManager_ConcurrentAccess(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	var wg sync.WaitGroup
@@ -531,9 +509,7 @@ func TestDeviceManager_Properties(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Initially no devices
@@ -608,9 +584,7 @@ func TestDeviceManager_StateTransitions(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register device (should be Available)
@@ -657,9 +631,7 @@ func TestDeviceManager_MultipleClients(t *testing.T) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Register device
@@ -749,9 +721,7 @@ func BenchmarkDeviceManager_RegisterDevice(b *testing.B) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, dm.Stop())
 	}()
 
 	caps := map[string]dbus.Variant{
@@ -778,9 +748,7 @@ func BenchmarkDeviceManager_RequestAccess(b *testing.B) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, dm.Stop())
 	}()
 
 	// Pre-register devices
@@ -813,9 +781,7 @@ func BenchmarkDeviceManager_ListDevices(b *testing.B) {
 		return
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, dm.Stop())
 	}()
 
 	// Register 100 devices

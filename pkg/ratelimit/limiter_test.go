@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"golang.org/x/time/rate"
 )
 
@@ -102,9 +104,7 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected status 200, got %d", i+1, resp.StatusCode)
 		}
-		if err := resp.Body.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 3rd request should be rate limited
@@ -113,9 +113,7 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 		t.Fatalf("Request 3 failed: %v", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}()
 
 	if resp.StatusCode != http.StatusTooManyRequests {
@@ -796,9 +794,7 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		if err := resp.Body.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 6th request should be rate limited
@@ -809,9 +805,7 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 6: expected 429, got %d", resp.StatusCode)
 	}
-	if err := resp.Body.Close(); err != nil {
-		t.Error(err)
-	}
+	testutil.CheckCleanup(t, resp.Body.Close())
 }
 
 // TestIPRateLimiter_Middleware_CustomIP tests middleware with custom IP headers
@@ -842,9 +836,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		if err := resp.Body.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, resp.Body.Close())
 	}
 
 	// 3rd request should be rate limited
@@ -861,9 +853,7 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: expected 429, got %d", resp.StatusCode)
 	}
-	if err := resp.Body.Close(); err != nil {
-		t.Error(err)
-	}
+	testutil.CheckCleanup(t, resp.Body.Close())
 }
 
 // TestIPRateLimiter_VerySmallRate tests with very small rate (< 1 req/sec)

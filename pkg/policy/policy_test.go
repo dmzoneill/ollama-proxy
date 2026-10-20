@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
 )
 
 // TestNewPolicy is part of the public API.
@@ -897,24 +899,16 @@ func TestCheckAndDeduct_MixedBackends(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree) // 5 NVIDIA/hour
 
 	// Use non-NVIDIA backends - should not affect NVIDIA quota
-	if err := budget.CheckAndDeduct(strOllamaNpu, 1.0); err != nil {
-		t.Fatal(err)
-	}
-	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
-		t.Fatal(err)
-	}
-	if err := budget.CheckAndDeduct(strOllamaCPU, 1.0); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaNpu, 1.0))
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaIgpu, 1.0))
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaCPU, 1.0))
 
 	if budget.nvidiaUsedThisHour != 0 {
 		t.Error("Non-NVIDIA backends should not affect NVIDIA quota")
 	}
 
 	// Now use NVIDIA - should count
-	if err := budget.CheckAndDeduct(strOllamaNvidia, 1.0); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaNvidia, 1.0))
 	if budget.nvidiaUsedThisHour != 1 {
 		t.Error("NVIDIA deduction should increment NVIDIA quota")
 	}
@@ -1027,16 +1021,12 @@ func TestCheckAndDeduct_MultipleDailyResets(t *testing.T) {
 	budget.usedTodayWh = 5.0
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
 
-	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaIgpu, 1.0))
 	firstUsed := budget.usedTodayWh
 
 	// Second reset simulation
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
-	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaIgpu, 1.0))
 	secondUsed := budget.usedTodayWh
 
 	if firstUsed != 1.0 || secondUsed != 1.0 {
@@ -1053,16 +1043,12 @@ func TestCheckAndDeduct_MultipleHourlyResets(t *testing.T) {
 	budget.nvidiaUsedThisHour = 10
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
 
-	if err := budget.CheckAndDeduct(strOllamaNvidia, 0.5); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaNvidia, 0.5))
 	firstCount := budget.nvidiaUsedThisHour
 
 	// Second reset simulation
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
-	if err := budget.CheckAndDeduct(strOllamaNvidia, 0.5); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, budget.CheckAndDeduct(strOllamaNvidia, 0.5))
 	secondCount := budget.nvidiaUsedThisHour
 
 	if firstCount != 1 || secondCount != 1 {

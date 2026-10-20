@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
@@ -31,9 +33,7 @@ func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -47,9 +47,7 @@ func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client.Close())
 	}()
 
 	// Give time for server to register client
@@ -67,9 +65,7 @@ func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -81,9 +77,7 @@ func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -120,9 +114,7 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -134,9 +126,7 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 		t.Fatalf("Failed to connect client 1: %v", err)
 	}
 	defer func() {
-		if err := client1.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client1.Close())
 	}()
 
 	client2, err := ConnectUDSClient(server.GetSocketPath(), logging.Logger)
@@ -144,9 +134,7 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 		t.Fatalf("Failed to connect client 2: %v", err)
 	}
 	defer func() {
-		if err := client2.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client2.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -191,9 +179,7 @@ func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -204,9 +190,7 @@ func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -237,9 +221,7 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -254,9 +236,7 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 			if client == nil || closed[i] {
 				continue
 			}
-			if err := client.Close(); err != nil {
-				t.Error(err)
-			}
+			testutil.CheckCleanup(t, client.Close())
 		}
 	})
 	for i := 0; i < len(clients); i++ {
@@ -274,9 +254,7 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	}
 
 	// Disconnect one client
-	if err := clients[2].Close(); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Check(t, clients[2].Close())
 	closed[2] = true
 	time.Sleep(10 * time.Millisecond)
 
@@ -292,9 +270,7 @@ func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 		b.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, server.Stop())
 	}()
 
 	server.Start()
@@ -305,9 +281,7 @@ func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 		b.Fatalf("Failed to connect client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, client.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -332,9 +306,7 @@ func BenchmarkUDSClient_SendReceive(b *testing.B) {
 		b.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, server.Stop())
 	}()
 
 	server.Start()
@@ -345,9 +317,7 @@ func BenchmarkUDSClient_SendReceive(b *testing.B) {
 		b.Fatalf("Failed to connect client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, client.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -361,9 +331,7 @@ func BenchmarkUDSClient_SendReceive(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		if err := client.SendMessage(msg); err != nil {
-			b.Fatal(err)
-		}
+		testutil.Check(b, client.SendMessage(msg))
 		if _, err := client.ReceiveMessage(); err != nil {
 			b.Fatal(err)
 		}
