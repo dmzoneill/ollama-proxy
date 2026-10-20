@@ -7,38 +7,40 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// DeviceType represents the type of device
-type DeviceType string
+// Type represents the type of device
+type Type string
 
+// DeviceTypeMicrophone is an exported const.
 const (
-	DeviceTypeMicrophone DeviceType = "microphone"
-	DeviceTypeCamera     DeviceType = "camera"
-	DeviceTypeScreen     DeviceType = "screen"
-	DeviceTypeSpeaker    DeviceType = "speaker"
-	DeviceTypeKeyboard   DeviceType = "keyboard"
-	DeviceTypeMouse      DeviceType = "mouse"
+	DeviceTypeMicrophone Type = "microphone"
+	DeviceTypeCamera     Type = "camera"
+	DeviceTypeScreen     Type = "screen"
+	DeviceTypeSpeaker    Type = "speaker"
+	DeviceTypeKeyboard   Type = "keyboard"
+	DeviceTypeMouse      Type = "mouse"
 )
 
-// DeviceState represents the current state of a device
-type DeviceState string
+// State represents the current state of a device
+type State string
 
+// DeviceStateAvailable is an exported const.
 const (
-	DeviceStateAvailable DeviceState = "available"
-	DeviceStateInUse     DeviceState = "in-use"
-	DeviceStateError     DeviceState = "error"
-	DeviceStateOffline   DeviceState = "offline"
+	DeviceStateAvailable State = "available"
+	DeviceStateInUse     State = "in-use"
+	DeviceStateError     State = "error"
+	DeviceStateOffline   State = "offline"
 )
 
 // Device represents a registered device in the system
 type Device struct {
-	ID           string                 `json:"id"`
-	Type         DeviceType             `json:"type"`
-	Name         string                 `json:"name"`
-	Path         string                 `json:"path"` // Device path (/dev/video0, etc.)
-	Capabilities map[string]interface{} `json:"capabilities"`
-	State        DeviceState            `json:"state"`
 	RegisteredAt time.Time              `json:"registered_at"`
 	LastUsedAt   time.Time              `json:"last_used_at,omitempty"`
+	Capabilities map[string]interface{} `json:"capabilities"`
+	ID           string                 `json:"id"`
+	Type         Type                   `json:"type"`
+	Name         string                 `json:"name"`
+	Path         string                 `json:"path"`
+	State        State                  `json:"state"`
 	mu           sync.RWMutex
 }
 
@@ -53,14 +55,14 @@ type AccessGrant struct {
 }
 
 // SetState updates the device state (thread-safe)
-func (d *Device) SetState(state DeviceState) {
+func (d *Device) SetState(state State) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.State = state
 }
 
 // GetState returns the current device state (thread-safe)
-func (d *Device) GetState() DeviceState {
+func (d *Device) GetState() State {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.State

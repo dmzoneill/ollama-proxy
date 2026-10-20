@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	proxyerrors "github.com/daoneill/ollama-proxy/pkg/errors"
@@ -13,12 +14,12 @@ import (
 // ThermalRouter extends Router with thermal awareness
 type ThermalRouter struct {
 	*Router
-	thermalMonitor   *thermal.ThermalMonitor
+	thermalMonitor   *thermal.Monitor
 	workloadDetector *workload.Detector
 }
 
 // NewThermalRouter creates a router with thermal monitoring
-func NewThermalRouter(cfg Config, thermalMonitor *thermal.ThermalMonitor) *ThermalRouter {
+func NewThermalRouter(cfg Config, thermalMonitor *thermal.Monitor) *ThermalRouter {
 	return &ThermalRouter{
 		Router:           NewRouter(cfg),
 		thermalMonitor:   thermalMonitor,
@@ -34,7 +35,7 @@ func (tr *ThermalRouter) RouteRequestThermal(ctx context.Context, annotations *b
 
 // RouteRequestWithModel routes with full model-aware and thermal-aware logic
 func (tr *ThermalRouter) RouteRequestWithModel(
-	ctx context.Context,
+	_ context.Context,
 	prompt string,
 	requestedModel string,
 	annotations *backends.Annotations,
@@ -203,83 +204,97 @@ func (tr *ThermalRouter) scoreCandidatesWithHints(
 	hints *workload.RoutingHints,
 ) []candidateScore {
 	scored := make([]candidateScore, 0, len(candidates))
-
-	// Check if system wants quiet operation
 	preferQuiet := tr.thermalMonitor.ShouldPreferQuiet()
 
 	for _, backend := range candidates {
-		score := 0.0
-		reasons := []string{}
-
-		// Base score from backend priority
-		score += float64(backend.Priority()) * 10.0
-
-		// Workload-specific preferences
-		if hints.PreferLowLatency {
-			latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
-			score += latencyScore * 2.5 // Strong preference for low latency
-			reasons = append(reasons, "low-latency-workload")
-		}
-
-		if hints.PreferLowPower {
-			powerScore := 1000.0 - (backend.PowerWatts() * 10)
-			score += powerScore * 2.0 // Strong preference for power efficiency
-			reasons = append(reasons, "power-efficient-workload")
-		}
-
-		// Annotation overrides
-		if annotations.LatencyCritical {
-			latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
-			score += latencyScore * 2
-			reasons = append(reasons, "latency-critical")
-		}
-
-		if annotations.PreferPowerEfficiency || tr.powerAware {
-			powerScore := 1000.0 - (backend.PowerWatts() * 10)
-			score += powerScore * 1.5
-			reasons = append(reasons, "power-efficient")
-		}
-
-		// THERMAL PENALTY
-		thermalPenalty := tr.thermalMonitor.GetThermalPenalty(backend.Hardware())
-		score -= thermalPenalty
-
-		if thermalPenalty > 100 {
-			reasons = append(reasons, "thermal-penalty")
-		}
-
-		// Quiet mode preference
-		if preferQuiet {
-			thermalState := tr.thermalMonitor.GetState(backend.Hardware())
-			if thermalState != nil && thermalState.FanPercent < 40 {
-				score += 200 // Bonus for quiet backends
-				reasons = append(reasons, "quiet-mode")
-			}
-		}
-
-		// If no specific preference, use balanced scoring
-		if !annotations.LatencyCritical && !annotations.PreferPowerEfficiency && !hints.PreferLowLatency && !hints.PreferLowPower {
-			latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
-			powerScore := 1000.0 - (backend.PowerWatts() * 10)
-			score += (latencyScore + powerScore) / 2
-			reasons = append(reasons, "balanced")
-		}
-
-		if len(reasons) == 0 {
-			reasons = append(reasons, "default-scoring")
-		}
-
-		scored = append(scored, candidateScore{
-			backend: backend,
-			score:   score,
-			reason:  fmt.Sprintf("%s", reasons[0]),
-		})
+		scored = append(scored, tr.scoreCandidateWithHints(backend, annotations, hints, preferQuiet))
 	}
 
-	// Sort by score descending
 	sortScored(scored)
-
 	return scored
+}
+
+func (tr *ThermalRouter) scoreCandidateWithHints(
+	backend backends.Backend,
+	annotations *backends.Annotations,
+	hints *workload.RoutingHints,
+	preferQuiet bool,
+) candidateScore {
+	score, reasons := tr.workloadHintScore(backend, annotations, hints)
+	score, reasons = tr.adjustScoreForThermal(backend, preferQuiet, score, reasons)
+	if len(reasons) == 0 {
+		reasons = append(reasons, "default-scoring")
+	}
+	return candidateScore{
+		backend: backend,
+		score:   score,
+		reason:  reasons[0],
+	}
+}
+
+func (tr *ThermalRouter) workloadHintScore(
+	backend backends.Backend,
+	annotations *backends.Annotations,
+	hints *workload.RoutingHints,
+) (float64, []string) {
+	score := float64(backend.Priority()) * 10.0
+	reasons := []string{}
+
+	if hints.PreferLowLatency {
+		latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
+		score += latencyScore * 2.5
+		reasons = append(reasons, "low-latency-workload")
+	}
+
+	if hints.PreferLowPower {
+		powerScore := 1000.0 - (backend.PowerWatts() * 10)
+		score += powerScore * 2.0
+		reasons = append(reasons, "power-efficient-workload")
+	}
+
+	if annotations.LatencyCritical {
+		latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
+		score += latencyScore * 2
+		reasons = append(reasons, "latency-critical")
+	}
+
+	if annotations.PreferPowerEfficiency || tr.powerAware {
+		powerScore := 1000.0 - (backend.PowerWatts() * 10)
+		score += powerScore * 1.5
+		reasons = append(reasons, strPowerEfficient)
+	}
+
+	if !annotations.LatencyCritical && !annotations.PreferPowerEfficiency && !hints.PreferLowLatency && !hints.PreferLowPower {
+		latencyScore := 1000.0 - float64(backend.AvgLatencyMs())
+		powerScore := 1000.0 - (backend.PowerWatts() * 10)
+		score += (latencyScore + powerScore) / 2
+		reasons = append(reasons, "balanced")
+	}
+
+	return score, reasons
+}
+
+func (tr *ThermalRouter) adjustScoreForThermal(
+	backend backends.Backend,
+	preferQuiet bool,
+	score float64,
+	reasons []string,
+) (float64, []string) {
+	thermalPenalty := tr.thermalMonitor.GetThermalPenalty(backend.Hardware())
+	score -= thermalPenalty
+	if thermalPenalty > 100 {
+		reasons = append(reasons, "thermal-penalty")
+	}
+
+	if preferQuiet {
+		thermalState := tr.thermalMonitor.GetState(backend.Hardware())
+		if thermalState != nil && thermalState.FanPercent < 40 {
+			score += 200
+			reasons = append(reasons, "quiet-mode")
+		}
+	}
+
+	return score, reasons
 }
 
 // filterCandidatesThermal filters backends by health and thermal state
@@ -346,7 +361,7 @@ func (tr *ThermalRouter) scoreCandidatesThermal(candidates []backends.Backend, a
 			powerScore := 1000.0 - (backend.PowerWatts() * 10)
 			score += powerScore * 1.5
 			if annotations.PreferPowerEfficiency {
-				reasons = append(reasons, "power-efficient")
+				reasons = append(reasons, strPowerEfficient)
 			}
 		}
 
@@ -392,72 +407,14 @@ func (tr *ThermalRouter) scoreCandidatesThermal(candidates []backends.Backend, a
 	return scored
 }
 
-// findThermalAlternative finds alternative when preferred backend is too hot
-func (tr *ThermalRouter) findThermalAlternative(
-	ctx context.Context,
-	annotations *backends.Annotations,
-	overheatedHardware string,
-	thermalReason string,
-) (*RoutingDecision, error) {
-
-	// Get coolest alternative
-	var alternatives []string
-	for _, backend := range tr.backends {
-		hw := backend.Hardware()
-		if hw != overheatedHardware {
-			if canUse, _ := tr.thermalMonitor.CanUse(hw); canUse {
-				alternatives = append(alternatives, hw)
-			}
-		}
-	}
-
-	if len(alternatives) == 0 {
-		constraints := []string{fmt.Sprintf("hardware=%s is overheated", overheatedHardware), thermalReason}
-		healthyCount := 0
-		for _, backend := range tr.backends {
-			if backend.IsHealthy() {
-				healthyCount++
-			}
-		}
-		return nil, proxyerrors.NewNoBackendsError(len(tr.backends), healthyCount, constraints)
-	}
-
-	coolest := tr.thermalMonitor.GetCoolestBackend(alternatives)
-
-	// Find backend with this hardware
-	for _, backend := range tr.backends {
-		if backend.Hardware() == coolest && backend.IsHealthy() {
-			thermalState := tr.thermalMonitor.GetState(coolest)
-			reason := fmt.Sprintf("Thermal override: %s too hot, using %s (%.1f°C)",
-				overheatedHardware, coolest, thermalState.Temperature)
-
-			return &RoutingDecision{
-				Backend:            backend,
-				Reason:             reason,
-				EstimatedPowerW:    backend.PowerWatts(),
-				EstimatedLatencyMs: backend.AvgLatencyMs(),
-				Alternatives:       []string{},
-			}, nil
-		}
-	}
-
-	constraints := []string{fmt.Sprintf("hardware=%s", coolest), "no healthy backend found"}
-	return nil, proxyerrors.NewNoBackendsError(len(tr.backends), 0, constraints)
-}
-
 // GetThermalStatus returns current thermal status for all backends
-func (tr *ThermalRouter) GetThermalStatus() map[string]*thermal.ThermalState {
+func (tr *ThermalRouter) GetThermalStatus() map[string]*thermal.State {
 	return tr.thermalMonitor.GetAllStates()
 }
 
-// Helper to sort scored candidates
+// sortScored orders candidates by score descending.
 func sortScored(scored []candidateScore) {
-	// Simple bubble sort for clarity (use sort.Slice in production)
-	for i := 0; i < len(scored); i++ {
-		for j := i + 1; j < len(scored); j++ {
-			if scored[j].score > scored[i].score {
-				scored[i], scored[j] = scored[j], scored[i]
-			}
-		}
-	}
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
 }

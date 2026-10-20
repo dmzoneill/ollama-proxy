@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"google.golang.org/grpc/metadata"
 
 	pb "github.com/daoneill/ollama-proxy/api/gen/go"
@@ -36,44 +38,78 @@ func TestMain(m *testing.M) {
 
 // MockBackend is a mock implementation of the Backend interface
 type MockBackend struct {
-	id              string
-	backendType     string
-	name            string
-	hardware        string
-	healthy         bool
-	powerWatts      float64
-	avgLatencyMs    int32
-	priority        int
-	generateErr     error
-	embedErr        error
-	streamErr       error
-	streamChunks    []*backends.StreamChunk
-	streamEOF       bool
-	models          []string
+	generateErr      error
+	embedErr         error
+	streamErr        error
+	backendType      string
+	name             string
+	hardware         string
+	id               string
+	models           []string
+	streamChunks     []*backends.StreamChunk
+	powerWatts       float64
+	priority         int
+	avgLatencyMs     int32
+	healthy          bool
+	streamEOF        bool
 	supportsGenerate bool
-	supportsEmbed   bool
-	supportsStream  bool
+	supportsEmbed    bool
+	supportsStream   bool
 }
 
-func (m *MockBackend) ID() string                                              { return m.id }
-func (m *MockBackend) Type() string                                            { return m.backendType }
-func (m *MockBackend) Name() string                                            { return m.name }
-func (m *MockBackend) Hardware() string                                        { return m.hardware }
-func (m *MockBackend) IsHealthy() bool                                         { return m.healthy }
-func (m *MockBackend) HealthCheck(ctx context.Context) error                   { return nil }
-func (m *MockBackend) PowerWatts() float64                                     { return m.powerWatts }
-func (m *MockBackend) AvgLatencyMs() int32                                     { return m.avgLatencyMs }
-func (m *MockBackend) Priority() int                                           { return m.priority }
-func (m *MockBackend) SupportsGenerate() bool                                  { return m.supportsGenerate }
-func (m *MockBackend) SupportsStream() bool                                    { return m.supportsStream }
-func (m *MockBackend) SupportsEmbed() bool                                     { return m.supportsEmbed }
-func (m *MockBackend) ListModels(ctx context.Context) ([]string, error)        { return m.models, nil }
-func (m *MockBackend) SupportsModel(modelName string) bool                     { return true }
-func (m *MockBackend) GetMaxModelSizeGB() int                                  { return 10 }
-func (m *MockBackend) GetSupportedModelPatterns() []string                     { return []string{"*"} }
-func (m *MockBackend) GetPreferredModels() []string                            { return []string{} }
+// ID is part of the public API.
+func (m *MockBackend) ID() string { return m.id }
 
-func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// Type is part of the public API.
+func (m *MockBackend) Type() string { return m.backendType }
+
+// Name is part of the public API.
+func (m *MockBackend) Name() string { return m.name }
+
+// Hardware is part of the public API.
+func (m *MockBackend) Hardware() string { return m.hardware }
+
+// IsHealthy reports whether the condition holds.
+func (m *MockBackend) IsHealthy() bool { return m.healthy }
+
+// HealthCheck is part of the public API.
+func (m *MockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// PowerWatts is part of the public API.
+func (m *MockBackend) PowerWatts() float64 { return m.powerWatts }
+
+// AvgLatencyMs is part of the public API.
+func (m *MockBackend) AvgLatencyMs() int32 { return m.avgLatencyMs }
+
+// Priority is part of the public API.
+func (m *MockBackend) Priority() int { return m.priority }
+
+// SupportsGenerate is part of the public API.
+func (m *MockBackend) SupportsGenerate() bool { return m.supportsGenerate }
+
+// SupportsStream is part of the public API.
+func (m *MockBackend) SupportsStream() bool { return m.supportsStream }
+
+// SupportsEmbed is part of the public API.
+func (m *MockBackend) SupportsEmbed() bool { return m.supportsEmbed }
+
+// ListModels is part of the public API.
+func (m *MockBackend) ListModels(_ context.Context) ([]string, error) { return m.models, nil }
+
+// SupportsModel is part of the public API.
+func (m *MockBackend) SupportsModel(_ string) bool { return true }
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *MockBackend) GetMaxModelSizeGB() int { return 10 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *MockBackend) GetSupportedModelPatterns() []string { return []string{"*"} }
+
+// GetPreferredModels is part of the public API.
+func (m *MockBackend) GetPreferredModels() []string { return []string{} }
+
+// Generate is part of the public API.
+func (m *MockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	if m.generateErr != nil {
 		return nil, m.generateErr
 	}
@@ -89,7 +125,8 @@ func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateReques
 	}, nil
 }
 
-func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *MockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	if m.streamErr != nil {
 		return nil, m.streamErr
 	}
@@ -103,7 +140,8 @@ func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.Generate
 	return &MockStreamReader{chunks: chunks, returnEOF: m.streamEOF}, nil
 }
 
-func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *MockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	if m.embedErr != nil {
 		return nil, m.embedErr
 	}
@@ -112,35 +150,96 @@ func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*b
 	}, nil
 }
 
-func (m *MockBackend) UpdateMetrics(latencyMs int32, success bool) {}
+// UpdateMetrics is part of the public API.
+func (m *MockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// GetMetrics is part of the public API.
 func (m *MockBackend) GetMetrics() *backends.BackendMetrics {
 	return &backends.BackendMetrics{
 		AvgLatencyMs: 50,
 		ErrorRate:    0.0,
-		LoadedModels: []string{"test-model"},
+		LoadedModels: []string{strTestModel},
 	}
 }
-func (m *MockBackend) Start(ctx context.Context) error { return nil }
-func (m *MockBackend) Stop(ctx context.Context) error  { return nil }
+
+// Start is part of the public API.
+func (m *MockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *MockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *MockBackend) SupportsAudioToText() bool { return false }
+
+// SupportsTextToAudio is part of the public API.
 func (m *MockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
 func (m *MockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
 func (m *MockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
 func (m *MockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
 func (m *MockBackend) SupportsTextToVideo() bool { return false }
-func (m *MockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
+
+// TranscribeAudio is part of the public API.
+func (m *MockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *MockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *MockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *MockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *MockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *MockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *MockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *MockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *MockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *MockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *MockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // MockStreamReader is a mock implementation of StreamReader
 type MockStreamReader struct {
@@ -150,6 +249,7 @@ type MockStreamReader struct {
 	returnEOF bool
 }
 
+// Recv is part of the public API.
 func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	if m.idx >= len(m.chunks) {
 		if m.returnEOF {
@@ -162,6 +262,7 @@ func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return chunk, nil
 }
 
+// Close is part of the public API.
 func (m *MockStreamReader) Close() error {
 	m.closed = true
 	return nil
@@ -173,31 +274,38 @@ type MockGenerateStream struct {
 	sent []*pb.GenerateStreamResponse
 }
 
+// Send is part of the public API.
 func (m *MockGenerateStream) Send(resp *pb.GenerateStreamResponse) error {
 	m.sent = append(m.sent, resp)
 	return nil
 }
 
+// Context is part of the public API.
 func (m *MockGenerateStream) Context() context.Context {
 	return m.ctx
 }
 
-func (m *MockGenerateStream) SendMsg(v interface{}) error {
+// SendMsg is part of the public API.
+func (m *MockGenerateStream) SendMsg(_ interface{}) error {
 	return nil
 }
 
-func (m *MockGenerateStream) RecvMsg(v interface{}) error {
+// RecvMsg is part of the public API.
+func (m *MockGenerateStream) RecvMsg(_ interface{}) error {
 	return nil
 }
 
+// SendHeader is part of the public API.
 func (m *MockGenerateStream) SendHeader(metadata.MD) error {
 	return nil
 }
 
+// SetHeader is part of the public API.
 func (m *MockGenerateStream) SetHeader(metadata.MD) error {
 	return nil
 }
 
+// SetTrailer is part of the public API.
 func (m *MockGenerateStream) SetTrailer(metadata.MD) {
 }
 
@@ -207,31 +315,38 @@ type MockPipelineStream struct {
 	sent []*pb.PipelineStreamResponse
 }
 
+// Send is part of the public API.
 func (m *MockPipelineStream) Send(resp *pb.PipelineStreamResponse) error {
 	m.sent = append(m.sent, resp)
 	return nil
 }
 
+// Context is part of the public API.
 func (m *MockPipelineStream) Context() context.Context {
 	return m.ctx
 }
 
-func (m *MockPipelineStream) SendMsg(v interface{}) error {
+// SendMsg is part of the public API.
+func (m *MockPipelineStream) SendMsg(_ interface{}) error {
 	return nil
 }
 
-func (m *MockPipelineStream) RecvMsg(v interface{}) error {
+// RecvMsg is part of the public API.
+func (m *MockPipelineStream) RecvMsg(_ interface{}) error {
 	return nil
 }
 
+// SendHeader is part of the public API.
 func (m *MockPipelineStream) SendHeader(metadata.MD) error {
 	return nil
 }
 
+// SetHeader is part of the public API.
 func (m *MockPipelineStream) SetHeader(metadata.MD) error {
 	return nil
 }
 
+// SetTrailer is part of the public API.
 func (m *MockPipelineStream) SetTrailer(metadata.MD) {
 }
 
@@ -239,8 +354,9 @@ func (m *MockPipelineStream) SetTrailer(metadata.MD) {
 // Tests for Server Initialization
 // ============================================================================
 
+// TestNewComputeServer is part of the public API.
 func TestNewComputeServer(t *testing.T) {
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
 	server := NewComputeServer(r)
 
 	if server == nil {
@@ -264,6 +380,7 @@ func TestNewComputeServer(t *testing.T) {
 	}
 }
 
+// TestSetForwardingRouter is part of the public API.
 func TestSetForwardingRouter(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	server := NewComputeServer(r)
@@ -276,14 +393,15 @@ func TestSetForwardingRouter(t *testing.T) {
 	}
 }
 
+// TestSetPipelineExecutor is part of the public API.
 func TestSetPipelineExecutor(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	server := NewComputeServer(r)
 
-	backend := &MockBackend{id: "backend-1", healthy: true}
+	backend := &MockBackend{id: strBackend1, healthy: true}
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
-	pipelineLoader := &pipeline.PipelineLoader{}
+	pipelineLoader := &pipeline.Loader{}
 
 	server.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
 
@@ -300,25 +418,26 @@ func TestSetPipelineExecutor(t *testing.T) {
 // Tests for Generate (without forwarding router)
 // ============================================================================
 
+// TestGenerateSuccess is part of the public API.
 func TestGenerateSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 		powerWatts:       50.0,
 		avgLatencyMs:     100,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 		Annotations: &pb.JobAnnotations{
-			Target: "backend-1",
+			Target: strBackend1,
 		},
 	}
 
@@ -335,26 +454,27 @@ func TestGenerateSuccess(t *testing.T) {
 		t.Errorf("Expected response 'test response', got '%s'", resp.Response)
 	}
 
-	if resp.BackendUsed != "backend-1" {
+	if resp.BackendUsed != strBackend1 {
 		t.Errorf("Expected backend 'backend-1', got '%s'", resp.BackendUsed)
 	}
 }
 
+// TestGenerateWithNilAnnotations is part of the public API.
 func TestGenerateWithNilAnnotations(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt2,
+		Model:       strTestModel,
 		Annotations: nil,
 	}
 
@@ -365,22 +485,23 @@ func TestGenerateWithNilAnnotations(t *testing.T) {
 	}
 }
 
+// TestGenerateBackendError is part of the public API.
 func TestGenerateBackendError(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 		generateErr:      errors.New("backend error"),
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 	}
 
 	resp, err := server.Generate(context.Background(), req)
@@ -393,21 +514,22 @@ func TestGenerateBackendError(t *testing.T) {
 	}
 }
 
+// TestGenerateWithOptions is part of the public API.
 func TestGenerateWithOptions(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 		Options: &pb.GenerationOptions{
 			MaxTokens:     100,
 			Temperature:   0.7,
@@ -427,38 +549,36 @@ func TestGenerateWithOptions(t *testing.T) {
 	}
 }
 
+// TestGenerateWithFallbackSuccess is part of the public API.
 func TestGenerateWithFallbackSuccess(t *testing.T) {
 	primaryBackend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 		generateErr:      errors.New("primary failed"),
 	}
 
 	fallbackBackend := &MockBackend{
-		id:               "backend-2",
+		id:               strBackend2,
 		healthy:          true,
 		supportsGenerate: true,
 		generateErr:      nil,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(primaryBackend)
-	r.RegisterBackend(fallbackBackend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(primaryBackend))
+	testutil.Check(t, r.RegisterBackend(fallbackBackend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 	}
 
 	resp, err := server.Generate(context.Background(), req)
-	// This will fail because fallback routing is more complex
-	// but we're testing the code path exists
-	if resp != nil || err != nil {
-		// Test passes if we get either response or error
-		// The actual behavior depends on router implementation
+	if resp == nil && err == nil {
+		t.Fatal("expected a response or an error from fallback routing")
 	}
 }
 
@@ -466,21 +586,22 @@ func TestGenerateWithFallbackSuccess(t *testing.T) {
 // Tests for GenerateStream
 // ============================================================================
 
+// TestGenerateStreamSuccess is part of the public API.
 func TestGenerateStreamSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:             "backend-1",
+		id:             strBackend1,
 		healthy:        true,
 		supportsStream: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 	}
 
 	stream := &MockGenerateStream{
@@ -498,27 +619,28 @@ func TestGenerateStreamSuccess(t *testing.T) {
 
 	// Check first message has backend info
 	firstMsg := stream.sent[0]
-	if firstMsg.BackendUsed != "backend-1" {
+	if firstMsg.BackendUsed != strBackend1 {
 		t.Errorf("Expected backend 'backend-1', got '%s'", firstMsg.BackendUsed)
 	}
 }
 
+// TestGenerateStreamBackendError is part of the public API.
 func TestGenerateStreamBackendError(t *testing.T) {
 	backend := &MockBackend{
-		id:             "backend-1",
+		id:             strBackend1,
 		healthy:        true,
 		supportsStream: true,
 		streamErr:      errors.New("stream error"),
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 	}
 
 	stream := &MockGenerateStream{
@@ -531,23 +653,24 @@ func TestGenerateStreamBackendError(t *testing.T) {
 	}
 }
 
+// TestGenerateStreamWithAnnotations is part of the public API.
 func TestGenerateStreamWithAnnotations(t *testing.T) {
 	backend := &MockBackend{
-		id:             "backend-1",
+		id:             strBackend1,
 		healthy:        true,
 		supportsStream: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.GenerateRequest{
-		Prompt: "test prompt",
-		Model:  "test-model",
+		Prompt: strTestPrompt2,
+		Model:  strTestModel,
 		Annotations: &pb.JobAnnotations{
-			Target:          "backend-1",
+			Target:          strBackend1,
 			LatencyCritical: true,
 		},
 	}
@@ -570,21 +693,22 @@ func TestGenerateStreamWithAnnotations(t *testing.T) {
 // Tests for Embed
 // ============================================================================
 
+// TestEmbedSuccess is part of the public API.
 func TestEmbedSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:            "backend-1",
+		id:            strBackend1,
 		healthy:       true,
 		supportsEmbed: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.EmbedRequest{
-		Text:  "test text",
-		Model: "test-model",
+		Text:  strTestText,
+		Model: strTestModel,
 	}
 
 	resp, err := server.Embed(context.Background(), req)
@@ -596,7 +720,7 @@ func TestEmbedSuccess(t *testing.T) {
 		t.Fatal("Expected response, got nil")
 	}
 
-	if resp.BackendUsed != "backend-1" {
+	if resp.BackendUsed != strBackend1 {
 		t.Errorf("Expected backend 'backend-1', got '%s'", resp.BackendUsed)
 	}
 
@@ -605,22 +729,23 @@ func TestEmbedSuccess(t *testing.T) {
 	}
 }
 
+// TestEmbedBackendError is part of the public API.
 func TestEmbedBackendError(t *testing.T) {
 	backend := &MockBackend{
-		id:            "backend-1",
+		id:            strBackend1,
 		healthy:       true,
 		supportsEmbed: true,
 		embedErr:      errors.New("embed error"),
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.EmbedRequest{
-		Text:  "test text",
-		Model: "test-model",
+		Text:  strTestText,
+		Model: strTestModel,
 	}
 
 	resp, err := server.Embed(context.Background(), req)
@@ -633,23 +758,24 @@ func TestEmbedBackendError(t *testing.T) {
 	}
 }
 
+// TestEmbedWithAnnotations is part of the public API.
 func TestEmbedWithAnnotations(t *testing.T) {
 	backend := &MockBackend{
-		id:            "backend-1",
+		id:            strBackend1,
 		healthy:       true,
 		supportsEmbed: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
 	req := &pb.EmbedRequest{
-		Text:  "test text",
-		Model: "test-model",
+		Text:  strTestText,
+		Model: strTestModel,
 		Annotations: &pb.JobAnnotations{
-			Target:                "backend-1",
+			Target:                strBackend1,
 			PreferPowerEfficiency: true,
 		},
 	}
@@ -663,7 +789,7 @@ func TestEmbedWithAnnotations(t *testing.T) {
 		t.Fatal("Expected response, got nil")
 	}
 
-	if resp.BackendUsed != "backend-1" {
+	if resp.BackendUsed != strBackend1 {
 		t.Errorf("Expected backend 'backend-1', got '%s'", resp.BackendUsed)
 	}
 }
@@ -672,9 +798,10 @@ func TestEmbedWithAnnotations(t *testing.T) {
 // Tests for ListBackends
 // ============================================================================
 
+// TestListBackendsSuccess is part of the public API.
 func TestListBackendsSuccess(t *testing.T) {
 	backend1 := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		name:             "Backend 1",
 		hardware:         "cpu",
 		healthy:          true,
@@ -685,7 +812,7 @@ func TestListBackendsSuccess(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:               "backend-2",
+		id:               strBackend2,
 		name:             "Backend 2",
 		hardware:         "gpu",
 		healthy:          false,
@@ -695,8 +822,8 @@ func TestListBackendsSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	server := NewComputeServer(r)
 
@@ -719,9 +846,10 @@ func TestListBackendsSuccess(t *testing.T) {
 	healthyCount := 0
 	unhealthyCount := 0
 	for _, b := range resp.Backends {
-		if b.Status.State == "healthy" {
+		switch b.Status.State {
+		case strHealthy:
 			healthyCount++
-		} else if b.Status.State == "unhealthy" {
+		case strUnhealthy:
 			unhealthyCount++
 		}
 	}
@@ -735,6 +863,7 @@ func TestListBackendsSuccess(t *testing.T) {
 	}
 }
 
+// TestListBackendsEmpty is part of the public API.
 func TestListBackendsEmpty(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 	server := NewComputeServer(r)
@@ -759,13 +888,14 @@ func TestListBackendsEmpty(t *testing.T) {
 // Tests for HealthCheck
 // ============================================================================
 
+// TestHealthCheckAllHealthy is part of the public API.
 func TestHealthCheckAllHealthy(t *testing.T) {
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
-	backend2 := &MockBackend{id: "backend-2", healthy: true}
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
+	backend2 := &MockBackend{id: strBackend2, healthy: true}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	server := NewComputeServer(r)
 
@@ -780,18 +910,19 @@ func TestHealthCheckAllHealthy(t *testing.T) {
 		t.Fatal("Expected response, got nil")
 	}
 
-	if resp.Status != "healthy" {
+	if resp.Status != strHealthy {
 		t.Errorf("Expected status 'healthy', got '%s'", resp.Status)
 	}
 }
 
+// TestHealthCheckDegraded is part of the public API.
 func TestHealthCheckDegraded(t *testing.T) {
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
-	backend2 := &MockBackend{id: "backend-2", healthy: false}
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
+	backend2 := &MockBackend{id: strBackend2, healthy: false}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	server := NewComputeServer(r)
 
@@ -810,11 +941,11 @@ func TestHealthCheckDegraded(t *testing.T) {
 		t.Errorf("Expected status 'degraded', got '%s'", resp.Status)
 	}
 
-	if resp.BackendHealth["backend-1"] != "healthy" {
+	if resp.BackendHealth[strBackend1] != strHealthy {
 		t.Errorf("Expected backend-1 to be healthy")
 	}
 
-	if resp.BackendHealth["backend-2"] != "unhealthy" {
+	if resp.BackendHealth[strBackend2] != strUnhealthy {
 		t.Errorf("Expected backend-2 to be unhealthy")
 	}
 }
@@ -823,20 +954,21 @@ func TestHealthCheckDegraded(t *testing.T) {
 // Tests for ExecutePipeline
 // ============================================================================
 
+// TestExecutePipelineNotEnabled is part of the public API.
 func TestExecutePipelineNotEnabled(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 	// Don't set pipeline executor
 
 	req := &pb.ExecutePipelineRequest{
-		PipelineId: "test-pipeline",
+		PipelineId: strTestPipeline,
 	}
 
 	resp, err := server.ExecutePipeline(context.Background(), req)
@@ -850,14 +982,15 @@ func TestExecutePipelineNotEnabled(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineSuccess is part of the public API.
 func TestExecutePipelineSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -867,7 +1000,7 @@ func TestExecutePipelineSuccess(t *testing.T) {
 	server.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
 
 	req := &pb.ExecutePipelineRequest{
-		PipelineId: "test-pipeline",
+		PipelineId: strTestPipeline,
 		Input:      map[string]string{"data": "test input"},
 	}
 
@@ -885,14 +1018,15 @@ func TestExecutePipelineSuccess(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineWithInput is part of the public API.
 func TestExecutePipelineWithInput(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -910,7 +1044,7 @@ func TestExecutePipelineWithInput(t *testing.T) {
 
 	for _, input := range testInputs {
 		req := &pb.ExecutePipelineRequest{
-			PipelineId: "test-pipeline",
+			PipelineId: strTestPipeline,
 			Input:      input,
 		}
 
@@ -923,32 +1057,33 @@ func TestExecutePipelineWithInput(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineFullSuccess is part of the public API.
 func TestExecutePipelineFullSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
-	backends_list := []backends.Backend{backend}
-	pipelineExecutor := pipeline.NewPipelineExecutor(backends_list)
+	backendsList := []backends.Backend{backend}
+	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
 	pipelineLoader := pipeline.NewPipelineLoader()
 
 	// Manually create and register a pipeline
 	testPipeline := &pipeline.Pipeline{
-		ID:   "test-success-pipeline",
+		ID:   strTestSuccessPipeline,
 		Name: "Test Success Pipeline",
 		Stages: []*pipeline.Stage{
 			{
 				ID:    "stage1",
 				Type:  pipeline.StageTypeTextGen,
-				Model: "test-model",
+				Model: strTestModel,
 			},
 		},
-		Options: &pipeline.PipelineOptions{
+		Options: &pipeline.Options{
 			ContinueOnError: false,
 		},
 	}
@@ -960,23 +1095,18 @@ func TestExecutePipelineFullSuccess(t *testing.T) {
 	server.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
 
 	req := &pb.ExecutePipelineRequest{
-		PipelineId: "test-success-pipeline",
+		PipelineId: strTestSuccessPipeline,
 		Input:      map[string]string{"prompt": "test input"},
 	}
 
 	resp, err := server.ExecutePipeline(context.Background(), req)
 
-	// The execution will complete (may succeed or fail depending on mock backend)
-	// We're testing the response conversion code, not the execution itself
-	if err != nil {
-		t.Fatalf("ExecutePipeline returned error: %v", err)
-	}
-
+	// Execution errors are returned alongside the response payload.
 	if resp == nil {
-		t.Fatal("Expected response, got nil")
+		t.Fatalf("ExecutePipeline returned nil response: %v", err)
 	}
 
-	if resp.PipelineId != "test-success-pipeline" {
+	if resp.PipelineId != strTestSuccessPipeline {
 		t.Errorf("Expected pipeline_id 'test-success-pipeline', got '%s'", resp.PipelineId)
 	}
 
@@ -990,18 +1120,19 @@ func TestExecutePipelineFullSuccess(t *testing.T) {
 	t.Logf("Success: %v, Error: %s", resp.Success, resp.Error)
 }
 
+// TestExecutePipelineWithMetadata is part of the public API.
 func TestExecutePipelineWithMetadata(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
-	backends_list := []backends.Backend{backend}
-	pipelineExecutor := pipeline.NewPipelineExecutor(backends_list)
+	backendsList := []backends.Backend{backend}
+	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
 	pipelineLoader := pipeline.NewPipelineLoader()
 
 	// Create pipeline with multiple stages to test metadata conversion
@@ -1020,7 +1151,7 @@ func TestExecutePipelineWithMetadata(t *testing.T) {
 				Model: "model2",
 			},
 		},
-		Options: &pipeline.PipelineOptions{
+		Options: &pipeline.Options{
 			ContinueOnError: true,
 			CollectMetrics:  true,
 		},
@@ -1066,18 +1197,19 @@ func TestExecutePipelineWithMetadata(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineOutputConversion is part of the public API.
 func TestExecutePipelineOutputConversion(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
-	backends_list := []backends.Backend{backend}
-	pipelineExecutor := pipeline.NewPipelineExecutor(backends_list)
+	backendsList := []backends.Backend{backend}
+	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
 	pipelineLoader := pipeline.NewPipelineLoader()
 
 	testPipeline := &pipeline.Pipeline{
@@ -1087,10 +1219,10 @@ func TestExecutePipelineOutputConversion(t *testing.T) {
 			{
 				ID:    "output-stage",
 				Type:  pipeline.StageTypeTextGen,
-				Model: "test-model",
+				Model: strTestModel,
 			},
 		},
-		Options: &pipeline.PipelineOptions{},
+		Options: &pipeline.Options{},
 	}
 
 	pipelineLoader.AddPipeline(testPipeline)
@@ -1105,12 +1237,8 @@ func TestExecutePipelineOutputConversion(t *testing.T) {
 
 	resp, err := server.ExecutePipeline(context.Background(), req)
 
-	if err != nil {
-		t.Fatalf("ExecutePipeline returned error: %v", err)
-	}
-
 	if resp == nil {
-		t.Fatal("Expected response, got nil")
+		t.Fatalf("ExecutePipeline returned nil response: %v", err)
 	}
 
 	// Test that final output was converted (may be nil for mock)
@@ -1134,20 +1262,21 @@ func TestExecutePipelineOutputConversion(t *testing.T) {
 // Tests for ExecutePipelineStream
 // ============================================================================
 
+// TestExecutePipelineStreamNotEnabled is part of the public API.
 func TestExecutePipelineStreamNotEnabled(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 	// Don't set pipeline executor
 
 	req := &pb.ExecutePipelineRequest{
-		PipelineId: "test-pipeline",
+		PipelineId: strTestPipeline,
 	}
 
 	stream := &MockPipelineStream{
@@ -1161,14 +1290,15 @@ func TestExecutePipelineStreamNotEnabled(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineStreamSuccess is part of the public API.
 func TestExecutePipelineStreamSuccess(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -1178,19 +1308,19 @@ func TestExecutePipelineStreamSuccess(t *testing.T) {
 	server.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
 
 	req := &pb.ExecutePipelineRequest{
-		PipelineId: "test-pipeline",
+		PipelineId: strTestPipeline,
 	}
 
 	stream := &MockPipelineStream{
 		ctx: context.Background(),
 	}
 
-	// This will fail because pipeline is not registered, but the stream path is tested
 	err := server.ExecutePipelineStream(req, stream)
-
-	// Expected to get error about pipeline not found
-	if err != nil && stream.sent == nil {
-		// Correct behavior - error caught before sending
+	if err == nil {
+		t.Fatal("expected an error for an unregistered pipeline")
+	}
+	if stream.sent != nil {
+		t.Fatal("expected no stream payload before the pipeline error")
 	}
 }
 
@@ -1198,15 +1328,16 @@ func TestExecutePipelineStreamSuccess(t *testing.T) {
 // Tests for Concurrent Operations
 // ============================================================================
 
+// TestConcurrentGenerateRequests is part of the public API.
 func TestConcurrentGenerateRequests(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
@@ -1216,11 +1347,11 @@ func TestConcurrentGenerateRequests(t *testing.T) {
 
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
-		go func(index int) {
+		go func(_ int) {
 			defer wg.Done()
 			req := &pb.GenerateRequest{
-				Prompt: "test prompt",
-				Model:  "test-model",
+				Prompt: strTestPrompt2,
+				Model:  strTestModel,
 			}
 			resp, err := server.Generate(context.Background(), req)
 			if err != nil {
@@ -1242,16 +1373,17 @@ func TestConcurrentGenerateRequests(t *testing.T) {
 	}
 }
 
+// TestConcurrentEmbedAndGenerate is part of the public API.
 func TestConcurrentEmbedAndGenerate(t *testing.T) {
 	backend := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 		supportsEmbed:    true,
 	}
 
-	r := router.NewRouter(router.Config{DefaultBackendID: "backend-1"})
-	r.RegisterBackend(backend)
+	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
@@ -1264,8 +1396,8 @@ func TestConcurrentEmbedAndGenerate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			req := &pb.GenerateRequest{
-				Prompt: "test prompt",
-				Model:  "test-model",
+				Prompt: strTestPrompt2,
+				Model:  strTestModel,
 			}
 			_, err := server.Generate(context.Background(), req)
 			if err != nil {
@@ -1280,8 +1412,8 @@ func TestConcurrentEmbedAndGenerate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			req := &pb.EmbedRequest{
-				Text:  "test text",
-				Model: "test-model",
+				Text:  strTestText,
+				Model: strTestModel,
 			}
 			_, err := server.Embed(context.Background(), req)
 			if err != nil {
@@ -1300,14 +1432,15 @@ func TestConcurrentEmbedAndGenerate(t *testing.T) {
 	}
 }
 
+// TestConcurrentListBackendsAndHealthCheck is part of the public API.
 func TestConcurrentListBackendsAndHealthCheck(t *testing.T) {
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := NewComputeServer(r)
 
@@ -1354,9 +1487,10 @@ func TestConcurrentListBackendsAndHealthCheck(t *testing.T) {
 // Tests for Helper Functions
 // ============================================================================
 
+// TestConvertAnnotations is part of the public API.
 func TestConvertAnnotations(t *testing.T) {
 	pbAnnotations := &pb.JobAnnotations{
-		Target:                "backend-1",
+		Target:                strBackend1,
 		LatencyCritical:       true,
 		PreferPowerEfficiency: true,
 		CacheEnabled:          false,
@@ -1369,7 +1503,7 @@ func TestConvertAnnotations(t *testing.T) {
 
 	result := convertAnnotations(pbAnnotations)
 
-	if result.Target != "backend-1" {
+	if result.Target != strBackend1 {
 		t.Errorf("Expected target 'backend-1', got '%s'", result.Target)
 	}
 
@@ -1390,6 +1524,7 @@ func TestConvertAnnotations(t *testing.T) {
 	}
 }
 
+// TestConvertAnnotationsNil is part of the public API.
 func TestConvertAnnotationsNil(t *testing.T) {
 	result := convertAnnotations(nil)
 
@@ -1402,6 +1537,7 @@ func TestConvertAnnotationsNil(t *testing.T) {
 	}
 }
 
+// TestConvertGenerationOptions is part of the public API.
 func TestConvertGenerationOptions(t *testing.T) {
 	pbOptions := &pb.GenerationOptions{
 		MaxTokens:     100,
@@ -1439,6 +1575,7 @@ func TestConvertGenerationOptions(t *testing.T) {
 	}
 }
 
+// TestConvertGenerationOptionsNil is part of the public API.
 func TestConvertGenerationOptionsNil(t *testing.T) {
 	result := convertGenerationOptions(nil)
 
@@ -1447,6 +1584,7 @@ func TestConvertGenerationOptionsNil(t *testing.T) {
 	}
 }
 
+// TestConvertStats is part of the public API.
 func TestConvertStats(t *testing.T) {
 	stats := &backends.GenerationStats{
 		TimeToFirstTokenMs: 50,
@@ -1479,6 +1617,7 @@ func TestConvertStats(t *testing.T) {
 	}
 }
 
+// TestConvertStatsNil is part of the public API.
 func TestConvertStatsNil(t *testing.T) {
 	result := convertStats(nil)
 
@@ -1487,16 +1626,18 @@ func TestConvertStatsNil(t *testing.T) {
 	}
 }
 
+// TestHealthState is part of the public API.
 func TestHealthState(t *testing.T) {
-	if healthState(true) != "healthy" {
+	if healthState(true) != strHealthy {
 		t.Error("Expected 'healthy' for true")
 	}
 
-	if healthState(false) != "unhealthy" {
+	if healthState(false) != strUnhealthy {
 		t.Error("Expected 'unhealthy' for false")
 	}
 }
 
+// TestHealthMessage is part of the public API.
 func TestHealthMessage(t *testing.T) {
 	if healthMessage(true) != "Backend is responding normally" {
 		t.Error("Expected 'Backend is responding normally' for true")
@@ -1507,17 +1648,18 @@ func TestHealthMessage(t *testing.T) {
 	}
 }
 
+// TestTruncate is part of the public API.
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		input    string
-		max      int
 		expected string
+		max      int
 	}{
-		{"short", 10, "short"},
-		{"this is a long string", 10, "this is a ..."},
-		{"exactly ten!", 10, "exactly te..."},
-		{"", 5, ""},
-		{"a", 5, "a"},
+		{input: "short", max: 10, expected: "short"},
+		{input: "this is a long string", max: 10, expected: "this is a ..."},
+		{input: "0123456789abcdef", max: 10, expected: "0123456789..."},
+		{input: "", max: 5, expected: ""},
+		{input: "a", max: 5, expected: "a"},
 	}
 
 	for _, tt := range tests {
@@ -1544,10 +1686,11 @@ func containsSubstring(s, substr string) bool {
 	return false
 }
 
+// TestGenerateWithForwardingRouter is part of the public API.
 func TestGenerateWithForwardingRouter(t *testing.T) {
 	// Create mock backend
 	mockBackend := &MockBackend{
-		id:               "test-backend",
+		id:               strTestBackend,
 		healthy:          true,
 		supportsGenerate: true,
 		powerWatts:       50.0,
@@ -1556,18 +1699,18 @@ func TestGenerateWithForwardingRouter(t *testing.T) {
 
 	// Create router
 	routerCfg := router.Config{
-		DefaultBackendID: "test-backend",
+		DefaultBackendID: strTestBackend,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(mockBackend))
 
 	// Create forwarding router
 	forwardingCfg := &router.ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.5,
 		MaxRetries:           2,
-		EscalationPath:       []string{"test-backend"},
+		EscalationPath:       []string{strTestBackend},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1579,8 +1722,8 @@ func TestGenerateWithForwardingRouter(t *testing.T) {
 
 	// Test request
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1597,7 +1740,7 @@ func TestGenerateWithForwardingRouter(t *testing.T) {
 		t.Error("Response text is empty")
 	}
 
-	if resp.BackendUsed != "test-backend" {
+	if resp.BackendUsed != strTestBackend {
 		t.Errorf("Expected backend 'test-backend', got '%s'", resp.BackendUsed)
 	}
 
@@ -1610,10 +1753,11 @@ func TestGenerateWithForwardingRouter(t *testing.T) {
 	}
 }
 
+// TestGenerateRoutingError is part of the public API.
 func TestGenerateRoutingError(t *testing.T) {
 	// Create router with no backends - this will cause routing to fail
 	routerCfg := router.Config{
-		DefaultBackendID: "non-existent",
+		DefaultBackendID: strNonExistent,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
@@ -1622,8 +1766,8 @@ func TestGenerateRoutingError(t *testing.T) {
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1637,10 +1781,11 @@ func TestGenerateRoutingError(t *testing.T) {
 	}
 }
 
+// TestGenerateWithForwardingError is part of the public API.
 func TestGenerateWithForwardingError(t *testing.T) {
 	// Create router with no backends - forwarding will fail
 	routerCfg := router.Config{
-		DefaultBackendID: "non-existent",
+		DefaultBackendID: strNonExistent,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
@@ -1650,7 +1795,7 @@ func TestGenerateWithForwardingError(t *testing.T) {
 		Enabled:              true,
 		MinConfidence:        0.5,
 		MaxRetries:           2,
-		EscalationPath:       []string{"non-existent"},
+		EscalationPath:       []string{strNonExistent},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    false, // Don't return best attempt
 	}
@@ -1661,8 +1806,8 @@ func TestGenerateWithForwardingError(t *testing.T) {
 	server.SetForwardingRouter(forwardingRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1676,10 +1821,11 @@ func TestGenerateWithForwardingError(t *testing.T) {
 	}
 }
 
+// TestGenerateWithActualForwarding is part of the public API.
 func TestGenerateWithActualForwarding(t *testing.T) {
 	// Create two backends
 	backend1 := &MockBackend{
-		id:               "backend-1",
+		id:               strBackend1,
 		healthy:          true,
 		supportsGenerate: true,
 		powerWatts:       50.0,
@@ -1688,7 +1834,7 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:               "backend-2",
+		id:               strBackend2,
 		healthy:          true,
 		supportsGenerate: true,
 		powerWatts:       100.0,
@@ -1697,12 +1843,12 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 
 	// Create router
 	routerCfg := router.Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	// Create forwarding router with very high confidence threshold
 	// to trigger forwarding
@@ -1710,7 +1856,7 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 		Enabled:              true,
 		MinConfidence:        0.95, // Very high - will cause forwarding
 		MaxRetries:           2,
-		EscalationPath:       []string{"backend-1", "backend-2"},
+		EscalationPath:       []string{strBackend1, strBackend2},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1721,8 +1867,8 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 	server.SetForwardingRouter(forwardingRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1745,15 +1891,15 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 func TestGenerateStreamRoutingError(t *testing.T) {
 	// Create router with no backends - routing will fail
 	routerCfg := router.Config{
-		DefaultBackendID: "non-existent",
+		DefaultBackendID: strNonExistent,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1775,25 +1921,25 @@ func TestGenerateStreamRoutingError(t *testing.T) {
 // TestEmbedWithPowerPreference tests embedding with power preference annotations
 func TestEmbedWithPowerPreference(t *testing.T) {
 	mockBackend := &MockBackend{
-		id:            "test-backend",
+		id:            strTestBackend,
 		healthy:       true,
 		supportsEmbed: true,
 	}
 
 	routerCfg := router.Config{
-		DefaultBackendID: "test-backend",
+		DefaultBackendID: strTestBackend,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(mockBackend))
 
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.EmbedRequest{
 		Text:  "Test text for embedding",
-		Model: "test-model",
+		Model: strTestModel,
 		Annotations: &pb.JobAnnotations{
-			Target:                "test-backend",
+			Target:                strTestBackend,
 			PreferPowerEfficiency: true,
 			MaxPowerWatts:         100,
 		},
@@ -1825,7 +1971,7 @@ func TestEmbedWithPowerPreference(t *testing.T) {
 func TestEmbedRoutingError(t *testing.T) {
 	// Create router with no backends
 	routerCfg := router.Config{
-		DefaultBackendID: "non-existent",
+		DefaultBackendID: strNonExistent,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
@@ -1833,7 +1979,7 @@ func TestEmbedRoutingError(t *testing.T) {
 
 	req := &pb.EmbedRequest{
 		Text:        "Test text",
-		Model:       "test-model",
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1850,24 +1996,24 @@ func TestEmbedRoutingError(t *testing.T) {
 // TestGenerateStreamBackendStreamError tests streaming generation when backend stream fails
 func TestGenerateStreamBackendStreamError(t *testing.T) {
 	mockBackend := &MockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		healthy:        true,
 		supportsStream: true,
 		streamErr:      errors.New("backend stream error"),
 	}
 
 	routerCfg := router.Config{
-		DefaultBackendID: "test-backend",
+		DefaultBackendID: strTestBackend,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(mockBackend))
 
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1888,10 +2034,11 @@ func TestGenerateStreamBackendStreamError(t *testing.T) {
 // Mock stream implementation for GenerateStream testing
 type mockGenerateStream struct {
 	ctx     context.Context
-	sent    []*pb.GenerateStreamResponse
 	sendErr error
+	sent    []*pb.GenerateStreamResponse
 }
 
+// Send is part of the public API.
 func (m *mockGenerateStream) Send(resp *pb.GenerateStreamResponse) error {
 	if m.sendErr != nil {
 		return m.sendErr
@@ -1900,26 +2047,32 @@ func (m *mockGenerateStream) Send(resp *pb.GenerateStreamResponse) error {
 	return nil
 }
 
+// Context is part of the public API.
 func (m *mockGenerateStream) Context() context.Context {
 	return m.ctx
 }
 
+// SetHeader is part of the public API.
 func (m *mockGenerateStream) SetHeader(metadata.MD) error {
 	return nil
 }
 
+// SendHeader is part of the public API.
 func (m *mockGenerateStream) SendHeader(metadata.MD) error {
 	return nil
 }
 
+// SetTrailer is part of the public API.
 func (m *mockGenerateStream) SetTrailer(metadata.MD) {
 }
 
-func (m *mockGenerateStream) SendMsg(msg interface{}) error {
+// SendMsg is part of the public API.
+func (m *mockGenerateStream) SendMsg(_ interface{}) error {
 	return nil
 }
 
-func (m *mockGenerateStream) RecvMsg(msg interface{}) error {
+// RecvMsg is part of the public API.
+func (m *mockGenerateStream) RecvMsg(_ interface{}) error {
 	return nil
 }
 
@@ -1943,14 +2096,14 @@ func TestGenerateFallbackOnBackendFailure(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(failingBackend)
-	baseRouter.RegisterBackend(fallbackBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(failingBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(fallbackBackend))
 
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 
@@ -1971,7 +2124,7 @@ func TestGenerateFallbackOnBackendFailure(t *testing.T) {
 func TestGenerateStreamEOFHandling(t *testing.T) {
 	// Create a backend that returns EOF after some chunks
 	mockBackend := &MockBackend{
-		id:             "test-backend",
+		id:             strTestBackend,
 		healthy:        true,
 		supportsStream: true,
 		streamChunks: []*backends.StreamChunk{
@@ -1982,17 +2135,17 @@ func TestGenerateStreamEOFHandling(t *testing.T) {
 	}
 
 	routerCfg := router.Config{
-		DefaultBackendID: "test-backend",
+		DefaultBackendID: strTestBackend,
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(mockBackend))
 
 	server := NewComputeServer(baseRouter)
 
 	req := &pb.GenerateRequest{
-		Prompt:      "Test prompt",
-		Model:       "test-model",
+		Prompt:      strTestPrompt,
+		Model:       strTestModel,
 		Annotations: &pb.JobAnnotations{},
 	}
 

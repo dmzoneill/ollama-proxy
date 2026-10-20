@@ -7,16 +7,17 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestConvertChatCompletionRequest is part of the public API.
 func TestConvertChatCompletionRequest(t *testing.T) {
 	temp := float32(0.7)
 	topP := float32(0.9)
 	maxTokens := int32(100)
 
 	req := &ChatCompletionRequest{
-		Model: "gpt-3.5-turbo",
+		Model: strGpt35Turbo,
 		Messages: []ChatCompletionMessage{
-			{Role: "system", Content: "You are a helpful assistant"},
-			{Role: "user", Content: "Hello!"},
+			{Role: strSystem, Content: "You are a helpful assistant"},
+			{Role: strUser, Content: "Hello!"},
 		},
 		Temperature: &temp,
 		TopP:        &topP,
@@ -26,7 +27,7 @@ func TestConvertChatCompletionRequest(t *testing.T) {
 
 	genReq := ConvertChatCompletionRequest(req)
 
-	if genReq.Model != "gpt-3.5-turbo" {
+	if genReq.Model != strGpt35Turbo {
 		t.Errorf("Expected model gpt-3.5-turbo, got %s", genReq.Model)
 	}
 
@@ -47,11 +48,12 @@ func TestConvertChatCompletionRequest(t *testing.T) {
 	}
 }
 
+// TestConvertChatCompletionRequest_NoOptions is part of the public API.
 func TestConvertChatCompletionRequest_NoOptions(t *testing.T) {
 	req := &ChatCompletionRequest{
 		Model: "gpt-4",
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "Test"},
+			{Role: strUser, Content: "Test"},
 		},
 	}
 
@@ -62,6 +64,7 @@ func TestConvertChatCompletionRequest_NoOptions(t *testing.T) {
 	}
 }
 
+// TestConvertCompletionRequest_StringPrompt is part of the public API.
 func TestConvertCompletionRequest_StringPrompt(t *testing.T) {
 	temp := float32(0.5)
 	req := &CompletionRequest{
@@ -81,10 +84,11 @@ func TestConvertCompletionRequest_StringPrompt(t *testing.T) {
 	}
 }
 
+// TestConvertCompletionRequest_ArrayPrompt is part of the public API.
 func TestConvertCompletionRequest_ArrayPrompt(t *testing.T) {
 	prompts := []string{"First prompt", "Second prompt"}
 	req := &CompletionRequest{
-		Model:  "gpt-3.5-turbo",
+		Model:  strGpt35Turbo,
 		Prompt: prompts,
 	}
 
@@ -95,13 +99,14 @@ func TestConvertCompletionRequest_ArrayPrompt(t *testing.T) {
 	}
 }
 
+// TestConvertCompletionRequest_AllOptions is part of the public API.
 func TestConvertCompletionRequest_AllOptions(t *testing.T) {
 	temp := float32(0.8)
 	topP := float32(0.95)
 	maxTokens := int32(200)
 
 	req := &CompletionRequest{
-		Model:       "gpt-3.5-turbo",
+		Model:       strGpt35Turbo,
 		Prompt:      "Test",
 		Temperature: &temp,
 		TopP:        &topP,
@@ -120,15 +125,16 @@ func TestConvertCompletionRequest_AllOptions(t *testing.T) {
 	}
 }
 
+// TestConvertEmbeddingRequest_String is part of the public API.
 func TestConvertEmbeddingRequest_String(t *testing.T) {
 	req := &EmbeddingRequest{
-		Model: "text-embedding-ada-002",
+		Model: strTextEmbeddingAda002,
 		Input: "This is a test",
 	}
 
 	embedReq := ConvertEmbeddingRequest(req)
 
-	if embedReq.Model != "text-embedding-ada-002" {
+	if embedReq.Model != strTextEmbeddingAda002 {
 		t.Errorf("Expected model text-embedding-ada-002, got %s", embedReq.Model)
 	}
 
@@ -137,10 +143,11 @@ func TestConvertEmbeddingRequest_String(t *testing.T) {
 	}
 }
 
+// TestConvertEmbeddingRequest_Array is part of the public API.
 func TestConvertEmbeddingRequest_Array(t *testing.T) {
 	inputs := []string{"First text", "Second text"}
 	req := &EmbeddingRequest{
-		Model: "text-embedding-ada-002",
+		Model: strTextEmbeddingAda002,
 		Input: inputs,
 	}
 
@@ -151,9 +158,10 @@ func TestConvertEmbeddingRequest_Array(t *testing.T) {
 	}
 }
 
+// TestConvertToOpenAIEmbeddingResponse is part of the public API.
 func TestConvertToOpenAIEmbeddingResponse(t *testing.T) {
 	req := &EmbeddingRequest{
-		Model: "text-embedding-ada-002",
+		Model: strTextEmbeddingAda002,
 		Input: "Test input",
 	}
 
@@ -163,11 +171,11 @@ func TestConvertToOpenAIEmbeddingResponse(t *testing.T) {
 
 	openaiResp := ConvertToOpenAIEmbeddingResponse(req, embedResp)
 
-	if openaiResp.Object != "list" {
+	if openaiResp.Object != strList {
 		t.Errorf("Expected object list, got %s", openaiResp.Object)
 	}
 
-	if openaiResp.Model != "text-embedding-ada-002" {
+	if openaiResp.Model != strTextEmbeddingAda002 {
 		t.Errorf("Expected model text-embedding-ada-002, got %s", openaiResp.Model)
 	}
 
@@ -180,10 +188,11 @@ func TestConvertToOpenAIEmbeddingResponse(t *testing.T) {
 	}
 }
 
+// TestBuildPromptFromMessages is part of the public API.
 func TestBuildPromptFromMessages(t *testing.T) {
 	messages := []ChatCompletionMessage{
-		{Role: "system", Content: "You are helpful"},
-		{Role: "user", Content: "Hello"},
+		{Role: strSystem, Content: strYouAreHelpful},
+		{Role: strUser, Content: strHello2},
 	}
 
 	result := buildPromptFromMessages(messages)
@@ -198,9 +207,10 @@ func TestBuildPromptFromMessages(t *testing.T) {
 	}
 }
 
+// TestBuildPromptFromMessages_EndsWithAssistant is part of the public API.
 func TestBuildPromptFromMessages_EndsWithAssistant(t *testing.T) {
 	messages := []ChatCompletionMessage{
-		{Role: "user", Content: "Hello"},
+		{Role: strUser, Content: strHello2},
 	}
 
 	prompt := buildPromptFromMessages(messages)
@@ -212,10 +222,11 @@ func TestBuildPromptFromMessages_EndsWithAssistant(t *testing.T) {
 	}
 }
 
+// TestBuildPromptFromMessages_EmptyContent is part of the public API.
 func TestBuildPromptFromMessages_EmptyContent(t *testing.T) {
 	messages := []ChatCompletionMessage{
-		{Role: "user", Content: ""},
-		{Role: "assistant", Content: "Response"},
+		{Role: strUser, Content: ""},
+		{Role: strAssistant, Content: strResponse},
 	}
 
 	result := buildPromptFromMessages(messages)
@@ -226,11 +237,12 @@ func TestBuildPromptFromMessages_EmptyContent(t *testing.T) {
 	}
 }
 
+// TestBuildPromptFromMessages_CustomRole is part of the public API.
 func TestBuildPromptFromMessages_CustomRole(t *testing.T) {
 	messages := []ChatCompletionMessage{
-		{Role: "system", Content: "You are helpful"},
+		{Role: strSystem, Content: strYouAreHelpful},
 		{Role: "tool", Content: "Tool output data"},
-		{Role: "user", Content: "What is this?"},
+		{Role: strUser, Content: "What is this?"},
 	}
 
 	result := buildPromptFromMessages(messages)
@@ -251,6 +263,7 @@ func TestBuildPromptFromMessages_CustomRole(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_String is part of the public API.
 func TestExtractPrompt_String(t *testing.T) {
 	result := extractPrompt("Simple string")
 
@@ -259,6 +272,7 @@ func TestExtractPrompt_String(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_StringArray is part of the public API.
 func TestExtractPrompt_StringArray(t *testing.T) {
 	prompts := []string{"First", "Second", "Third"}
 	result := extractPrompt(prompts)
@@ -268,6 +282,7 @@ func TestExtractPrompt_StringArray(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_EmptyStringArray is part of the public API.
 func TestExtractPrompt_EmptyStringArray(t *testing.T) {
 	prompts := []string{}
 	result := extractPrompt(prompts)
@@ -277,6 +292,7 @@ func TestExtractPrompt_EmptyStringArray(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_InterfaceArray is part of the public API.
 func TestExtractPrompt_InterfaceArray(t *testing.T) {
 	prompts := []interface{}{"Interface string", 123}
 	result := extractPrompt(prompts)
@@ -286,6 +302,7 @@ func TestExtractPrompt_InterfaceArray(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_EmptyInterfaceArray is part of the public API.
 func TestExtractPrompt_EmptyInterfaceArray(t *testing.T) {
 	prompts := []interface{}{}
 	result := extractPrompt(prompts)
@@ -295,6 +312,7 @@ func TestExtractPrompt_EmptyInterfaceArray(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_InterfaceArrayNonString is part of the public API.
 func TestExtractPrompt_InterfaceArrayNonString(t *testing.T) {
 	prompts := []interface{}{123, 456}
 	result := extractPrompt(prompts)
@@ -304,6 +322,7 @@ func TestExtractPrompt_InterfaceArrayNonString(t *testing.T) {
 	}
 }
 
+// TestExtractPrompt_OtherType is part of the public API.
 func TestExtractPrompt_OtherType(t *testing.T) {
 	result := extractPrompt(12345)
 
@@ -312,6 +331,7 @@ func TestExtractPrompt_OtherType(t *testing.T) {
 	}
 }
 
+// TestGenerateCompletionID is part of the public API.
 func TestGenerateCompletionID(t *testing.T) {
 	id1 := generateCompletionID("chatcmpl")
 	id2 := generateCompletionID("chatcmpl")
@@ -327,17 +347,18 @@ func TestGenerateCompletionID(t *testing.T) {
 	}
 }
 
+// TestEstimateTokens is part of the public API.
 func TestEstimateTokens(t *testing.T) {
 	tests := []struct {
 		text     string
 		expected int32
 	}{
-		{"", 0},
-		{"a", 1},
-		{"test", 1},
-		{"hello", 2},
-		{"hello world", 3},
-		{"This is a longer text with more characters", 11},
+		{text: "", expected: 0},
+		{text: "a", expected: 1},
+		{text: strTest, expected: 1},
+		{text: strHello, expected: 2},
+		{text: "hello world", expected: 3},
+		{text: "This is a longer text with more characters", expected: 11},
 	}
 
 	for _, tt := range tests {
@@ -348,12 +369,13 @@ func TestEstimateTokens(t *testing.T) {
 	}
 }
 
+// TestConvertToOpenAIChatResponse_TokenEstimation is part of the public API.
 func TestConvertToOpenAIChatResponse_TokenEstimation(t *testing.T) {
 	// Test when TokensGenerated is 0, should estimate tokens
 	req := &ChatCompletionRequest{
-		Model: "test-model",
+		Model: strTestModel,
 		Messages: []ChatCompletionMessage{
-			{Role: "user", Content: "test"},
+			{Role: strUser, Content: strTest},
 		},
 	}
 
@@ -378,10 +400,11 @@ func TestConvertToOpenAIChatResponse_TokenEstimation(t *testing.T) {
 	}
 }
 
+// TestConvertToOpenAICompletionResponse_TokenEstimation is part of the public API.
 func TestConvertToOpenAICompletionResponse_TokenEstimation(t *testing.T) {
 	// Test when TokensGenerated is 0, should estimate tokens
 	req := &CompletionRequest{
-		Model:  "test-model",
+		Model:  strTestModel,
 		Prompt: "test prompt",
 	}
 

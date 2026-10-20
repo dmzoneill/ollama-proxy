@@ -1,3 +1,4 @@
+// Package confidence estimates how reliable a model response is.
 package confidence
 
 import (
@@ -7,8 +8,8 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
-// ConfidenceEstimator estimates the confidence/quality of LLM outputs
-type ConfidenceEstimator struct {
+// Estimator estimates the confidence/quality of LLM outputs
+type Estimator struct {
 	config *Config
 }
 
@@ -38,31 +39,31 @@ func DefaultConfig() *Config {
 }
 
 // NewConfidenceEstimator creates a new confidence estimator
-func NewConfidenceEstimator(config *Config) *ConfidenceEstimator {
+func NewConfidenceEstimator(config *Config) *Estimator {
 	if config == nil {
 		config = DefaultConfig()
 	}
-	return &ConfidenceEstimator{config: config}
+	return &Estimator{config: config}
 }
 
-// ConfidenceScore represents the confidence analysis of a response
-type ConfidenceScore struct {
-	Overall       float64 // Overall confidence (0-1)
-	LengthScore   float64 // Score based on response length
-	PatternScore  float64 // Score based on pattern matching
-	ModelScore    float64 // Score based on model-specific heuristics
-	Reasoning     string  // Explanation of the score
-	Uncertainties []string // Detected uncertainty indicators
+// Score represents the confidence analysis of a response
+type Score struct {
+	Reasoning     string
+	Uncertainties []string
+	Overall       float64
+	LengthScore   float64
+	PatternScore  float64
+	ModelScore    float64
 }
 
 // Estimate calculates confidence score for a response
-func (ce *ConfidenceEstimator) Estimate(
-	prompt string,
+func (ce *Estimator) Estimate(
+	_ string,
 	response string,
 	model string,
 	backend backends.Backend,
-) *ConfidenceScore {
-	score := &ConfidenceScore{
+) *Score {
+	score := &Score{
 		Uncertainties: make([]string, 0),
 	}
 
@@ -87,7 +88,7 @@ func (ce *ConfidenceEstimator) Estimate(
 }
 
 // scoreLengthQuality scores based on response length
-func (ce *ConfidenceEstimator) scoreLengthQuality(response string) float64 {
+func (ce *Estimator) scoreLengthQuality(response string) float64 {
 	length := len(strings.TrimSpace(response))
 
 	// Very short responses are likely incomplete or low quality
@@ -111,28 +112,28 @@ func (ce *ConfidenceEstimator) scoreLengthQuality(response string) float64 {
 }
 
 // scorePatterns detects uncertainty patterns in the response
-func (ce *ConfidenceEstimator) scorePatterns(response string, score *ConfidenceScore) float64 {
+func (ce *Estimator) scorePatterns(response string, score *Score) float64 {
 	responseLower := strings.ToLower(response)
 
 	// Uncertainty indicators (negative patterns)
 	uncertaintyPatterns := []struct {
 		pattern string
-		penalty float64
 		reason  string
+		penalty float64
 	}{
-		{"i don't know", 0.4, "Explicit uncertainty: 'I don't know'"},
-		{"i'm not sure", 0.3, "Explicit uncertainty: 'I'm not sure'"},
-		{"i cannot", 0.3, "Inability statement"},
-		{"i can't", 0.3, "Inability statement"},
-		{"unclear", 0.2, "Acknowledges lack of clarity"},
-		{"uncertain", 0.2, "Explicit uncertainty"},
-		{"perhaps", 0.1, "Hedging language"},
-		{"maybe", 0.1, "Hedging language"},
-		{"possibly", 0.1, "Hedging language"},
-		{"might be", 0.1, "Hedging language"},
-		{"could be", 0.1, "Hedging language"},
-		{"i think", 0.05, "Weak assertion"},
-		{"it seems", 0.05, "Weak assertion"},
+		{pattern: "i don't know", penalty: 0.4, reason: "Explicit uncertainty: 'I don't know'"},
+		{pattern: "i'm not sure", penalty: 0.3, reason: "Explicit uncertainty: 'I'm not sure'"},
+		{pattern: "i cannot", penalty: 0.3, reason: strInabilityStatement},
+		{pattern: "i can't", penalty: 0.3, reason: strInabilityStatement},
+		{pattern: "unclear", penalty: 0.2, reason: "Acknowledges lack of clarity"},
+		{pattern: "uncertain", penalty: 0.2, reason: "Explicit uncertainty"},
+		{pattern: "perhaps", penalty: 0.1, reason: strHedgingLanguage},
+		{pattern: "maybe", penalty: 0.1, reason: strHedgingLanguage},
+		{pattern: "possibly", penalty: 0.1, reason: strHedgingLanguage},
+		{pattern: "might be", penalty: 0.1, reason: strHedgingLanguage},
+		{pattern: "could be", penalty: 0.1, reason: strHedgingLanguage},
+		{pattern: "i think", penalty: 0.05, reason: "Weak assertion"},
+		{pattern: "it seems", penalty: 0.05, reason: "Weak assertion"},
 	}
 
 	totalPenalty := 0.0
@@ -145,7 +146,7 @@ func (ce *ConfidenceEstimator) scorePatterns(response string, score *ConfidenceS
 
 	// Incomplete response indicators
 	incompletePatterns := []string{
-		"...",           // Trailing ellipsis
+		"...", // Trailing ellipsis
 		"[incomplete]",
 		"[truncated]",
 	}
@@ -202,7 +203,7 @@ func (ce *ConfidenceEstimator) scorePatterns(response string, score *ConfidenceS
 }
 
 // scoreModelSpecific applies model-specific heuristics
-func (ce *ConfidenceEstimator) scoreModelSpecific(model string, backend backends.Backend, response string) float64 {
+func (ce *Estimator) scoreModelSpecific(model string, _ backends.Backend, response string) float64 {
 	// Small models (0.5b-1.5b) get penalty for complex responses
 	if strings.Contains(model, "0.5b") || strings.Contains(model, "1.5b") {
 		wordCount := len(strings.Fields(response))
@@ -232,7 +233,7 @@ func (ce *ConfidenceEstimator) scoreModelSpecific(model string, backend backends
 }
 
 // generateReasoning creates human-readable explanation
-func (ce *ConfidenceEstimator) generateReasoning(score *ConfidenceScore) string {
+func (ce *Estimator) generateReasoning(score *Score) string {
 	var parts []string
 
 	// Overall assessment
@@ -275,11 +276,7 @@ func hasStructuredContent(response string) bool {
 
 	// Check for markdown headers
 	headers := regexp.MustCompile(`(?m)^#+\s`)
-	if headers.MatchString(response) {
-		return true
-	}
-
-	return false
+	return headers.MatchString(response)
 }
 
 // hasTechnicalContent checks for technical depth
@@ -310,12 +307,12 @@ func hasTechnicalContent(response string) bool {
 }
 
 // ShouldEscalate determines if response quality warrants escalation
-func (ce *ConfidenceEstimator) ShouldEscalate(score *ConfidenceScore, threshold float64) bool {
+func (ce *Estimator) ShouldEscalate(score *Score, threshold float64) bool {
 	return score.Overall < threshold
 }
 
 // EstimateForPrompt estimates expected quality for a prompt (before generation)
-func (ce *ConfidenceEstimator) EstimateForPrompt(prompt string, model string) float64 {
+func (ce *Estimator) EstimateForPrompt(prompt string, model string) float64 {
 	// Simple heuristic: estimate if prompt is likely too complex for model
 	promptLower := strings.ToLower(prompt)
 

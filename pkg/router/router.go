@@ -16,31 +16,25 @@ import (
 type RoutingDecision struct {
 	Backend            backends.Backend
 	Reason             string
+	ModelRequested     string
+	ModelUsed          string
+	SubstitutionReason string
+	DetectedMediaType  string
+	Alternatives       []string
+	RoutingHints       []string
 	EstimatedPowerW    float64
 	EstimatedLatencyMs int32
-	Alternatives       []string
-
-	// Model overrides
-	ModelRequested     string // Model user requested
-	ModelUsed          string // Model actually used
-	ModelSubstituted   bool   // Was model changed for compatibility?
-	SubstitutionReason string // Why was model substituted?
-
-	// Workload detection
-	DetectedMediaType  string   // Auto-detected workload type
-	RoutingHints       []string // Reasoning chain for routing decision
+	ModelSubstituted   bool
 }
 
 // Router handles intelligent routing to backends
 type Router struct {
-	mu               sync.RWMutex
 	backends         map[string]backends.Backend
+	queueMgr         *QueueManager
 	defaultBackendID string
+	mu               sync.RWMutex
 	powerAware       bool
 	autoOptimize     bool
-
-	// Queue management for priority-aware routing
-	queueMgr         *QueueManager
 }
 
 // Config for router initialization
@@ -190,8 +184,8 @@ func (r *Router) RouteRequest(ctx context.Context, annotations *backends.Annotat
 // candidateScore holds backend with its score
 type candidateScore struct {
 	backend backends.Backend
-	score   float64
 	reason  string
+	score   float64
 }
 
 // filterCandidates returns backends that meet basic requirements
@@ -255,7 +249,7 @@ func (r *Router) scoreCandidates(candidates []backends.Backend, annotations *bac
 			powerScore := 1000.0 - (backend.PowerWatts() * 10)
 			score += powerScore * 1.5 // Weight power efficiency
 			if annotations.PreferPowerEfficiency {
-				reasons = append(reasons, "power-efficient")
+				reasons = append(reasons, strPowerEfficient)
 			}
 		}
 
@@ -277,10 +271,11 @@ func (r *Router) scoreCandidates(candidates []backends.Backend, annotations *bac
 		}
 
 		// Priority boost for critical requests
-		if annotations.Priority == backends.PriorityCritical {
+		switch annotations.Priority {
+		case backends.PriorityCritical:
 			score += 500.0 // Strong boost for voice/realtime
 			reasons = append(reasons, "critical-priority")
-		} else if annotations.Priority == backends.PriorityHigh {
+		case backends.PriorityHigh:
 			score += 200.0 // Moderate boost for high priority
 			reasons = append(reasons, "high-priority")
 		}
@@ -316,7 +311,7 @@ func (r *Router) getAlternatives(excludeID string) []string {
 }
 
 // FallbackRequest tries alternative backends if primary fails
-func (r *Router) FallbackRequest(ctx context.Context, excludeBackends []string, annotations *backends.Annotations) (*RoutingDecision, error) {
+func (r *Router) FallbackRequest(_ context.Context, excludeBackends []string, annotations *backends.Annotations) (*RoutingDecision, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -360,7 +355,7 @@ func (r *Router) FallbackRequest(ctx context.Context, excludeBackends []string, 
 }
 
 // HealthCheckAll performs health checks on all backends
-func (r *Router) HealthCheckAll(ctx context.Context) map[string]bool {
+func (r *Router) HealthCheckAll(_ context.Context) map[string]bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

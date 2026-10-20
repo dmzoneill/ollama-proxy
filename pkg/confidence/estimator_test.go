@@ -14,58 +14,164 @@ type mockBackend struct {
 	hardware string
 }
 
-func (m *mockBackend) ID() string                                                                { return m.id }
-func (m *mockBackend) Type() string                                                              { return "mock" }
-func (m *mockBackend) Name() string                                                              { return m.id }
-func (m *mockBackend) Hardware() string                                                          { return m.hardware }
-func (m *mockBackend) Endpoint() string                                                          { return "http://mock" }
-func (m *mockBackend) IsHealthy() bool                                                           { return true }
-func (m *mockBackend) PowerWatts() float64                                                       { return 10.0 }
-func (m *mockBackend) AvgLatencyMs() int32                                                       { return 100 }
-func (m *mockBackend) Priority() int                                                             { return 1 }
-func (m *mockBackend) SupportsGenerate() bool                                                    { return true }
-func (m *mockBackend) SupportsEmbed() bool                                                       { return true }
-func (m *mockBackend) SupportsStream() bool                                                      { return true }
-func (m *mockBackend) SupportsModel(model string) bool                                           { return true }
-func (m *mockBackend) Start(ctx context.Context) error                                               { return nil }
-func (m *mockBackend) Stop(ctx context.Context) error                                                               { return nil }
+// ID is part of the public API.
+func (m *mockBackend) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *mockBackend) Type() string { return "mock" }
+
+// Name is part of the public API.
+func (m *mockBackend) Name() string { return m.id }
+
+// Hardware is part of the public API.
+func (m *mockBackend) Hardware() string { return m.hardware }
+
+// Endpoint is part of the public API.
+func (m *mockBackend) Endpoint() string { return "http://mock" }
+
+// IsHealthy reports whether the condition holds.
+func (m *mockBackend) IsHealthy() bool { return true }
+
+// PowerWatts is part of the public API.
+func (m *mockBackend) PowerWatts() float64 { return 10.0 }
+
+// AvgLatencyMs is part of the public API.
+func (m *mockBackend) AvgLatencyMs() int32 { return 100 }
+
+// Priority is part of the public API.
+func (m *mockBackend) Priority() int { return 1 }
+
+// SupportsGenerate is part of the public API.
+func (m *mockBackend) SupportsGenerate() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *mockBackend) SupportsEmbed() bool { return true }
+
+// SupportsStream is part of the public API.
+func (m *mockBackend) SupportsStream() bool { return true }
+
+// SupportsModel is part of the public API.
+func (m *mockBackend) SupportsModel(_ string) bool { return true }
+
+// Start is part of the public API.
+func (m *mockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *mockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *mockBackend) SupportsAudioToText() bool { return false }
-func (m *mockBackend) SupportsTextToAudio() bool { return false }
-func (m *mockBackend) SupportsImageToText() bool { return false }
-func (m *mockBackend) SupportsTextToImage() bool { return false }
-func (m *mockBackend) SupportsVideoToText() bool { return false }
-func (m *mockBackend) SupportsTextToVideo() bool { return false }
-func (m *mockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackend) HealthCheck(ctx context.Context) error                                         { return nil }
-func (m *mockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
-	return nil, nil
-}
-func (m *mockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
-	return nil, nil
-}
-func (m *mockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
-	return nil, nil
-}
-func (m *mockBackend) ListModels(ctx context.Context) ([]string, error) { return nil, nil }
-func (m *mockBackend) GetMetrics() *backends.BackendMetrics         { return nil }
-func (m *mockBackend) GetMaxModelSizeGB() int                       { return 16 }
-func (m *mockBackend) GetSupportedModelPatterns() []string          { return nil }
-func (m *mockBackend) GetPreferredModels() []string                 { return nil }
-func (m *mockBackend) UpdateMetrics(latencyMs int32, success bool)  {}
-func (m *mockBackend) Recv() (*backends.StreamChunk, error)         { return nil, nil }
 
+// SupportsTextToAudio is part of the public API.
+func (m *mockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *mockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *mockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *mockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *mockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *mockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *mockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *mockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *mockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *mockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *mockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *mockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *mockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *mockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *mockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *mockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// HealthCheck is part of the public API.
+func (m *mockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// Generate is part of the public API.
+func (m *mockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+	return nil, nil
+}
+
+// GenerateStream is part of the public API.
+func (m *mockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
+	return nil, nil
+}
+
+// Embed is part of the public API.
+func (m *mockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+	return nil, nil
+}
+
+// ListModels is part of the public API.
+func (m *mockBackend) ListModels(_ context.Context) ([]string, error) { return nil, nil }
+
+// GetMetrics is part of the public API.
+func (m *mockBackend) GetMetrics() *backends.BackendMetrics { return nil }
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *mockBackend) GetMaxModelSizeGB() int { return 16 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *mockBackend) GetSupportedModelPatterns() []string { return nil }
+
+// GetPreferredModels is part of the public API.
+func (m *mockBackend) GetPreferredModels() []string { return nil }
+
+// UpdateMetrics is part of the public API.
+func (m *mockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// Recv is part of the public API.
+func (m *mockBackend) Recv() (*backends.StreamChunk, error) { return nil, nil }
+
+// TestConfidenceEstimator_LengthScoring is part of the public API.
 func TestConfidenceEstimator_LengthScoring(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -76,28 +182,28 @@ func TestConfidenceEstimator_LengthScoring(t *testing.T) {
 	}
 
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test-backend", hardware: "igpu"}
+	backend := &mockBackend{id: strTestBackend, hardware: strIgpu}
 
 	tests := []struct {
-		name           string
-		response       string
-		expectedMin    float64
-		expectedMax    float64
-		description    string
+		name        string
+		response    string
+		description string
+		expectedMin float64
+		expectedMax float64
 	}{
 		{
-			name:           "Very short response",
-			response:       "No.",
-			expectedMin:    0.0,
-			expectedMax:    0.3,
-			description:    "Should score low due to length < MinLengthChars",
+			name:        "Very short response",
+			response:    "No.",
+			expectedMin: 0.0,
+			expectedMax: 0.3,
+			description: "Should score low due to length < MinLengthChars",
 		},
 		{
-			name:           "Minimal acceptable response",
-			response:       "This is a reasonable response with enough content to be useful.",
-			expectedMin:    0.95,
-			expectedMax:    1.0,
-			description:    "Should score high as length is within optimal range",
+			name:        "Minimal acceptable response",
+			response:    "This is a reasonable response with enough content to be useful.",
+			expectedMin: 0.95,
+			expectedMax: 1.0,
+			description: "Should score high as length is within optimal range",
 		},
 		{
 			name: "Ideal length response",
@@ -110,8 +216,8 @@ func TestConfidenceEstimator_LengthScoring(t *testing.T) {
 			description: "Should score high as length is optimal",
 		},
 		{
-			name: "Very long response",
-			response: string(make([]byte, 2000)),
+			name:        "Very long response",
+			response:    string(make([]byte, 2000)),
 			expectedMin: 0.85,
 			expectedMax: 0.95,
 			description: "Should get minor penalty as length exceeds MaxLengthChars",
@@ -134,6 +240,7 @@ func TestConfidenceEstimator_LengthScoring(t *testing.T) {
 	}
 }
 
+// TestConfidenceEstimator_UncertaintyPatterns is part of the public API.
 func TestConfidenceEstimator_UncertaintyPatterns(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -144,61 +251,61 @@ func TestConfidenceEstimator_UncertaintyPatterns(t *testing.T) {
 	}
 
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test-backend", hardware: "igpu"}
+	backend := &mockBackend{id: strTestBackend, hardware: strIgpu}
 
 	tests := []struct {
-		name             string
-		response         string
+		name              string
+		response          string
+		expectedPattern   string
+		description       string
 		expectUncertainty bool
-		expectedPattern  string
-		description      string
 	}{
 		{
-			name:             "Confident response",
-			response:         "The answer is 42. This is the correct solution because of mathematical proofs.",
+			name:              "Confident response",
+			response:          "The answer is 42. This is the correct solution because of mathematical proofs.",
 			expectUncertainty: false,
-			description:      "Should have high confidence with no uncertainty patterns",
+			description:       "Should have high confidence with no uncertainty patterns",
 		},
 		{
-			name:             "Explicit uncertainty - don't know",
-			response:         "I don't know the answer to this question.",
+			name:              "Explicit uncertainty - don't know",
+			response:          "I don't know the answer to this question.",
 			expectUncertainty: true,
-			expectedPattern:  "I don't know",
-			description:      "Should detect 'I don't know' pattern",
+			expectedPattern:   "I don't know",
+			description:       "Should detect 'I don't know' pattern",
 		},
 		{
-			name:             "Explicit uncertainty - not sure",
-			response:         "I'm not sure about this, but it might be related to quantum mechanics.",
+			name:              "Explicit uncertainty - not sure",
+			response:          "I'm not sure about this, but it might be related to quantum mechanics.",
 			expectUncertainty: true,
-			expectedPattern:  "i'm not sure",
-			description:      "Should detect 'I'm not sure' pattern",
+			expectedPattern:   "i'm not sure",
+			description:       "Should detect 'I'm not sure' pattern",
 		},
 		{
-			name:             "Hedging language - perhaps",
-			response:         "Perhaps the solution involves considering the edge cases more carefully.",
+			name:              "Hedging language - perhaps",
+			response:          "Perhaps the solution involves considering the edge cases more carefully.",
 			expectUncertainty: true,
-			expectedPattern:  "perhaps",
-			description:      "Should detect hedging language",
+			expectedPattern:   "perhaps",
+			description:       "Should detect hedging language",
 		},
 		{
-			name:             "Hedging language - maybe",
-			response:         "Maybe we should try a different approach to this problem.",
+			name:              "Hedging language - maybe",
+			response:          "Maybe we should try a different approach to this problem.",
 			expectUncertainty: true,
-			expectedPattern:  "maybe",
-			description:      "Should detect hedging language",
+			expectedPattern:   "maybe",
+			description:       "Should detect hedging language",
 		},
 		{
-			name:             "Multiple uncertainty patterns",
-			response:         "I'm not sure, but maybe it's possible that the answer could be 42.",
+			name:              "Multiple uncertainty patterns",
+			response:          "I'm not sure, but maybe it's possible that the answer could be 42.",
 			expectUncertainty: true,
-			description:      "Should detect multiple uncertainty patterns",
+			description:       "Should detect multiple uncertainty patterns",
 		},
 		{
-			name:             "Refusal to answer",
-			response:         "I cannot provide that information as it may be harmful.",
+			name:              "Refusal to answer",
+			response:          "I cannot provide that information as it may be harmful.",
 			expectUncertainty: true,
-			expectedPattern:  "i cannot",
-			description:      "Should detect refusal patterns",
+			expectedPattern:   "i cannot",
+			description:       "Should detect refusal patterns",
 		},
 	}
 
@@ -217,9 +324,9 @@ func TestConfidenceEstimator_UncertaintyPatterns(t *testing.T) {
 				found := false
 				for _, uncertainty := range score.Uncertainties {
 					if uncertainty == tt.expectedPattern ||
-					   uncertainty == "Explicit uncertainty: '"+tt.expectedPattern+"'" ||
-					   uncertainty == "Hedging language" ||
-					   uncertainty == "Inability statement" {
+						uncertainty == "Explicit uncertainty: '"+tt.expectedPattern+"'" ||
+						uncertainty == strHedgingLanguage ||
+						uncertainty == strInabilityStatement {
 						found = true
 						break
 					}
@@ -245,6 +352,7 @@ func TestConfidenceEstimator_UncertaintyPatterns(t *testing.T) {
 	}
 }
 
+// TestConfidenceEstimator_ModelScoring is part of the public API.
 func TestConfidenceEstimator_ModelScoring(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -260,38 +368,38 @@ func TestConfidenceEstimator_ModelScoring(t *testing.T) {
 		name        string
 		model       string
 		hardware    string
+		description string
 		expectedMin float64
 		expectedMax float64
-		description string
 	}{
 		{
 			name:        "Large model on GPU",
-			model:       "llama3:70b",
-			hardware:    "nvidia",
+			model:       strLlama370b,
+			hardware:    strNvidia,
 			expectedMin: 0.8,
 			expectedMax: 1.0,
 			description: "Large model on powerful hardware should score high",
 		},
 		{
 			name:        "Medium model on GPU",
-			model:       "llama3:7b",
-			hardware:    "nvidia",
+			model:       strLlama37b,
+			hardware:    strNvidia,
 			expectedMin: 0.7,
 			expectedMax: 0.9,
 			description: "Medium model on GPU should score well",
 		},
 		{
 			name:        "Small model on NPU",
-			model:       "qwen2.5:0.5b",
-			hardware:    "npu",
+			model:       strQwen2505b,
+			hardware:    strNpu,
 			expectedMin: 0.75,
 			expectedMax: 0.85,
 			description: "Small model gets default score (hardware not considered in model scoring)",
 		},
 		{
 			name:        "Large model on NPU (mismatch)",
-			model:       "llama3:70b",
-			hardware:    "npu",
+			model:       strLlama370b,
+			hardware:    strNpu,
 			expectedMin: 0.95,
 			expectedMax: 1.0,
 			description: "Large model scores high regardless of hardware (hardware mismatch not detected)",
@@ -304,7 +412,7 @@ func TestConfidenceEstimator_ModelScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend := &mockBackend{id: "test-backend", hardware: tt.hardware}
+			backend := &mockBackend{id: strTestBackend, hardware: tt.hardware}
 			score := estimator.Estimate("test prompt", goodResponse, tt.model, backend)
 
 			if score.ModelScore < tt.expectedMin || score.ModelScore > tt.expectedMax {
@@ -315,6 +423,7 @@ func TestConfidenceEstimator_ModelScoring(t *testing.T) {
 	}
 }
 
+// TestConfidenceEstimator_OverallScore is part of the public API.
 func TestConfidenceEstimator_OverallScore(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -325,59 +434,59 @@ func TestConfidenceEstimator_OverallScore(t *testing.T) {
 	}
 
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test-backend", hardware: "nvidia"}
+	backend := &mockBackend{id: strTestBackend, hardware: strNvidia}
 
 	tests := []struct {
-		name           string
-		prompt         string
-		response       string
-		model          string
-		expectedMin    float64
-		expectedMax    float64
-		shouldForward  bool
-		description    string
+		name          string
+		prompt        string
+		response      string
+		model         string
+		description   string
+		expectedMin   float64
+		expectedMax   float64
+		shouldForward bool
 	}{
 		{
 			name:   "High confidence response",
-			prompt: "What is 2+2?",
+			prompt: strWhatIs22,
 			response: "The answer is 4. This is a fundamental arithmetic operation where we add two " +
 				"units to two units, resulting in four units total.",
-			model:          "llama3:70b",
-			expectedMin:    0.75,
-			expectedMax:    1.0,
-			shouldForward:  false,
-			description:    "Good response should not need forwarding",
+			model:         strLlama370b,
+			expectedMin:   0.75,
+			expectedMax:   1.0,
+			shouldForward: false,
+			description:   "Good response should not need forwarding",
 		},
 		{
-			name:   "Low confidence response",
-			prompt: "Explain quantum entanglement",
-			response: "I'm not sure, but I think it might have something to do with particles.",
-			model:          "qwen2.5:0.5b",
-			expectedMin:    0.78,
-			expectedMax:    0.85,
-			shouldForward:  false,
-			description:    "Weak response but still above forwarding threshold",
+			name:          "Low confidence response",
+			prompt:        "Explain quantum entanglement",
+			response:      "I'm not sure, but I think it might have something to do with particles.",
+			model:         strQwen2505b,
+			expectedMin:   0.78,
+			expectedMax:   0.85,
+			shouldForward: false,
+			description:   "Weak response but still above forwarding threshold",
 		},
 		{
 			name:   "Medium confidence response",
 			prompt: "What is machine learning?",
 			response: "Machine learning is a field of AI where systems learn from data. Perhaps the most " +
 				"important aspect is the ability to improve performance over time.",
-			model:          "llama3:7b",
-			expectedMin:    0.90,
-			expectedMax:    0.96,
-			shouldForward:  false,
-			description:    "Borderline response",
+			model:         strLlama37b,
+			expectedMin:   0.90,
+			expectedMax:   0.96,
+			shouldForward: false,
+			description:   "Borderline response",
 		},
 		{
-			name:   "Refusal response",
-			prompt: "How do I hack into a system?",
-			response: "I cannot provide information on illegal activities.",
-			model:          "llama3:70b",
-			expectedMin:    0.82,
-			expectedMax:    0.90,
-			shouldForward:  false,
-			description:    "Refusal should trigger forwarding to potentially provide helpful alternative",
+			name:          "Refusal response",
+			prompt:        "How do I hack into a system?",
+			response:      "I cannot provide information on illegal activities.",
+			model:         strLlama370b,
+			expectedMin:   0.82,
+			expectedMax:   0.90,
+			shouldForward: false,
+			description:   "Refusal should trigger forwarding to potentially provide helpful alternative",
 		},
 	}
 
@@ -415,6 +524,7 @@ func TestConfidenceEstimator_OverallScore(t *testing.T) {
 	}
 }
 
+// TestConfidenceEstimator_Reasoning is part of the public API.
 func TestConfidenceEstimator_Reasoning(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -425,10 +535,10 @@ func TestConfidenceEstimator_Reasoning(t *testing.T) {
 	}
 
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test-backend", hardware: "igpu"}
+	backend := &mockBackend{id: strTestBackend, hardware: strIgpu}
 
 	response := "I'm not sure about this question."
-	score := estimator.Estimate("test", response, "llama3:7b", backend)
+	score := estimator.Estimate(strTest, response, strLlama37b, backend)
 
 	if score.Reasoning == "" {
 		t.Error("Reasoning should not be empty")
@@ -442,6 +552,7 @@ func TestConfidenceEstimator_Reasoning(t *testing.T) {
 	t.Logf("Uncertainties: %v", score.Uncertainties)
 }
 
+// TestDefaultConfig is part of the public API.
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
@@ -466,36 +577,37 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
+// TestShouldEscalate is part of the public API.
 func TestShouldEscalate(t *testing.T) {
 	estimator := NewConfidenceEstimator(nil)
 
 	tests := []struct {
+		score     *Score
 		name      string
-		score     *ConfidenceScore
 		threshold float64
 		expected  bool
 	}{
 		{
 			name:      "High confidence should not escalate",
-			score:     &ConfidenceScore{Overall: 0.9},
+			score:     &Score{Overall: 0.9},
 			threshold: 0.7,
 			expected:  false,
 		},
 		{
 			name:      "Low confidence should escalate",
-			score:     &ConfidenceScore{Overall: 0.5},
+			score:     &Score{Overall: 0.5},
 			threshold: 0.7,
 			expected:  true,
 		},
 		{
 			name:      "Exactly at threshold should not escalate",
-			score:     &ConfidenceScore{Overall: 0.7},
+			score:     &Score{Overall: 0.7},
 			threshold: 0.7,
 			expected:  false,
 		},
 		{
 			name:      "Just below threshold should escalate",
-			score:     &ConfidenceScore{Overall: 0.69},
+			score:     &Score{Overall: 0.69},
 			threshold: 0.7,
 			expected:  true,
 		},
@@ -512,41 +624,42 @@ func TestShouldEscalate(t *testing.T) {
 	}
 }
 
+// TestEstimateForPrompt is part of the public API.
 func TestEstimateForPrompt(t *testing.T) {
 	estimator := NewConfidenceEstimator(nil)
 
 	tests := []struct {
-		name           string
-		prompt         string
-		model          string
-		expectLow      bool
-		description    string
+		name        string
+		prompt      string
+		model       string
+		description string
+		expectLow   bool
 	}{
 		{
 			name:        "Simple prompt with small model",
-			prompt:      "What is 2+2?",
-			model:       "qwen2.5:0.5b",
+			prompt:      strWhatIs22,
+			model:       strQwen2505b,
 			expectLow:   false,
 			description: "Simple question should have reasonable confidence",
 		},
 		{
 			name:        "Complex prompt with small model",
 			prompt:      "Explain in detail the comprehensive analysis of quantum computing",
-			model:       "qwen2.5:0.5b",
+			model:       strQwen2505b,
 			expectLow:   true,
 			description: "Complex prompt on small model should have low confidence",
 		},
 		{
 			name:        "Complex prompt with large model",
 			prompt:      "Explain in detail the comprehensive analysis of quantum computing",
-			model:       "llama3:70b",
+			model:       strLlama370b,
 			expectLow:   false,
 			description: "Complex prompt on large model should have higher confidence",
 		},
 		{
 			name:        "Medium complexity medium model",
 			prompt:      "Analyze the benefits of exercise",
-			model:       "llama3:7b",
+			model:       strLlama37b,
 			expectLow:   false,
 			description: "Medium complexity should work on medium model",
 		},
@@ -569,6 +682,7 @@ func TestEstimateForPrompt(t *testing.T) {
 	}
 }
 
+// TestEstimate_EdgeCases is part of the public API.
 func TestEstimate_EdgeCases(t *testing.T) {
 	config := &Config{
 		MinLengthChars: 50,
@@ -578,7 +692,7 @@ func TestEstimate_EdgeCases(t *testing.T) {
 		ModelWeight:    0.2,
 	}
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test", hardware: "igpu"}
+	backend := &mockBackend{id: strTest, hardware: strIgpu}
 
 	tests := []struct {
 		name     string
@@ -590,7 +704,7 @@ func TestEstimate_EdgeCases(t *testing.T) {
 			name:     "Very long response",
 			prompt:   "Tell me a story",
 			response: "Once upon a time " + string(make([]byte, 3000)),
-			model:    "llama3:7b",
+			model:    strLlama37b,
 		},
 		{
 			name:     "Response with code blocks",
@@ -602,13 +716,13 @@ func TestEstimate_EdgeCases(t *testing.T) {
 			name:     "Response with numbered lists",
 			response: "1. First\n2. Second\n3. Third",
 			prompt:   "Make a list",
-			model:    "llama3:7b",
+			model:    strLlama37b,
 		},
 		{
 			name:     "Response with technical terms",
 			response: "The algorithm complexity is O(n log n) with spatial locality optimizations",
 			prompt:   "Explain algorithm",
-			model:    "llama3:7b",
+			model:    strLlama37b,
 		},
 	}
 
@@ -624,55 +738,56 @@ func TestEstimate_EdgeCases(t *testing.T) {
 	}
 }
 
+// TestEstimate_PatternDetection is part of the public API.
 func TestEstimate_PatternDetection(t *testing.T) {
 	estimator := NewConfidenceEstimator(nil)
-	backend := &mockBackend{id: "test", hardware: "igpu"}
+	backend := &mockBackend{id: strTest, hardware: strIgpu}
 
 	// Test detection of various patterns
 	tests := []struct {
-		name         string
-		response     string
-		expectHigh   bool
-		description  string
+		name        string
+		response    string
+		description string
+		expectHigh  bool
 	}{
 		{
-			name:         "Bullet points",
-			response:     "Here are the points:\n• First point\n• Second point\n• Third point",
-			expectHigh:   true,
-			description:  "Should detect bullet points as structured",
+			name:        "Bullet points",
+			response:    "Here are the points:\n• First point\n• Second point\n• Third point",
+			expectHigh:  true,
+			description: "Should detect bullet points as structured",
 		},
 		{
-			name:         "Headers and sections",
-			response:     "# Main Header\n## Subsection\nContent here",
-			expectHigh:   true,
-			description:  "Should detect headers as structured",
+			name:        "Headers and sections",
+			response:    "# Main Header\n## Subsection\nContent here",
+			expectHigh:  true,
+			description: "Should detect headers as structured",
 		},
 		{
-			name:         "JSON output",
-			response:     `{"key": "value", "array": [1, 2, 3]}`,
-			expectHigh:   true,
-			description:  "Should detect JSON as structured",
+			name:        "JSON output",
+			response:    `{"key": "value", "array": [1, 2, 3]}`,
+			expectHigh:  true,
+			description: "Should detect JSON as structured",
 		},
 		{
-			name:         "Table format",
-			response:     "| Col1 | Col2 |\n|------|------|\n| A    | B    |",
-			expectHigh:   true,
-			description:  "Should detect tables as structured",
+			name:        "Table format",
+			response:    "| Col1 | Col2 |\n|------|------|\n| A    | B    |",
+			expectHigh:  true,
+			description: "Should detect tables as structured",
 		},
 		{
-			name:         "Plain rambling text",
-			response:     "Well, um, I think maybe possibly it could be that perhaps...",
-			expectHigh:   false,
-			description:  "Should detect uncertainty",
+			name:        "Plain rambling text",
+			response:    "Well, um, I think maybe possibly it could be that perhaps...",
+			expectHigh:  false,
+			description: "Should detect uncertainty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := estimator.Estimate("test", tt.response, "llama3:7b", backend)
+			score := estimator.Estimate(strTest, tt.response, strLlama37b, backend)
 
 			if tt.expectHigh && score.PatternScore < 0.5 {
-				t.Errorf("%s: expected high pattern score (>0.5), got %.2f", 
+				t.Errorf("%s: expected high pattern score (>0.5), got %.2f",
 					tt.description, score.PatternScore)
 			}
 
@@ -681,6 +796,7 @@ func TestEstimate_PatternDetection(t *testing.T) {
 	}
 }
 
+// TestEstimate_ModelScoreScoring is part of the public API.
 func TestEstimate_ModelScoreScoring(t *testing.T) {
 	estimator := NewConfidenceEstimator(nil)
 
@@ -692,28 +808,28 @@ func TestEstimate_ModelScoreScoring(t *testing.T) {
 	}{
 		{
 			name:     "Small model simple task",
-			model:    "qwen2.5:0.5b",
-			hardware: "npu",
+			model:    strQwen2505b,
+			hardware: strNpu,
 			response: "The answer is 42.",
 		},
 		{
 			name:     "Large model complex task",
-			model:    "llama3:70b",
-			hardware: "nvidia",
+			model:    strLlama370b,
+			hardware: strNvidia,
 			response: "After careful analysis of the multifaceted problem...",
 		},
 		{
 			name:     "Code model with code",
 			model:    "codellama:13b",
-			hardware: "igpu",
+			hardware: strIgpu,
 			response: "```python\ndef solve(n):\n    return n * 2\n```",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend := &mockBackend{id: "test", hardware: tt.hardware}
-			score := estimator.Estimate("test", tt.response, tt.model, backend)
+			backend := &mockBackend{id: strTest, hardware: tt.hardware}
+			score := estimator.Estimate(strTest, tt.response, tt.model, backend)
 
 			if score.ModelScore < 0 || score.ModelScore > 1 {
 				t.Errorf("ModelScore score out of range: %f", score.ModelScore)
@@ -725,9 +841,10 @@ func TestEstimate_ModelScoreScoring(t *testing.T) {
 	}
 }
 
+// TestEstimate_ModelSizeVariants is part of the public API.
 func TestEstimate_ModelSizeVariants(t *testing.T) {
 	estimator := NewConfidenceEstimator(nil)
-	backend := &mockBackend{id: "test", hardware: "nvidia"}
+	backend := &mockBackend{id: strTest, hardware: strNvidia}
 
 	// Generate a long response (>200 words) for small model testing
 	longResponse := "This is a comprehensive and detailed response. "
@@ -739,13 +856,13 @@ func TestEstimate_ModelSizeVariants(t *testing.T) {
 		name             string
 		model            string
 		response         string
+		description      string
 		expectedMinScore float64
 		expectedMaxScore float64
-		description      string
 	}{
 		{
 			name:             "Small 0.5b model with long response",
-			model:            "qwen2.5:0.5b",
+			model:            strQwen2505b,
 			response:         longResponse,
 			expectedMinScore: 0.65,
 			expectedMaxScore: 0.75,
@@ -819,13 +936,13 @@ func TestEstimateForPrompt_ComplexityExceedsCapability(t *testing.T) {
 		name          string
 		prompt        string
 		model         string
-		expectedScore float64
 		description   string
+		expectedScore float64
 	}{
 		{
 			name:          "High complexity exceeds 0.5b capability",
 			prompt:        complexPrompt,
-			model:         "qwen2.5:0.5b",
+			model:         strQwen2505b,
 			expectedScore: 0.5,
 			description:   "0.8 complexity > 0.4 capability should return 0.5",
 		},
@@ -839,14 +956,14 @@ func TestEstimateForPrompt_ComplexityExceedsCapability(t *testing.T) {
 		{
 			name:          "High complexity within 7b capability",
 			prompt:        complexPrompt,
-			model:         "llama3:7b",
+			model:         strLlama37b,
 			expectedScore: 0.8,
 			description:   "0.8 complexity <= 0.8 capability should return 0.8",
 		},
 		{
 			name:          "High complexity within 70b capability",
 			prompt:        complexPrompt,
-			model:         "llama3:70b",
+			model:         strLlama370b,
 			expectedScore: 1.0,
 			description:   "0.8 complexity < 1.0 capability should return 1.0",
 		},
@@ -875,13 +992,13 @@ func TestEstimate_ErrorPatterns(t *testing.T) {
 		ModelWeight:    0.2,
 	}
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test", hardware: "igpu"}
+	backend := &mockBackend{id: strTest, hardware: strIgpu}
 
 	tests := []struct {
 		name                string
 		response            string
-		expectErrorDetected bool
 		description         string
+		expectErrorDetected bool
 	}{
 		{
 			name:                "Error prefix",
@@ -917,7 +1034,7 @@ func TestEstimate_ErrorPatterns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := estimator.Estimate("test prompt", tt.response, "llama3:7b", backend)
+			score := estimator.Estimate("test prompt", tt.response, strLlama37b, backend)
 
 			hasError := false
 			for _, uncertainty := range score.Uncertainties {
@@ -950,13 +1067,13 @@ func TestEstimate_ExtremePatternPenalties(t *testing.T) {
 		ModelWeight:    0.2,
 	}
 	estimator := NewConfidenceEstimator(config)
-	backend := &mockBackend{id: "test", hardware: "igpu"}
+	backend := &mockBackend{id: strTest, hardware: strIgpu}
 
 	// Response with multiple high-penalty patterns to exceed 1.0 total penalty
 	extremeResponse := "I don't know. I'm not sure. I cannot help. Perhaps maybe possibly " +
 		"it might be unclear. I think it seems uncertain. Error: failed to process."
 
-	score := estimator.Estimate("test prompt", extremeResponse, "llama3:7b", backend)
+	score := estimator.Estimate("test prompt", extremeResponse, strLlama37b, backend)
 
 	// PatternScore should be clamped to 0-1 range even with extreme penalties
 	if score.PatternScore < 0 || score.PatternScore > 1 {
@@ -979,8 +1096,8 @@ func TestEstimateForPrompt_ComplexityScoring(t *testing.T) {
 		name        string
 		prompt      string
 		model       string
-		expectLow   bool
 		description string
+		expectLow   bool
 	}{
 		{
 			name:        "Complex prompt with 1.5b model",
@@ -1005,8 +1122,8 @@ func TestEstimateForPrompt_ComplexityScoring(t *testing.T) {
 		},
 		{
 			name:        "Simple prompt with 7b model",
-			model:       "llama3:7b",
-			prompt:      "What is 2+2?",
+			model:       strLlama37b,
+			prompt:      strWhatIs22,
 			expectLow:   false,
 			description: "Simple prompt well within 7b model capability",
 		},
@@ -1020,7 +1137,7 @@ func TestEstimateForPrompt_ComplexityScoring(t *testing.T) {
 		{
 			name:        "Any prompt with 70b model",
 			prompt:      "Explain comprehensive detailed thorough intricate complex sophisticated advanced analysis",
-			model:       "llama3:70b",
+			model:       strLlama370b,
 			expectLow:   false,
 			description: "Even very complex prompts within 70b model capability",
 		},

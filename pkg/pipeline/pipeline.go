@@ -6,33 +6,36 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"go.uber.org/zap"
 )
 
 // StageType defines the type of processing stage
 type StageType string
 
+// StageTypeTextGen is an exported const.
 const (
 	// Text stages
 	StageTypeTextGen StageType = "text_generation" // LLM inference
 	StageTypeEmbed   StageType = "embedding"       // Generate embeddings
 
 	// Audio stages
-	StageTypeAudioToText    StageType = "audio_to_text"    // Speech recognition (Whisper)
-	StageTypeTextToAudio    StageType = "text_to_audio"    // Text-to-speech (Piper, Bark)
-	StageTypeAudioEnhance   StageType = "audio_enhance"    // Noise reduction, enhancement
-	StageTypeAudioTranslate StageType = "audio_translate"  // Speech translation
+	StageTypeAudioToText    StageType = "audio_to_text"   // Speech recognition (Whisper)
+	StageTypeTextToAudio    StageType = "text_to_audio"   // Text-to-speech (Piper, Bark)
+	StageTypeAudioEnhance   StageType = "audio_enhance"   // Noise reduction, enhancement
+	StageTypeAudioTranslate StageType = "audio_translate" // Speech translation
 
 	// Image stages
-	StageTypeImageToText StageType = "image_to_text" // OCR, image captioning (LLaVA, BLIP)
-	StageTypeTextToImage StageType = "text_to_image" // Image generation (Stable Diffusion, DALL-E)
-	StageTypeImageEdit   StageType = "image_edit"    // Image editing, inpainting
+	StageTypeImageToText  StageType = "image_to_text" // OCR, image captioning (LLaVA, BLIP)
+	StageTypeTextToImage  StageType = "text_to_image" // Image generation (Stable Diffusion, DALL-E)
+	StageTypeImageEdit    StageType = "image_edit"    // Image editing, inpainting
 	StageTypeImageEnhance StageType = "image_enhance" // Upscaling, restoration
 
 	// Video stages
-	StageTypeVideoToText     StageType = "video_to_text"     // Video transcription/captioning
-	StageTypeTextToVideo     StageType = "text_to_video"     // Video generation
-	StageTypeVideoAnalysis   StageType = "video_analysis"    // Object detection, tracking
-	StageTypeVideoSummary    StageType = "video_summary"     // Video summarization
+	StageTypeVideoToText   StageType = "video_to_text"  // Video transcription/captioning
+	StageTypeTextToVideo   StageType = "text_to_video"  // Video generation
+	StageTypeVideoAnalysis StageType = "video_analysis" // Object detection, tracking
+	StageTypeVideoSummary  StageType = "video_summary"  // Video summarization
 
 	// Generic
 	StageTypeCustom StageType = "custom" // Custom processing
@@ -40,137 +43,111 @@ const (
 
 // Stage represents one step in a processing pipeline
 type Stage struct {
-	ID          string
-	Type        StageType
-	Description string
-
-	// Backend selection
-	PreferredBackend string   // Specific backend ID
-	PreferredHardware string  // "npu", "igpu", "nvidia", etc.
-	RequiredCapabilities []string // ["audio", "streaming", etc.]
-
-	// Model selection
-	Model string // Model to use for this stage
-
-	// Forwarding policy
-	ForwardingPolicy *ForwardingPolicy
-
-	// Input/Output transformation
-	InputTransform  func(interface{}) (interface{}, error)
-	OutputTransform func(interface{}) (interface{}, error)
+	ForwardingPolicy     *ForwardingPolicy
+	InputTransform       func(interface{}) (interface{}, error)
+	OutputTransform      func(interface{}) (interface{}, error)
+	ID                   string
+	Type                 StageType
+	Description          string
+	PreferredBackend     string
+	PreferredHardware    string
+	Model                string
+	RequiredCapabilities []string
 }
 
 // ForwardingPolicy defines when and how to forward to next backend
 type ForwardingPolicy struct {
-	// Confidence-based forwarding
-	EnableConfidenceCheck bool
+	EscalationPath        []string
 	MinConfidence         float64
-	MaxRetries           int
-	EscalationPath       []string // Ordered list of backend IDs
-
-	// Thermal-based forwarding
-	EnableThermalCheck bool
-	MaxTemperature     float64
-	MaxFanPercent      int
-
-	// Quality-based forwarding
-	EnableQualityCheck bool
-	QualityThreshold   float64
-
-	// Timeout-based forwarding
-	EnableTimeoutForward bool
-	MaxLatencyMs        int32
+	MaxRetries            int
+	MaxTemperature        float64
+	MaxFanPercent         int
+	QualityThreshold      float64
+	MaxLatencyMs          int32
+	EnableConfidenceCheck bool
+	EnableThermalCheck    bool
+	EnableQualityCheck    bool
+	EnableTimeoutForward  bool
 }
 
 // Pipeline represents a multi-stage processing workflow
 type Pipeline struct {
+	Options     *Options
 	ID          string
 	Name        string
 	Description string
 	Stages      []*Stage
-
-	// Execution options
-	Options *PipelineOptions
 }
 
-// PipelineOptions controls pipeline execution
-type PipelineOptions struct {
-	// Streaming
-	EnableStreaming bool
-
-	// Context preservation
-	PreserveContext bool
-
-	// Error handling
-	ContinueOnError bool
+// Options controls pipeline execution
+type Options struct {
 	FallbackStage   *Stage
-
-	// Performance
-	ParallelStages bool // Execute independent stages in parallel
-
-	// Monitoring
-	CollectMetrics bool
+	EnableStreaming bool
+	PreserveContext bool
+	ContinueOnError bool
+	ParallelStages  bool
+	CollectMetrics  bool
 }
 
 // StageResult represents the output of a stage
 type StageResult struct {
-	StageID   string
-	Backend   string
-	Success   bool
-	Output    interface{}
-	Metadata  *StageMetadata
-	Error     error
+	Output   interface{}
+	Error    error
+	Metadata *StageMetadata
+	StageID  string
+	Backend  string
+	Success  bool
 }
 
 // StageMetadata contains execution metadata
 type StageMetadata struct {
-	StartTime      time.Time
-	EndTime        time.Time
-	DurationMs     int64
-	Backend        string
-	Model          string
-	TokensIn       int32
-	TokensOut      int32
-	Confidence     float64
-	Temperature    float64
-	FanSpeed       int
-	Forwarded      bool
-	ForwardReason  string
-	AttemptCount   int
+	StartTime     time.Time
+	EndTime       time.Time
+	ForwardReason string
+	Backend       string
+	Model         string
+	FanSpeed      int
+	Confidence    float64
+	Temperature   float64
+	DurationMs    int64
+	AttemptCount  int
+	TokensOut     int32
+	TokensIn      int32
+	Forwarded     bool
 }
 
-// PipelineResult represents the complete pipeline execution result
-type PipelineResult struct {
-	PipelineID   string
-	Success      bool
-	StageResults []*StageResult
-	FinalOutput  interface{}
-	TotalTimeMs  int64
+// Result represents the complete pipeline execution result
+type Result struct {
+	FinalOutput   interface{}
+	Error         error
+	PipelineID    string
+	StageResults  []*StageResult
+	TotalTimeMs   int64
 	TotalEnergyWh float64
-	Error        error
+	Success       bool
 }
 
-// PipelineExecutor executes multi-stage pipelines
-type PipelineExecutor struct {
+// Executor executes multi-stage pipelines
+type Executor struct {
 	backendRegistry map[string]backends.Backend
 }
 
 // NewPipelineExecutor creates a new pipeline executor
-func NewPipelineExecutor(backendList []backends.Backend) *PipelineExecutor {
+func NewPipelineExecutor(backendList []backends.Backend) *Executor {
 	registry := make(map[string]backends.Backend)
 	for _, backend := range backendList {
 		registry[backend.ID()] = backend
 	}
 
-	return &PipelineExecutor{
+	return &Executor{
 		backendRegistry: registry,
 	}
 }
 
 // Execute runs a pipeline
-func (pe *PipelineExecutor) Execute(ctx context.Context, pipeline *Pipeline, input interface{}) (*PipelineResult, error) {
+func (pe *Executor) Execute(ctx context.Context, pipeline *Pipeline, input interface{}) (*Result, error) {
 	startTime := time.Now()
-	result := &PipelineResult{
+	result := &Result{
 		PipelineID:   pipeline.ID,
 		StageResults: make([]*StageResult, 0),
 	}
@@ -206,109 +183,134 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, pipeline *Pipeline, inp
 	return result, nil
 }
 
+type stageTask struct {
+	stage  *Stage
+	input  interface{}
+	result *StageResult
+	err    error
+}
+
 // executeParallel runs independent pipeline stages in parallel
-func (pe *PipelineExecutor) executeParallel(ctx context.Context, pipeline *Pipeline, input interface{}, startTime time.Time) (*PipelineResult, error) {
-	result := &PipelineResult{
+func (pe *Executor) executeParallel(ctx context.Context, pipeline *Pipeline, input interface{}, startTime time.Time) (*Result, error) {
+	result := &Result{
 		PipelineID:   pipeline.ID,
 		StageResults: make([]*StageResult, 0),
 	}
 
-	// Group stages by dependency level
-	// For now, we assume all stages at the same level can run in parallel
-	// More sophisticated dependency analysis can be added later
-
-	type stageTask struct {
-		stage  *Stage
-		input  interface{}
-		result *StageResult
-		err    error
-	}
-
-	// Determine which stages can run in parallel
-	// Simple approach: stages that don't depend on previous stage output can run in parallel
-	parallelGroups := make([][]*Stage, 0)
-	currentGroup := make([]*Stage, 0)
-
-	for _, stage := range pipeline.Stages {
-		// If stage requires input from previous stage, start new group
-		if stage.InputTransform != nil && len(currentGroup) > 0 {
-			parallelGroups = append(parallelGroups, currentGroup)
-			currentGroup = []*Stage{stage}
-		} else {
-			currentGroup = append(currentGroup, stage)
-		}
-	}
-	if len(currentGroup) > 0 {
-		parallelGroups = append(parallelGroups, currentGroup)
-	}
-
-	// Execute groups sequentially, but stages within group in parallel
 	currentInput := input
-
-	for groupIdx, group := range parallelGroups {
-		if len(group) == 1 {
-			// Single stage, execute normally
-			stageResult, err := pe.executeStage(ctx, group[0], currentInput)
-			result.StageResults = append(result.StageResults, stageResult)
-
-			if err != nil && !pipeline.Options.ContinueOnError {
-				result.Success = false
-				result.Error = fmt.Errorf("stage group %d failed: %w", groupIdx, err)
-				return result, result.Error
-			}
-
-			if stageResult.Success {
-				currentInput = stageResult.Output
-			}
-		} else {
-			// Multiple stages in parallel
-			tasks := make([]*stageTask, len(group))
-			resultChan := make(chan *stageTask, len(group))
-
-			// Launch parallel tasks
-			for i, stage := range group {
-				tasks[i] = &stageTask{
-					stage: stage,
-					input: currentInput,
-				}
-
-				go func(task *stageTask) {
-					task.result, task.err = pe.executeStage(ctx, task.stage, task.input)
-					resultChan <- task
-				}(tasks[i])
-			}
-
-			// Collect results
-			for i := 0; i < len(group); i++ {
-				task := <-resultChan
-				result.StageResults = append(result.StageResults, task.result)
-
-				if task.err != nil && !pipeline.Options.ContinueOnError {
-					result.Success = false
-					result.Error = fmt.Errorf("parallel stage %s failed: %w", task.stage.ID, task.err)
-					return result, result.Error
-				}
-			}
-
-			// For parallel stages, use the output of the last successful stage
-			for _, task := range tasks {
-				if task.result != nil && task.result.Success {
-					currentInput = task.result.Output
-					break
-				}
-			}
+	for groupIdx, group := range groupParallelStages(pipeline.Stages) {
+		nextInput, err := pe.executeStageGroup(ctx, pipeline, result, group, groupIdx, currentInput)
+		if err != nil {
+			return result, err
 		}
+		currentInput = nextInput
 	}
 
 	result.FinalOutput = currentInput
 	result.Success = true
 	result.TotalTimeMs = time.Since(startTime).Milliseconds()
-
 	return result, nil
 }
 
+func groupParallelStages(stages []*Stage) [][]*Stage {
+	parallelGroups := make([][]*Stage, 0)
+	currentGroup := make([]*Stage, 0)
+	for _, stage := range stages {
+		if stage.InputTransform != nil && len(currentGroup) > 0 {
+			parallelGroups = append(parallelGroups, currentGroup)
+			currentGroup = []*Stage{stage}
+			continue
+		}
+		currentGroup = append(currentGroup, stage)
+	}
+	if len(currentGroup) > 0 {
+		parallelGroups = append(parallelGroups, currentGroup)
+	}
+	return parallelGroups
+}
+
+func (pe *Executor) executeStageGroup(
+	ctx context.Context,
+	pipeline *Pipeline,
+	result *Result,
+	group []*Stage,
+	groupIdx int,
+	currentInput interface{},
+) (interface{}, error) {
+	if len(group) == 1 {
+		return pe.executeSingleParallelStage(ctx, pipeline, result, group[0], groupIdx, currentInput)
+	}
+	return pe.executeParallelGroup(ctx, pipeline, result, group, currentInput)
+}
+
+func (pe *Executor) executeSingleParallelStage(
+	ctx context.Context,
+	pipeline *Pipeline,
+	result *Result,
+	stage *Stage,
+	groupIdx int,
+	currentInput interface{},
+) (interface{}, error) {
+	stageResult, err := pe.executeStage(ctx, stage, currentInput)
+	result.StageResults = append(result.StageResults, stageResult)
+	if err != nil && !pipeline.Options.ContinueOnError {
+		result.Success = false
+		result.Error = fmt.Errorf("stage group %d failed: %w", groupIdx, err)
+		return currentInput, result.Error
+	}
+	if stageResult.Success {
+		return stageResult.Output, nil
+	}
+	return currentInput, nil
+}
+
+func (pe *Executor) executeParallelGroup(
+	ctx context.Context,
+	pipeline *Pipeline,
+	result *Result,
+	group []*Stage,
+	currentInput interface{},
+) (interface{}, error) {
+	tasks := make([]*stageTask, len(group))
+	resultChan := make(chan *stageTask, len(group))
+	for i, stage := range group {
+		tasks[i] = &stageTask{stage: stage, input: currentInput}
+		go func(task *stageTask) {
+			task.result, task.err = pe.executeStage(ctx, task.stage, task.input)
+			resultChan <- task
+		}(tasks[i])
+	}
+
+	for i := 0; i < len(group); i++ {
+		task := <-resultChan
+		result.StageResults = append(result.StageResults, task.result)
+		if task.err != nil && !pipeline.Options.ContinueOnError {
+			result.Success = false
+			result.Error = fmt.Errorf("parallel stage %s failed: %w", task.stage.ID, task.err)
+			return currentInput, result.Error
+		}
+	}
+
+	for _, task := range tasks {
+		if task.result != nil && task.result.Success {
+			return task.result.Output, nil
+		}
+	}
+	return currentInput, nil
+}
+
+func closeStream(c interface{ Close() error }) {
+	if err := c.Close(); err != nil {
+		logging.Warn("failed to close stream", zap.Error(err))
+	}
+}
+
+func errUnsupportedStage(stageType StageType) error {
+	return fmt.Errorf("unsupported stage type: %s", stageType)
+}
+
 // executeStage executes a single stage with forwarding support
-func (pe *PipelineExecutor) executeStage(ctx context.Context, stage *Stage, input interface{}) (*StageResult, error) {
+func (pe *Executor) executeStage(ctx context.Context, stage *Stage, input interface{}) (*StageResult, error) {
 	metadata := &StageMetadata{
 		StartTime: time.Now(),
 	}
@@ -388,7 +390,7 @@ func (pe *PipelineExecutor) executeStage(ctx context.Context, stage *Stage, inpu
 }
 
 // executeWithForwarding executes with confidence-based forwarding
-func (pe *PipelineExecutor) executeWithForwarding(
+func (pe *Executor) executeWithForwarding(
 	ctx context.Context,
 	stage *Stage,
 	initialBackend backends.Backend,
@@ -408,8 +410,10 @@ func (pe *PipelineExecutor) executeWithForwarding(
 		if err != nil {
 			// Try next backend in escalation path
 			if attemptCount < len(policy.EscalationPath) {
-				nextBackendID := policy.EscalationPath[attemptCount]
-				nextBackend, _ := pe.getBackendByID(nextBackendID)
+				nextBackend, lookupErr := pe.getBackendByID(policy.EscalationPath[attemptCount])
+				if lookupErr != nil {
+					return nil, metadata, fmt.Errorf("escalation backend %s: %w", policy.EscalationPath[attemptCount], lookupErr)
+				}
 				currentBackend = nextBackend
 				metadata.Forwarded = true
 				metadata.ForwardReason = fmt.Sprintf("Error: %v", err)
@@ -430,7 +434,10 @@ func (pe *PipelineExecutor) executeWithForwarding(
 		// Confidence too low, try next backend
 		if attemptCount < len(policy.EscalationPath) {
 			nextBackendID := policy.EscalationPath[attemptCount]
-			nextBackend, _ := pe.getBackendByID(nextBackendID)
+			nextBackend, lookupErr := pe.getBackendByID(nextBackendID)
+			if lookupErr != nil {
+				return nil, metadata, fmt.Errorf("escalation backend %s: %w", nextBackendID, lookupErr)
+			}
 			currentBackend = nextBackend
 			metadata.Forwarded = true
 			metadata.ForwardReason = fmt.Sprintf("Low confidence: %.2f < %.2f", confidence, policy.MinConfidence)
@@ -446,65 +453,81 @@ func (pe *PipelineExecutor) executeWithForwarding(
 }
 
 // executeOnBackend executes stage on specific backend
-func (pe *PipelineExecutor) executeOnBackend(
+func (pe *Executor) executeOnBackend(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
 	input interface{},
 ) (interface{}, error) {
 	switch stage.Type {
-	// ===== TEXT STAGES =====
-	case StageTypeTextGen:
-		return pe.executeTextGeneration(ctx, backend, stage, input)
-
-	case StageTypeEmbed:
-		return pe.executeEmbedding(ctx, backend, stage, input)
-
-	// ===== AUDIO STAGES =====
-	case StageTypeAudioToText:
-		return pe.executeAudioToText(ctx, backend, stage, input)
-
-	case StageTypeTextToAudio:
-		return pe.executeTextToAudio(ctx, backend, stage, input)
-
-	case StageTypeAudioEnhance:
-		return pe.executeAudioEnhance(ctx, backend, stage, input)
-
-	case StageTypeAudioTranslate:
-		return pe.executeAudioTranslate(ctx, backend, stage, input)
-
-	// ===== IMAGE STAGES =====
-	case StageTypeImageToText:
-		return pe.executeImageToText(ctx, backend, stage, input)
-
-	case StageTypeTextToImage:
-		return pe.executeTextToImage(ctx, backend, stage, input)
-
-	case StageTypeImageEdit:
-		return pe.executeImageEdit(ctx, backend, stage, input)
-
-	case StageTypeImageEnhance:
-		return pe.executeImageEnhance(ctx, backend, stage, input)
-
-	// ===== VIDEO STAGES =====
-	case StageTypeVideoToText:
-		return pe.executeVideoToText(ctx, backend, stage, input)
-
-	case StageTypeTextToVideo:
-		return pe.executeTextToVideo(ctx, backend, stage, input)
-
-	case StageTypeVideoAnalysis:
-		return pe.executeVideoAnalysis(ctx, backend, stage, input)
-
-	case StageTypeVideoSummary:
-		return pe.executeVideoSummary(ctx, backend, stage, input)
-
-	// ===== CUSTOM =====
+	case StageTypeTextGen, StageTypeEmbed:
+		return pe.executeTextStage(ctx, backend, stage, input)
+	case StageTypeAudioToText, StageTypeTextToAudio, StageTypeAudioEnhance, StageTypeAudioTranslate:
+		return pe.executeAudioStage(ctx, backend, stage, input)
+	case StageTypeImageToText, StageTypeTextToImage, StageTypeImageEdit, StageTypeImageEnhance:
+		return pe.executeImageStage(ctx, backend, stage, input)
+	case StageTypeVideoToText, StageTypeTextToVideo, StageTypeVideoAnalysis, StageTypeVideoSummary:
+		return pe.executeVideoStage(ctx, backend, stage, input)
 	case StageTypeCustom:
 		return nil, fmt.Errorf("custom stages must provide InputTransform function")
-
 	default:
-		return nil, fmt.Errorf("unsupported stage type: %s", stage.Type)
+		return nil, errUnsupportedStage(stage.Type)
+	}
+}
+
+func (pe *Executor) executeTextStage(ctx context.Context, backend backends.Backend, stage *Stage, input interface{}) (interface{}, error) {
+	switch stage.Type {
+	case StageTypeTextGen:
+		return pe.executeTextGeneration(ctx, backend, stage, input)
+	case StageTypeEmbed:
+		return pe.executeEmbedding(ctx, backend, stage, input)
+	default:
+		return nil, errUnsupportedStage(stage.Type)
+	}
+}
+
+func (pe *Executor) executeAudioStage(ctx context.Context, backend backends.Backend, stage *Stage, input interface{}) (interface{}, error) {
+	switch stage.Type {
+	case StageTypeAudioToText:
+		return pe.executeAudioToText(ctx, backend, stage, input)
+	case StageTypeTextToAudio:
+		return pe.executeTextToAudio(ctx, backend, stage, input)
+	case StageTypeAudioEnhance:
+		return pe.executeAudioEnhance(ctx, backend, stage, input)
+	case StageTypeAudioTranslate:
+		return pe.executeAudioTranslate(ctx, backend, stage, input)
+	default:
+		return nil, errUnsupportedStage(stage.Type)
+	}
+}
+
+func (pe *Executor) executeImageStage(ctx context.Context, backend backends.Backend, stage *Stage, input interface{}) (interface{}, error) {
+	switch stage.Type {
+	case StageTypeImageToText:
+		return pe.executeImageToText(ctx, backend, stage, input)
+	case StageTypeTextToImage:
+		return pe.executeTextToImage(ctx, backend, stage, input)
+	case StageTypeImageEdit:
+		return pe.executeImageEdit(ctx, backend, stage, input)
+	case StageTypeImageEnhance:
+		return pe.executeImageEnhance(ctx, backend, stage, input)
+	default:
+		return nil, errUnsupportedStage(stage.Type)
+	}
+}
+
+func (pe *Executor) executeVideoStage(ctx context.Context, backend backends.Backend, stage *Stage, input interface{}) (interface{}, error) {
+	switch stage.Type {
+	case StageTypeVideoToText:
+		return pe.executeVideoToText(ctx, backend, stage, input)
+	case StageTypeTextToVideo:
+		return pe.executeTextToVideo(ctx, backend, stage, input)
+	case StageTypeVideoAnalysis:
+		return pe.executeVideoAnalysis(ctx, backend, stage, input)
+	case StageTypeVideoSummary:
+		return pe.executeVideoSummary(ctx, backend, stage, input)
+	default:
+		return nil, errUnsupportedStage(stage.Type)
 	}
 }
 
@@ -512,7 +535,7 @@ func (pe *PipelineExecutor) executeOnBackend(
 // Text Stage Implementations
 // ============================================================
 
-func (pe *PipelineExecutor) executeTextGeneration(
+func (pe *Executor) executeTextGeneration(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -534,7 +557,7 @@ func (pe *PipelineExecutor) executeTextGeneration(
 	return resp.Response, nil
 }
 
-func (pe *PipelineExecutor) executeEmbedding(
+func (pe *Executor) executeEmbedding(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -560,7 +583,7 @@ func (pe *PipelineExecutor) executeEmbedding(
 // Audio Stage Implementations - Optimized for Low Latency
 // ============================================================
 
-func (pe *PipelineExecutor) executeAudioToText(
+func (pe *Executor) executeAudioToText(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -609,7 +632,7 @@ func (pe *PipelineExecutor) executeAudioToText(
 	return resp.Text, nil
 }
 
-func (pe *PipelineExecutor) executeAudioToTextStreaming(
+func (pe *Executor) executeAudioToTextStreaming(
 	ctx context.Context,
 	backend backends.Backend,
 	req *backends.TranscribeRequest,
@@ -618,7 +641,7 @@ func (pe *PipelineExecutor) executeAudioToTextStreaming(
 	if err != nil {
 		return nil, fmt.Errorf("failed to start streaming transcription: %w", err)
 	}
-	defer stream.Close()
+	defer closeStream(stream)
 
 	// Accumulate streaming results
 	var fullText string
@@ -640,7 +663,7 @@ func (pe *PipelineExecutor) executeAudioToTextStreaming(
 	return fullText, nil
 }
 
-func (pe *PipelineExecutor) executeTextToAudio(
+func (pe *Executor) executeTextToAudio(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -678,7 +701,7 @@ func (pe *PipelineExecutor) executeTextToAudio(
 	return pe.executeTextToAudioStreaming(ctx, backend, req)
 }
 
-func (pe *PipelineExecutor) executeTextToAudioStreaming(
+func (pe *Executor) executeTextToAudioStreaming(
 	ctx context.Context,
 	backend backends.Backend,
 	req *backends.SynthesizeRequest,
@@ -692,7 +715,7 @@ func (pe *PipelineExecutor) executeTextToAudioStreaming(
 		}
 		return resp.AudioData, nil
 	}
-	defer stream.Close()
+	defer closeStream(stream)
 
 	// Accumulate audio chunks with pre-allocated buffer to reduce allocations
 	var audioData []byte
@@ -716,22 +739,22 @@ func (pe *PipelineExecutor) executeTextToAudioStreaming(
 	return audioData, nil
 }
 
-func (pe *PipelineExecutor) executeAudioEnhance(
-	ctx context.Context,
-	backend backends.Backend,
-	stage *Stage,
-	input interface{},
+func (pe *Executor) executeAudioEnhance(
+	_ context.Context,
+	_ backends.Backend,
+	_ *Stage,
+	_ interface{},
 ) (interface{}, error) {
 	// Audio enhancement (noise reduction, etc.)
 	// This would call a specialized model for audio processing
 	return nil, fmt.Errorf("audio enhancement not yet implemented - requires specialized model")
 }
 
-func (pe *PipelineExecutor) executeAudioTranslate(
-	ctx context.Context,
-	backend backends.Backend,
-	stage *Stage,
-	input interface{},
+func (pe *Executor) executeAudioTranslate(
+	_ context.Context,
+	_ backends.Backend,
+	_ *Stage,
+	_ interface{},
 ) (interface{}, error) {
 	// Speech translation (e.g., Whisper with translation)
 	// Similar to transcription but with target language
@@ -742,7 +765,7 @@ func (pe *PipelineExecutor) executeAudioTranslate(
 // Image Stage Implementations
 // ============================================================
 
-func (pe *PipelineExecutor) executeImageToText(
+func (pe *Executor) executeImageToText(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -780,7 +803,7 @@ func (pe *PipelineExecutor) executeImageToText(
 	return resp.Text, nil
 }
 
-func (pe *PipelineExecutor) executeTextToImage(
+func (pe *Executor) executeTextToImage(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -798,10 +821,10 @@ func (pe *PipelineExecutor) executeTextToImage(
 		req = &backends.ImageGenRequest{
 			Prompt:        v,
 			Model:         stage.Model,
-			Width:         512,  // Default dimensions
+			Width:         512, // Default dimensions
 			Height:        512,
 			Format:        backends.ImageFormatPNG,
-			Steps:         20,   // Balanced quality/speed
+			Steps:         20, // Balanced quality/speed
 			GuidanceScale: 7.5,
 			BatchSize:     1,
 		}
@@ -827,7 +850,7 @@ func (pe *PipelineExecutor) executeTextToImage(
 		}
 		return resp.Images[0].ImageData, nil
 	}
-	defer stream.Close()
+	defer closeStream(stream)
 
 	// Get final image from stream
 	var finalImage []byte
@@ -847,21 +870,21 @@ func (pe *PipelineExecutor) executeTextToImage(
 	return finalImage, nil
 }
 
-func (pe *PipelineExecutor) executeImageEdit(
-	ctx context.Context,
-	backend backends.Backend,
-	stage *Stage,
-	input interface{},
+func (pe *Executor) executeImageEdit(
+	_ context.Context,
+	_ backends.Backend,
+	_ *Stage,
+	_ interface{},
 ) (interface{}, error) {
 	// Image editing/inpainting
 	return nil, fmt.Errorf("image editing not yet implemented - requires inpainting model")
 }
 
-func (pe *PipelineExecutor) executeImageEnhance(
-	ctx context.Context,
-	backend backends.Backend,
-	stage *Stage,
-	input interface{},
+func (pe *Executor) executeImageEnhance(
+	_ context.Context,
+	_ backends.Backend,
+	_ *Stage,
+	_ interface{},
 ) (interface{}, error) {
 	// Image enhancement/upscaling
 	return nil, fmt.Errorf("image enhancement not yet implemented - requires upscaling model")
@@ -871,7 +894,7 @@ func (pe *PipelineExecutor) executeImageEnhance(
 // Video Stage Implementations
 // ============================================================
 
-func (pe *PipelineExecutor) executeVideoToText(
+func (pe *Executor) executeVideoToText(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -914,7 +937,7 @@ func (pe *PipelineExecutor) executeVideoToText(
 	return resp.Text, nil
 }
 
-func (pe *PipelineExecutor) executeVideoToTextStreaming(
+func (pe *Executor) executeVideoToTextStreaming(
 	ctx context.Context,
 	backend backends.Backend,
 	req *backends.VideoAnalysisRequest,
@@ -923,7 +946,7 @@ func (pe *PipelineExecutor) executeVideoToTextStreaming(
 	if err != nil {
 		return nil, fmt.Errorf("failed to start streaming analysis: %w", err)
 	}
-	defer stream.Close()
+	defer closeStream(stream)
 
 	var fullText string
 	for {
@@ -942,7 +965,7 @@ func (pe *PipelineExecutor) executeVideoToTextStreaming(
 	return fullText, nil
 }
 
-func (pe *PipelineExecutor) executeTextToVideo(
+func (pe *Executor) executeTextToVideo(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -985,7 +1008,7 @@ func (pe *PipelineExecutor) executeTextToVideo(
 		}
 		return resp.VideoData, nil
 	}
-	defer stream.Close()
+	defer closeStream(stream)
 
 	// Accumulate video data
 	var videoData []byte
@@ -1005,7 +1028,7 @@ func (pe *PipelineExecutor) executeTextToVideo(
 	return videoData, nil
 }
 
-func (pe *PipelineExecutor) executeVideoAnalysis(
+func (pe *Executor) executeVideoAnalysis(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -1016,7 +1039,7 @@ func (pe *PipelineExecutor) executeVideoAnalysis(
 	return pe.executeVideoToText(ctx, backend, stage, input)
 }
 
-func (pe *PipelineExecutor) executeVideoSummary(
+func (pe *Executor) executeVideoSummary(
 	ctx context.Context,
 	backend backends.Backend,
 	stage *Stage,
@@ -1027,7 +1050,7 @@ func (pe *PipelineExecutor) executeVideoSummary(
 }
 
 // selectBackend selects the best backend for a stage
-func (pe *PipelineExecutor) selectBackend(stage *Stage) (backends.Backend, error) {
+func (pe *Executor) selectBackend(stage *Stage) (backends.Backend, error) {
 	// If specific backend requested, use it
 	if stage.PreferredBackend != "" {
 		backend, ok := pe.backendRegistry[stage.PreferredBackend]
@@ -1056,7 +1079,7 @@ func (pe *PipelineExecutor) selectBackend(stage *Stage) (backends.Backend, error
 }
 
 // getBackendByID gets backend by ID
-func (pe *PipelineExecutor) getBackendByID(id string) (backends.Backend, error) {
+func (pe *Executor) getBackendByID(id string) (backends.Backend, error) {
 	backend, ok := pe.backendRegistry[id]
 	if !ok {
 		return nil, fmt.Errorf("backend not found: %s", id)
@@ -1065,7 +1088,7 @@ func (pe *PipelineExecutor) getBackendByID(id string) (backends.Backend, error) 
 }
 
 // estimateConfidence estimates output confidence
-func (pe *PipelineExecutor) estimateConfidence(output interface{}) float64 {
+func (pe *Executor) estimateConfidence(_ interface{}) float64 {
 	// TODO: Implement confidence estimation
 	// Could use:
 	// - Response length

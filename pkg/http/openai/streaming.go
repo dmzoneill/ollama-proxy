@@ -7,16 +7,18 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"go.uber.org/zap"
 )
 
 // StreamChatCompletion streams a chat completion response in OpenAI SSE format
 func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, model string, completionID string) error {
-	defer reader.Close()
+	defer closeStream(reader)
 
 	// Set SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Content-Type", strTextEventStream)
+	w.Header().Set("Cache-Control", strNoCache)
+	w.Header().Set("Connection", strKeepAlive)
 	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
 	// Flush headers immediately
@@ -32,30 +34,7 @@ func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, m
 	errChan := make(chan error, 1)
 	done := make(chan struct{})
 
-	// Writer goroutine with timeout protection
-	go func() {
-		defer close(done)
-		for data := range writeChan {
-			// Write with timeout protection (detect slow clients)
-			written := make(chan bool, 1)
-			go func() {
-				fmt.Fprintf(w, "data: %s\n\n", string(data))
-				if flusher, ok := w.(http.Flusher); ok {
-					flusher.Flush()
-				}
-				written <- true
-			}()
-
-			select {
-			case <-written:
-				// Write successful
-			case <-time.After(10 * time.Second):
-				// Client too slow
-				errChan <- fmt.Errorf("client write timeout - slow consumer")
-				return
-			}
-		}
-	}()
+	go pumpSSE(w, writeChan, errChan, done)
 
 	// Reader loop
 	for {
@@ -66,18 +45,8 @@ func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, m
 
 			// Check if it's a normal EOF or an error
 			if err.Error() != "EOF" {
-				// Send error event to client
-				errorEvent := map[string]interface{}{
-					"error": map[string]interface{}{
-						"message": err.Error(),
-						"type":    "stream_error",
-						"code":    "backend_error",
-					},
-				}
-				errorJSON, _ := json.Marshal(errorEvent)
-				fmt.Fprintf(w, "event: error\ndata: %s\n\n", string(errorJSON))
-				if flusher, ok := w.(http.Flusher); ok {
-					flusher.Flush()
+				if writeErr := writeStreamError(w, err); writeErr != nil {
+					return writeErr
 				}
 				return err
 			}
@@ -89,13 +58,13 @@ func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, m
 
 		// Populate chunk fields
 		openaiChunk.ID = completionID
-		openaiChunk.Object = "chat.completion.chunk"
+		openaiChunk.Object = strChatCompletionChunk
 		openaiChunk.Created = timestamp
 		openaiChunk.Model = model
 
 		if chunk.Done {
 			// Final chunk with finish_reason
-			finishReason := "stop"
+			finishReason := strStop
 			openaiChunk.Choices[0].Index = 0
 			openaiChunk.Choices[0].Delta.Content = chunk.Token
 			openaiChunk.Choices[0].FinishReason = &finishReason
@@ -154,25 +123,17 @@ func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, m
 		// No error
 	}
 
-	// Send [DONE] message
-	fmt.Fprintf(w, "data: [DONE]\n\n")
-
-	// Final flush
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
-	}
-
-	return nil
+	return writeSSE(w, "data: [DONE]\n\n")
 }
 
 // StreamCompletion streams a completion response in OpenAI SSE format
 func StreamCompletion(w http.ResponseWriter, reader backends.StreamReader, model string, completionID string) error {
-	defer reader.Close()
+	defer closeStream(reader)
 
 	// Set SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Content-Type", strTextEventStream)
+	w.Header().Set("Cache-Control", strNoCache)
+	w.Header().Set("Connection", strKeepAlive)
 
 	// Flush headers immediately
 	if flusher, ok := w.(http.Flusher); ok {
@@ -194,13 +155,13 @@ func StreamCompletion(w http.ResponseWriter, reader backends.StreamReader, model
 
 		// Populate chunk fields
 		openaiChunk.ID = completionID
-		openaiChunk.Object = "text_completion.chunk"
+		openaiChunk.Object = strTextCompletionChunk
 		openaiChunk.Created = timestamp
 		openaiChunk.Model = model
 
 		if chunk.Done {
 			// Final chunk with finish_reason
-			finishReason := "stop"
+			finishReason := strStop
 			openaiChunk.Choices[0].Text = chunk.Token
 			openaiChunk.Choices[0].Index = 0
 			openaiChunk.Choices[0].FinishReason = &finishReason
@@ -218,12 +179,9 @@ func StreamCompletion(w http.ResponseWriter, reader backends.StreamReader, model
 			return fmt.Errorf("failed to marshal chunk: %w", err)
 		}
 
-		// Write SSE formatted data
-		fmt.Fprintf(w, "data: %s\n\n", string(data))
-
-		// Flush the data immediately
-		if flusher, ok := w.(http.Flusher); ok {
-			flusher.Flush()
+		if err := writeSSE(w, "data: %s\n\n", string(data)); err != nil {
+			putCompletionChunk(openaiChunk)
+			return err
 		}
 
 		// Return chunk to pool
@@ -237,13 +195,59 @@ func StreamCompletion(w http.ResponseWriter, reader backends.StreamReader, model
 		}
 	}
 
-	// Send [DONE] message
-	fmt.Fprintf(w, "data: [DONE]\n\n")
+	return writeSSE(w, "data: [DONE]\n\n")
+}
 
-	// Final flush
+func pumpSSE(w http.ResponseWriter, writeChan <-chan []byte, errChan chan<- error, done chan struct{}) {
+	defer close(done)
+	for data := range writeChan {
+		written := make(chan bool, 1)
+		go func(payload []byte) {
+			if err := writeSSE(w, "data: %s\n\n", string(payload)); err != nil {
+				errChan <- err
+				return
+			}
+			written <- true
+		}(data)
+		select {
+		case <-written:
+		case <-time.After(10 * time.Second):
+			errChan <- fmt.Errorf("client write timeout - slow consumer")
+			return
+		}
+	}
+}
+
+func writeStreamError(w http.ResponseWriter, streamErr error) error {
+	errorEvent := map[string]interface{}{
+		"error": map[string]interface{}{
+			"message": streamErr.Error(),
+			"type":    "stream_error",
+			strCode:   "backend_error",
+		},
+	}
+	errorJSON, err := json.Marshal(errorEvent)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stream error: %w", err)
+	}
+	return writeSSE(w, "event: error\ndata: %s\n\n", string(errorJSON))
+}
+
+func closeStream(reader backends.StreamReader) {
+	if reader == nil {
+		return
+	}
+	if err := reader.Close(); err != nil {
+		logging.Warn("close stream reader", zap.Error(err))
+	}
+}
+
+func writeSSE(w http.ResponseWriter, format string, args ...any) error {
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		return err
+	}
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	}
-
 	return nil
 }

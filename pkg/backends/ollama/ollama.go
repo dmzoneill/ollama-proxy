@@ -1,3 +1,4 @@
+// Package ollama implements an Ollama backend.
 package ollama
 
 import (
@@ -12,60 +13,49 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"go.uber.org/zap"
 )
 
-// OllamaBackend implements Backend interface for Ollama instances
-type OllamaBackend struct {
-	mu sync.RWMutex
-
-	// Config
-	id       string
-	name     string
-	hardware string
-	endpoint string
-
-	// Characteristics
-	powerWatts   float64
-	avgLatencyMs int32
-	priority     int
-
-	// Model capabilities
+// Backend implements Backend interface for Ollama instances
+type Backend struct {
+	lastCheck       time.Time
+	metrics         *backends.BackendMetrics
 	modelCapability *backends.ModelCapability
-
-	// Health
-	healthy      atomic.Bool
-	lastCheck    time.Time
-	checkTimeout time.Duration
-
-	// Metrics
-	metrics *backends.BackendMetrics
-
-	// HTTP client
-	client *http.Client
+	client          *http.Client
+	id              string
+	name            string
+	hardware        string
+	endpoint        string
+	powerWatts      float64
+	priority        int
+	checkTimeout    time.Duration
+	mu              sync.RWMutex
+	avgLatencyMs    int32
+	healthy         atomic.Bool
 }
 
 // Config for Ollama backend
 type Config struct {
-	backends.BackendConfig
 	Endpoint string
+	backends.BackendConfig
 }
 
 // NewOllamaBackend creates a new Ollama backend instance
-func NewOllamaBackend(cfg Config) (*OllamaBackend, error) {
+func NewOllamaBackend(cfg Config) (*Backend, error) {
 	if cfg.Endpoint == "" {
 		return nil, fmt.Errorf("endpoint is required")
 	}
 
-	backend := &OllamaBackend{
+	backend := &Backend{
 		id:              cfg.ID,
 		name:            cfg.Name,
 		hardware:        cfg.Hardware,
@@ -110,32 +100,32 @@ func NewOllamaBackend(cfg Config) (*OllamaBackend, error) {
 }
 
 // ID returns backend identifier
-func (b *OllamaBackend) ID() string {
+func (b *Backend) ID() string {
 	return b.id
 }
 
 // Type returns backend type
-func (b *OllamaBackend) Type() string {
-	return "ollama"
+func (b *Backend) Type() string {
+	return strOllama
 }
 
 // Name returns human-readable name
-func (b *OllamaBackend) Name() string {
+func (b *Backend) Name() string {
 	return b.name
 }
 
 // Hardware returns hardware type
-func (b *OllamaBackend) Hardware() string {
+func (b *Backend) Hardware() string {
 	return b.hardware
 }
 
 // IsHealthy returns current health status
-func (b *OllamaBackend) IsHealthy() bool {
+func (b *Backend) IsHealthy() bool {
 	return b.healthy.Load()
 }
 
 // HealthCheck performs health check against Ollama instance
-func (b *OllamaBackend) HealthCheck(ctx context.Context) error {
+func (b *Backend) HealthCheck(ctx context.Context) error {
 	checkCtx, cancel := context.WithTimeout(ctx, b.checkTimeout)
 	defer cancel()
 
@@ -151,7 +141,11 @@ func (b *OllamaBackend) HealthCheck(ctx context.Context) error {
 		b.healthy.Store(false)
 		return fmt.Errorf("health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		b.healthy.Store(false)
@@ -167,12 +161,12 @@ func (b *OllamaBackend) HealthCheck(ctx context.Context) error {
 }
 
 // PowerWatts returns estimated power consumption
-func (b *OllamaBackend) PowerWatts() float64 {
+func (b *Backend) PowerWatts() float64 {
 	return b.powerWatts
 }
 
 // AvgLatencyMs returns average latency
-func (b *OllamaBackend) AvgLatencyMs() int32 {
+func (b *Backend) AvgLatencyMs() int32 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -183,27 +177,27 @@ func (b *OllamaBackend) AvgLatencyMs() int32 {
 }
 
 // Priority returns backend priority
-func (b *OllamaBackend) Priority() int {
+func (b *Backend) Priority() int {
 	return b.priority
 }
 
 // SupportsGenerate returns true (Ollama supports generation)
-func (b *OllamaBackend) SupportsGenerate() bool {
+func (b *Backend) SupportsGenerate() bool {
 	return true
 }
 
 // SupportsStream returns true (Ollama supports streaming)
-func (b *OllamaBackend) SupportsStream() bool {
+func (b *Backend) SupportsStream() bool {
 	return true
 }
 
 // SupportsEmbed returns true (Ollama supports embeddings)
-func (b *OllamaBackend) SupportsEmbed() bool {
+func (b *Backend) SupportsEmbed() bool {
 	return true
 }
 
 // ListModels fetches available models from Ollama
-func (b *OllamaBackend) ListModels(ctx context.Context) ([]string, error) {
+func (b *Backend) ListModels(ctx context.Context) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", b.endpoint+"/api/tags", nil)
 	if err != nil {
 		return nil, err
@@ -213,7 +207,11 @@ func (b *OllamaBackend) ListModels(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	var result struct {
 		Models []struct {
@@ -234,23 +232,23 @@ func (b *OllamaBackend) ListModels(ctx context.Context) ([]string, error) {
 }
 
 // Generate performs text generation
-func (b *OllamaBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+func (b *Backend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	start := time.Now()
 
 	// Build Ollama request
 	ollamaReq := map[string]interface{}{
-		"model":  req.Model,
-		"prompt": req.Prompt,
-		"stream": false,
+		strModel:  req.Model,
+		strPrompt: req.Prompt,
+		strStream: false,
 	}
 
 	// Build options
 	options := make(map[string]interface{})
 
 	// Voice assistant optimizations: small context, limited output
-	options["num_ctx"] = 512        // Small context for voice (vs default 8192)
-	options["num_predict"] = 256    // Limit response length
-	options["temperature"] = 0.7    // Balanced creativity
+	options["num_ctx"] = 512     // Small context for voice (vs default 8192)
+	options["num_predict"] = 256 // Limit response length
+	options["temperature"] = 0.7 // Balanced creativity
 
 	if req.Options != nil {
 		if req.Options.Temperature > 0 {
@@ -279,14 +277,21 @@ func (b *OllamaBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 
 	resp, err := b.client.Do(httpReq)
 	if err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read response body: %w", err)
+		}
 		return nil, fmt.Errorf("ollama error: %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -297,12 +302,12 @@ func (b *OllamaBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 
 	b.UpdateMetrics(latencyMs, true)
 
@@ -313,7 +318,7 @@ func (b *OllamaBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 		Response: ollamaResp.Response,
 		Stats: &backends.GenerationStats{
 			TotalTimeMs:     latencyMs,
-			TokensGenerated: int32(len(ollamaResp.Context)), // Approximation
+			TokensGenerated: safeconv.Int32FromInt(len(ollamaResp.Context)), // Approximation
 			TokensPerSecond: float32(len(ollamaResp.Context)) / float32(elapsed.Seconds()),
 			EnergyWh:        float32(energyWh),
 		},
@@ -322,34 +327,32 @@ func (b *OllamaBackend) Generate(ctx context.Context, req *backends.GenerateRequ
 
 // ollamaStreamReader implements StreamReader for Ollama streaming
 type ollamaStreamReader struct {
-	scanner  *bufio.Scanner
-	resp     *http.Response
-	start    time.Time
-	backend  *OllamaBackend
-
-	// Latency tracking
-	firstToken     bool
-	firstTokenTime *time.Time
+	start          time.Time
 	lastTokenTime  time.Time
+	scanner        *bufio.Scanner
+	resp           *http.Response
+	backend        *Backend
+	firstTokenTime *time.Time
 	tokenCount     int
+	firstToken     bool
 }
 
 // GenerateStream performs streaming text generation
-func (b *OllamaBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+func (b *Backend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
 	// Build Ollama request
 	ollamaReq := map[string]interface{}{
-		"model":  req.Model,
-		"prompt": req.Prompt,
-		"stream": true,
+		strModel:  req.Model,
+		strPrompt: req.Prompt,
+		strStream: true,
 	}
 
 	// Build options
 	options := make(map[string]interface{})
 
 	// Voice assistant optimizations: small context, limited output
-	options["num_ctx"] = 512        // Small context for voice (vs default 8192)
-	options["num_predict"] = 256    // Limit response length
-	options["temperature"] = 0.7    // Balanced creativity
+	options["num_ctx"] = 512     // Small context for voice (vs default 8192)
+	options["num_predict"] = 256 // Limit response length
+	options["temperature"] = 0.7 // Balanced creativity
 
 	if req.Options != nil {
 		if req.Options.Temperature > 0 {
@@ -382,7 +385,9 @@ func (b *OllamaBackend) GenerateStream(ctx context.Context, req *backends.Genera
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
 		return nil, fmt.Errorf("ollama error: status %d", resp.StatusCode)
 	}
 
@@ -457,7 +462,7 @@ func (r *ollamaStreamReader) Recv() (*backends.StreamChunk, error) {
 	var stats *backends.GenerationStats
 	if chunk.Done {
 		elapsed := time.Since(r.start)
-		latencyMs := int32(elapsed.Milliseconds())
+		latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 		r.backend.UpdateMetrics(latencyMs, true)
 
 		energyWh := (r.backend.powerWatts * elapsed.Seconds()) / 3600.0
@@ -503,13 +508,13 @@ func (r *ollamaStreamReader) Close() error {
 }
 
 // Embed generates embeddings (placeholder - Ollama supports this via /api/embeddings)
-func (b *OllamaBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+func (b *Backend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	// TODO: Implement embedding endpoint
 	return nil, fmt.Errorf("embeddings not yet implemented for Ollama backend")
 }
 
 // UpdateMetrics updates backend metrics
-func (b *OllamaBackend) UpdateMetrics(latencyMs int32, success bool) {
+func (b *Backend) UpdateMetrics(latencyMs int32, success bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -521,7 +526,7 @@ func (b *OllamaBackend) UpdateMetrics(latencyMs int32, success bool) {
 
 		// Update rolling average
 		if b.metrics.RequestCount > 0 {
-			b.metrics.AvgLatencyMs = int32(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
+			b.metrics.AvgLatencyMs = safeconv.Int32FromInt64(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
 		}
 	} else {
 		atomic.AddInt64(&b.metrics.ErrorCount, 1)
@@ -534,36 +539,36 @@ func (b *OllamaBackend) UpdateMetrics(latencyMs int32, success bool) {
 }
 
 // GetMetrics returns current metrics
-func (b *OllamaBackend) GetMetrics() *backends.BackendMetrics {
+func (b *Backend) GetMetrics() *backends.BackendMetrics {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	// Return copy
 	return &backends.BackendMetrics{
-		RequestCount:      b.metrics.RequestCount,
-		SuccessCount:      b.metrics.SuccessCount,
-		ErrorCount:        b.metrics.ErrorCount,
-		TotalLatencyMs:    b.metrics.TotalLatencyMs,
-		AvgLatencyMs:      b.metrics.AvgLatencyMs,
-		ErrorRate:         b.metrics.ErrorRate,
-		LoadedModels:      b.metrics.LoadedModels,
+		RequestCount:   b.metrics.RequestCount,
+		SuccessCount:   b.metrics.SuccessCount,
+		ErrorCount:     b.metrics.ErrorCount,
+		TotalLatencyMs: b.metrics.TotalLatencyMs,
+		AvgLatencyMs:   b.metrics.AvgLatencyMs,
+		ErrorRate:      b.metrics.ErrorRate,
+		LoadedModels:   b.metrics.LoadedModels,
 	}
 }
 
 // Start initializes the backend
-func (b *OllamaBackend) Start(ctx context.Context) error {
+func (b *Backend) Start(ctx context.Context) error {
 	// Perform initial health check
 	return b.HealthCheck(ctx)
 }
 
 // Stop shuts down the backend
-func (b *OllamaBackend) Stop(ctx context.Context) error {
+func (b *Backend) Stop(_ context.Context) error {
 	// Nothing to clean up for HTTP client
 	return nil
 }
 
 // SupportsModel checks if this backend can run the specified model
-func (b *OllamaBackend) SupportsModel(modelName string) bool {
+func (b *Backend) SupportsModel(modelName string) bool {
 	if b.modelCapability == nil {
 		return true // No restrictions if not configured
 	}
@@ -598,7 +603,7 @@ func (b *OllamaBackend) SupportsModel(modelName string) bool {
 }
 
 // GetMaxModelSizeGB returns maximum model size this backend can handle
-func (b *OllamaBackend) GetMaxModelSizeGB() int {
+func (b *Backend) GetMaxModelSizeGB() int {
 	if b.modelCapability == nil {
 		return 999 // No limit if not configured
 	}
@@ -606,7 +611,7 @@ func (b *OllamaBackend) GetMaxModelSizeGB() int {
 }
 
 // GetSupportedModelPatterns returns patterns of supported models
-func (b *OllamaBackend) GetSupportedModelPatterns() []string {
+func (b *Backend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
 		return []string{"*"} // Support all if not configured
 	}
@@ -614,7 +619,7 @@ func (b *OllamaBackend) GetSupportedModelPatterns() []string {
 }
 
 // GetPreferredModels returns list of preferred models for this backend
-func (b *OllamaBackend) GetPreferredModels() []string {
+func (b *Backend) GetPreferredModels() []string {
 	if b.modelCapability == nil {
 		return []string{}
 	}
@@ -659,36 +664,36 @@ func matchesPattern(modelName, pattern string) bool {
 // ============================================================
 
 // SupportsAudioToText returns whether backend supports speech-to-text
-func (b *OllamaBackend) SupportsAudioToText() bool {
+func (b *Backend) SupportsAudioToText() bool {
 	// We use whisper.cpp binary directly, so always return true
 	return true
 }
 
 // SupportsTextToAudio returns whether backend supports text-to-speech
-func (b *OllamaBackend) SupportsTextToAudio() bool {
+func (b *Backend) SupportsTextToAudio() bool {
 	// We use piper binary directly, so always return true
 	return true
 }
 
 // SupportsImageToText returns whether backend supports image captioning/OCR
-func (b *OllamaBackend) SupportsImageToText() bool {
+func (b *Backend) SupportsImageToText() bool {
 	// Check if LLaVA or similar vision models are loaded
 	return false
 }
 
 // SupportsTextToImage returns whether backend supports image generation
-func (b *OllamaBackend) SupportsTextToImage() bool {
+func (b *Backend) SupportsTextToImage() bool {
 	// Ollama doesn't natively support Stable Diffusion yet
 	return false
 }
 
 // SupportsVideoToText returns whether backend supports video transcription
-func (b *OllamaBackend) SupportsVideoToText() bool {
+func (b *Backend) SupportsVideoToText() bool {
 	return false
 }
 
 // SupportsTextToVideo returns whether backend supports video generation
-func (b *OllamaBackend) SupportsTextToVideo() bool {
+func (b *Backend) SupportsTextToVideo() bool {
 	return false
 }
 
@@ -698,7 +703,7 @@ func (b *OllamaBackend) SupportsTextToVideo() bool {
 
 // TranscribeAudio performs speech-to-text using whisper.cpp via subprocess
 // This uses the OpenVINO-accelerated whisper.cpp for NPU/GPU/CPU execution
-func (b *OllamaBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+func (b *Backend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 	start := time.Now()
 
 	// Read audio data
@@ -720,7 +725,11 @@ func (b *OllamaBackend) TranscribeAudio(ctx context.Context, req *backends.Trans
 
 	// Write audio to temporary WAV file for whisper.cpp
 	tmpFile := fmt.Sprintf("/tmp/whisper_input_%d.wav", time.Now().UnixNano())
-	defer os.Remove(tmpFile)
+	defer func() {
+		if err := os.Remove(tmpFile); err != nil && !os.IsNotExist(err) {
+			logging.Warn("remove temp file", zap.Error(err))
+		}
+	}()
 
 	// Convert PCM to WAV format
 	if err := writeWAVFile(tmpFile, audioData, int(req.SampleRate), int(req.Channels)); err != nil {
@@ -737,13 +746,17 @@ func (b *OllamaBackend) TranscribeAudio(ctx context.Context, req *backends.Trans
 	}
 
 	// Add OpenVINO device if this is an NPU/CPU backend
-	if b.hardware == "npu" {
+	switch b.hardware {
+	case "npu":
 		args = append(args, "-oved", "NPU") // Intel Neural Processor for 300ms target
-	} else if b.hardware == "cpu" {
+	case strCPU:
 		args = append(args, "-oved", "CPU") // CPU with OpenVINO optimizations
 	}
 
-	cmd := exec.CommandContext(ctx, "whisper-cpp", args...)
+	cmd, err := cmdexec.CommandContext(ctx, "whisper-cpp", args...)
+	if err != nil {
+		return nil, fmt.Errorf("whisper-cpp: %w", err)
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -753,14 +766,14 @@ func (b *OllamaBackend) TranscribeAudio(ctx context.Context, req *backends.Trans
 	transcription := strings.TrimSpace(string(output))
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 	energyWh := (b.powerWatts * elapsed.Seconds()) / 3600.0
 
 	segments := []backends.TranscriptSegment{
 		{
 			Text:       transcription,
 			StartMs:    0,
-			EndMs:      int64(elapsed.Milliseconds()),
+			EndMs:      elapsed.Milliseconds(),
 			Confidence: 0.9,
 		},
 	}
@@ -791,12 +804,12 @@ type ollamaAudioStreamReader struct {
 	scanner *bufio.Scanner
 	resp    *http.Response
 	start   time.Time
-	backend *OllamaBackend
+	backend *Backend
 	done    bool
 }
 
 // TranscribeAudioStream performs streaming speech-to-text
-func (b *OllamaBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+func (b *Backend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
 	// Read audio data
 	var audioData []byte
 	var err error
@@ -817,9 +830,9 @@ func (b *OllamaBackend) TranscribeAudioStream(ctx context.Context, req *backends
 	audioBase64 := base64.StdEncoding.EncodeToString(audioData)
 
 	ollamaReq := map[string]interface{}{
-		"model":  req.Model,
-		"prompt": fmt.Sprintf("Transcribe this audio: %s", audioBase64),
-		"stream": true,
+		strModel:  req.Model,
+		strPrompt: fmt.Sprintf("Transcribe this audio: %s", audioBase64),
+		strStream: true,
 		"options": map[string]interface{}{
 			"temperature": 0.0,
 		},
@@ -842,7 +855,9 @@ func (b *OllamaBackend) TranscribeAudioStream(ctx context.Context, req *backends
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
 		return nil, fmt.Errorf("ollama error: status %d", resp.StatusCode)
 	}
 
@@ -885,7 +900,7 @@ func (r *ollamaAudioStreamReader) Recv() (*backends.TranscriptChunk, error) {
 
 	if chunk.Done {
 		r.done = true
-		latencyMs := int32(elapsed.Milliseconds())
+		latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 		r.backend.UpdateMetrics(latencyMs, true)
 	}
 
@@ -905,7 +920,7 @@ func (r *ollamaAudioStreamReader) Close() error {
 }
 
 // SynthesizeSpeech performs text-to-speech using Piper TTS via subprocess
-func (b *OllamaBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+func (b *Backend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
 	start := time.Now()
 
 	if req.Text == "" {
@@ -914,14 +929,21 @@ func (b *OllamaBackend) SynthesizeSpeech(ctx context.Context, req *backends.Synt
 
 	// Output to temporary WAV file
 	tmpFile := fmt.Sprintf("/tmp/piper_output_%d.wav", time.Now().UnixNano())
-	defer os.Remove(tmpFile)
+	defer func() {
+		if err := os.Remove(tmpFile); err != nil && !os.IsNotExist(err) {
+			logging.Warn("remove temp file", zap.Error(err))
+		}
+	}()
 
 	// Run piper binary (assumes it's installed and in PATH)
 	// Voice model should be downloaded to ~/.cache/piper/
-	cmd := exec.CommandContext(ctx, "piper",
+	cmd, err := cmdexec.CommandContext(ctx, "piper",
 		"--model", "/home/daoneill/.cache/piper/en_US-lessac-medium.onnx",
 		"--output_file", tmpFile,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("piper: %w", err)
+	}
 
 	// Pipe text to stdin
 	cmd.Stdin = strings.NewReader(req.Text)
@@ -938,12 +960,12 @@ func (b *OllamaBackend) SynthesizeSpeech(ctx context.Context, req *backends.Synt
 	}
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 	energyWh := (b.powerWatts * elapsed.Seconds()) / 3600.0
 
 	// Calculate duration based on audio data size
-	bytesPerSample := 2 // 16-bit
-	channels := 1       // Mono
+	bytesPerSample := 2        // 16-bit
+	channels := 1              // Mono
 	sampleRate := int32(22050) // Piper outputs 22050 Hz
 	durationSeconds := float64(len(audioData)) / float64(sampleRate*int32(channels*bytesPerSample))
 	durationMs := int32(durationSeconds * 1000)
@@ -975,14 +997,14 @@ type ollamaAudioStreamWriter struct {
 	scanner *bufio.Scanner
 	resp    *http.Response
 	start   time.Time
-	backend *OllamaBackend
+	backend *Backend
 	format  backends.AudioFormat
 	sample  int32
 	done    bool
 }
 
 // SynthesizeSpeechStream performs streaming text-to-speech
-func (b *OllamaBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+func (b *Backend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
 	if req.Text == "" {
 		return nil, fmt.Errorf("no text provided")
 	}
@@ -990,9 +1012,9 @@ func (b *OllamaBackend) SynthesizeSpeechStream(ctx context.Context, req *backend
 	prompt := fmt.Sprintf("Generate speech audio for: %s", req.Text)
 
 	ollamaReq := map[string]interface{}{
-		"model":  req.Model,
-		"prompt": prompt,
-		"stream": true,
+		strModel:  req.Model,
+		strPrompt: prompt,
+		strStream: true,
 		"options": map[string]interface{}{
 			"temperature": 0.7,
 		},
@@ -1015,7 +1037,9 @@ func (b *OllamaBackend) SynthesizeSpeechStream(ctx context.Context, req *backend
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
 		return nil, fmt.Errorf("ollama error: status %d", resp.StatusCode)
 	}
 
@@ -1072,7 +1096,7 @@ func (w *ollamaAudioStreamWriter) Recv() (*backends.AudioChunk, error) {
 	if chunk.Done {
 		w.done = true
 		elapsed := time.Since(w.start)
-		latencyMs := int32(elapsed.Milliseconds())
+		latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 		w.backend.UpdateMetrics(latencyMs, true)
 	}
 
@@ -1095,17 +1119,17 @@ func (w *ollamaAudioStreamWriter) Close() error {
 // ============================================================
 
 // AnalyzeImage performs image analysis (captioning, OCR, VQA)
-func (b *OllamaBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+func (b *Backend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
 	return nil, fmt.Errorf("image analysis not yet implemented for Ollama backend - requires vision model (LLaVA, BLIP2)")
 }
 
 // GenerateImage performs text-to-image generation
-func (b *OllamaBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+func (b *Backend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
 	return nil, fmt.Errorf("image generation not supported by Ollama - requires Stable Diffusion backend")
 }
 
 // GenerateImageStream performs streaming image generation
-func (b *OllamaBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+func (b *Backend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
 	return nil, fmt.Errorf("streaming image generation not supported by Ollama")
 }
 
@@ -1114,35 +1138,35 @@ func (b *OllamaBackend) GenerateImageStream(ctx context.Context, req *backends.I
 // ============================================================
 
 // AnalyzeVideo performs video analysis (transcription, captioning, tracking)
-func (b *OllamaBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+func (b *Backend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
 	return nil, fmt.Errorf("video analysis not yet implemented for Ollama backend - requires video model")
 }
 
 // AnalyzeVideoStream performs streaming video analysis
-func (b *OllamaBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+func (b *Backend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("streaming video analysis not yet implemented for Ollama backend")
 }
 
 // GenerateVideo performs text-to-video generation
-func (b *OllamaBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+func (b *Backend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
 	return nil, fmt.Errorf("video generation not supported by Ollama")
 }
 
 // GenerateVideoStream performs streaming video generation
-func (b *OllamaBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+func (b *Backend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("streaming video generation not supported by Ollama")
 }
 
 // PullModel downloads a model from Ollama registry
-func (b *OllamaBackend) PullModel(ctx context.Context, modelName string) error {
+func (b *Backend) PullModel(ctx context.Context, modelName string) error {
 	logging.Logger.Info("Pulling model from Ollama",
 		zap.String("backend", b.id),
-		zap.String("model", modelName),
+		zap.String(strModel, modelName),
 	)
 
 	pullReq := map[string]interface{}{
-		"name":   modelName,
-		"stream": true,
+		"name":    modelName,
+		strStream: true,
 	}
 
 	body, err := json.Marshal(pullReq)
@@ -1160,10 +1184,17 @@ func (b *OllamaBackend) PullModel(ctx context.Context, modelName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute pull request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn(strCloseResponseBody, zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response body: %w", err)
+		}
 		return fmt.Errorf("pull request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -1182,7 +1213,7 @@ func (b *OllamaBackend) PullModel(ctx context.Context, modelName string) error {
 			if status != lastProgress {
 				logging.Logger.Info("Model pull progress",
 					zap.String("backend", b.id),
-					zap.String("model", modelName),
+					zap.String(strModel, modelName),
 					zap.String("status", status),
 				)
 				lastProgress = status
@@ -1201,14 +1232,14 @@ func (b *OllamaBackend) PullModel(ctx context.Context, modelName string) error {
 
 	logging.Logger.Info("Model pull completed",
 		zap.String("backend", b.id),
-		zap.String("model", modelName),
+		zap.String(strModel, modelName),
 	)
 
 	return nil
 }
 
 // EnsureModel checks if a model exists and pulls it if not
-func (b *OllamaBackend) EnsureModel(ctx context.Context, modelName string) error {
+func (b *Backend) EnsureModel(ctx context.Context, modelName string) error {
 	// Check if model exists
 	models, err := b.ListModels(ctx)
 	if err != nil {
@@ -1222,7 +1253,7 @@ func (b *OllamaBackend) EnsureModel(ctx context.Context, modelName string) error
 		if mLower == modelLower || strings.HasPrefix(mLower, modelLower+":") {
 			logging.Logger.Debug("Model already available",
 				zap.String("backend", b.id),
-				zap.String("model", modelName),
+				zap.String(strModel, modelName),
 				zap.String("found", m),
 			)
 			return nil
@@ -1232,7 +1263,7 @@ func (b *OllamaBackend) EnsureModel(ctx context.Context, modelName string) error
 	// Model not found, pull it
 	logging.Logger.Info("Model not found, pulling from registry",
 		zap.String("backend", b.id),
-		zap.String("model", modelName),
+		zap.String(strModel, modelName),
 	)
 
 	return b.PullModel(ctx, modelName)
@@ -1244,33 +1275,57 @@ func writeWAVFile(filename string, pcmData []byte, sampleRate, channels int) err
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logging.Warn("close file", zap.Error(err))
+		}
+	}()
 
-	// WAV file header
-	dataSize := uint32(len(pcmData))
-	fileSize := dataSize + 36
-
-	// RIFF chunk
-	f.Write([]byte("RIFF"))
-	binary.Write(f, binary.LittleEndian, fileSize)
-	f.Write([]byte("WAVE"))
-
-	// fmt chunk
-	f.Write([]byte("fmt "))
-	binary.Write(f, binary.LittleEndian, uint32(16)) // Chunk size
-	binary.Write(f, binary.LittleEndian, uint16(1))  // Audio format (PCM)
-	binary.Write(f, binary.LittleEndian, uint16(channels))
-	binary.Write(f, binary.LittleEndian, uint32(sampleRate))
-	binary.Write(f, binary.LittleEndian, uint32(sampleRate*channels*2)) // Byte rate
-	binary.Write(f, binary.LittleEndian, uint16(channels*2))             // Block align
-	binary.Write(f, binary.LittleEndian, uint16(16))                     // Bits per sample
-
-	// data chunk
-	f.Write([]byte("data"))
-	binary.Write(f, binary.LittleEndian, dataSize)
-	f.Write(pcmData)
-
+	if err := writeWAVContents(f, pcmData, sampleRate, channels); err != nil {
+		return fmt.Errorf("write wav file: %w", err)
+	}
 	return nil
+}
+
+// writeWAVContents writes a PCM WAV header and payload.
+func writeWAVContents(w io.Writer, pcmData []byte, sampleRate, channels int) error {
+	dataSize := safeconv.Uint32FromInt(len(pcmData))
+	ww := &wavWriter{w: w}
+	ww.bytes([]byte("RIFF"))
+	ww.le(dataSize + 36)
+	ww.bytes([]byte("WAVE"))
+	ww.bytes([]byte("fmt "))
+	ww.le(uint32(16)) // Chunk size
+	ww.le(uint16(1))  // Audio format (PCM)
+	ww.le(safeconv.Uint16FromInt(channels))
+	ww.le(safeconv.Uint32FromInt(sampleRate))
+	ww.le(safeconv.Uint32FromInt(sampleRate * channels * 2)) // Byte rate
+	ww.le(safeconv.Uint16FromInt(channels * 2))              // Block align
+	ww.le(uint16(16))                                        // Bits per sample
+	ww.bytes([]byte("data"))
+	ww.le(dataSize)
+	ww.bytes(pcmData)
+	return ww.err
+}
+
+// wavWriter records the first write error and skips later writes.
+type wavWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (ww *wavWriter) bytes(p []byte) {
+	if ww.err != nil {
+		return
+	}
+	_, ww.err = ww.w.Write(p)
+}
+
+func (ww *wavWriter) le(v any) {
+	if ww.err != nil {
+		return
+	}
+	ww.err = binary.Write(ww.w, binary.LittleEndian, v)
 }
 
 // readWAVFile reads a WAV file and returns PCM data
@@ -1279,7 +1334,11 @@ func readWAVFile(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logging.Warn("close file", zap.Error(err))
+		}
+	}()
 
 	// Skip WAV header (44 bytes)
 	header := make([]byte, 44)
