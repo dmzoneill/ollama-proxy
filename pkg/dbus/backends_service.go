@@ -1,3 +1,4 @@
+// Package dbus exposes proxy state over D-Bus.
 package dbus
 
 import (
@@ -6,6 +7,7 @@ import (
 
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 	"github.com/daoneill/ollama-proxy/pkg/router"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
@@ -30,9 +32,9 @@ type BackendInfo struct {
 	Name         string
 	Type         string
 	Hardware     string
-	Healthy      bool
 	PowerWatts   float64
 	AvgLatencyMs int32
+	Healthy      bool
 }
 
 // NewBackendsService creates a D-Bus service for backend monitoring
@@ -83,28 +85,28 @@ func (bs *BackendsService) Start() error {
 					{
 						Name: "ListBackends",
 						Args: []introspect.Arg{
-							{Name: "backends", Type: "a(ssssbdi)", Direction: "out"},
+							{Name: "backends", Type: "a(ssssbdi)", Direction: strOut},
 						},
 					},
 					{
 						Name: "GetBackendDetails",
 						Args: []introspect.Arg{
 							{Name: "id", Type: "s", Direction: "in"},
-							{Name: "details", Type: "a{sv}", Direction: "out"},
+							{Name: "details", Type: strASv, Direction: strOut},
 						},
 					},
 					{
 						Name: "GetBackendMetrics",
 						Args: []introspect.Arg{
 							{Name: "id", Type: "s", Direction: "in"},
-							{Name: "metrics", Type: "a{sv}", Direction: "out"},
+							{Name: "metrics", Type: strASv, Direction: strOut},
 						},
 					},
 					{
 						Name: "GetSupportedModels",
 						Args: []introspect.Arg{
 							{Name: "id", Type: "s", Direction: "in"},
-							{Name: "models", Type: "as", Direction: "out"},
+							{Name: "models", Type: "as", Direction: strOut},
 						},
 					},
 					{
@@ -115,12 +117,12 @@ func (bs *BackendsService) Start() error {
 					{
 						Name:   "BackendCount",
 						Type:   "i",
-						Access: "read",
+						Access: strRead,
 					},
 					{
 						Name:   "HealthyCount",
 						Type:   "i",
-						Access: "read",
+						Access: strRead,
 					},
 				},
 				Signals: []introspect.Signal{
@@ -142,7 +144,11 @@ func (bs *BackendsService) Start() error {
 	}
 
 	// Setup properties
-	bs.props, _ = prop.Export(bs.conn, backendsPath, bs.makePropertyMap())
+	props, err := prop.Export(bs.conn, backendsPath, bs.makePropertyMap())
+	if err != nil {
+		return fmt.Errorf("failed to export properties: %w", err)
+	}
+	bs.props = props
 
 	logging.Logger.Info("D-Bus Backends service started",
 		zap.String("interface", backendsInterface),
@@ -177,20 +183,20 @@ func (bs *BackendsService) GetBackendDetails(id string) (map[string]dbus.Variant
 	for _, backend := range backends {
 		if backend.ID() == id {
 			details := map[string]dbus.Variant{
-				"id":                  dbus.MakeVariant(backend.ID()),
-				"name":                dbus.MakeVariant(backend.Name()),
-				"type":                dbus.MakeVariant(backend.Type()),
-				"hardware":            dbus.MakeVariant(backend.Hardware()),
-				"healthy":             dbus.MakeVariant(backend.IsHealthy()),
-				"power_watts":         dbus.MakeVariant(backend.PowerWatts()),
-				"avg_latency_ms":      dbus.MakeVariant(backend.AvgLatencyMs()),
-				"priority":            dbus.MakeVariant(backend.Priority()),
-				"supports_generate":   dbus.MakeVariant(backend.SupportsGenerate()),
-				"supports_stream":     dbus.MakeVariant(backend.SupportsStream()),
-				"supports_embed":      dbus.MakeVariant(backend.SupportsEmbed()),
-				"max_model_size_gb":   dbus.MakeVariant(backend.GetMaxModelSizeGB()),
-				"supported_patterns":  dbus.MakeVariant(backend.GetSupportedModelPatterns()),
-				"preferred_models":    dbus.MakeVariant(backend.GetPreferredModels()),
+				"id":                 dbus.MakeVariant(backend.ID()),
+				"name":               dbus.MakeVariant(backend.Name()),
+				"type":               dbus.MakeVariant(backend.Type()),
+				strHardware:          dbus.MakeVariant(backend.Hardware()),
+				"healthy":            dbus.MakeVariant(backend.IsHealthy()),
+				"power_watts":        dbus.MakeVariant(backend.PowerWatts()),
+				"avg_latency_ms":     dbus.MakeVariant(backend.AvgLatencyMs()),
+				"priority":           dbus.MakeVariant(backend.Priority()),
+				"supports_generate":  dbus.MakeVariant(backend.SupportsGenerate()),
+				"supports_stream":    dbus.MakeVariant(backend.SupportsStream()),
+				"supports_embed":     dbus.MakeVariant(backend.SupportsEmbed()),
+				"max_model_size_gb":  dbus.MakeVariant(backend.GetMaxModelSizeGB()),
+				"supported_patterns": dbus.MakeVariant(backend.GetSupportedModelPatterns()),
+				"preferred_models":   dbus.MakeVariant(backend.GetPreferredModels()),
 			}
 
 			return details, nil
@@ -233,9 +239,7 @@ func (bs *BackendsService) GetSupportedModels(id string) ([]string, *dbus.Error)
 		if backend.ID() == id {
 			models, err := backend.ListModels(context.Background())
 			if err != nil {
-				// Return preferred models as fallback when listing fails
-				_ = err // Explicitly ignore - using fallback
-				return backend.GetPreferredModels(), nil
+				return backend.GetPreferredModels(), dbus.MakeFailedError(err)
 			}
 			return models, nil
 		}
@@ -251,12 +255,14 @@ func (bs *BackendsService) RefreshBackendStatus() *dbus.Error {
 
 	for _, backend := range backends {
 		oldStatus := backend.IsHealthy()
-		backend.HealthCheck(ctx)
+		if err := backend.HealthCheck(ctx); err != nil {
+			return dbus.MakeFailedError(err)
+		}
 		newStatus := backend.IsHealthy()
 
 		// Emit signal if status changed
 		if oldStatus != newStatus {
-			bs.conn.Emit(backendsPath, backendsInterface+".BackendStatusChanged",
+			emitOrLog(bs.conn, backendsPath, backendsInterface+".BackendStatusChanged",
 				backend.ID(), newStatus)
 		}
 	}
@@ -280,12 +286,12 @@ func (bs *BackendsService) makePropertyMap() map[string]map[string]*prop.Prop {
 	return map[string]map[string]*prop.Prop{
 		backendsInterface: {
 			"BackendCount": {
-				Value:    int32(len(backends)),
+				Value:    safeconv.Int32FromInt(len(backends)),
 				Writable: false,
 				Emit:     prop.EmitTrue,
 			},
 			"HealthyCount": {
-				Value:    int32(healthyCount),
+				Value:    safeconv.Int32FromInt(healthyCount),
 				Writable: false,
 				Emit:     prop.EmitTrue,
 			},
@@ -304,14 +310,30 @@ func (bs *BackendsService) updateProperties() {
 	}
 
 	if bs.props != nil {
-		bs.props.SetMust(backendsInterface, "BackendCount", int32(len(backends)))
-		bs.props.SetMust(backendsInterface, "HealthyCount", int32(healthyCount))
+		bs.props.SetMust(backendsInterface, "BackendCount", safeconv.Int32FromInt(len(backends)))
+		bs.props.SetMust(backendsInterface, "HealthyCount", safeconv.Int32FromInt(healthyCount))
 	}
 }
 
 // Stop stops the D-Bus service
 func (bs *BackendsService) Stop() {
-	if bs.conn != nil {
-		bs.conn.Close()
+	closeConn(bs.conn)
+}
+
+func emitOrLog(conn *dbus.Conn, path dbus.ObjectPath, name string, values ...interface{}) {
+	if conn == nil {
+		return
+	}
+	if err := conn.Emit(path, name, values...); err != nil {
+		logging.Warn("failed to emit dbus signal", zap.String("signal", name), zap.Error(err))
+	}
+}
+
+func closeConn(conn *dbus.Conn) {
+	if conn == nil {
+		return
+	}
+	if err := conn.Close(); err != nil {
+		logging.Warn("failed to close dbus connection", zap.Error(err))
 	}
 }

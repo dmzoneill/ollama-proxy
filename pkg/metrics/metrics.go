@@ -1,3 +1,4 @@
+// Package metrics registers Prometheus collectors for the proxy.
 package metrics
 
 import (
@@ -5,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// RequestsTotal is an exported var.
 var (
 	// Request metrics
 	RequestsTotal = promauto.NewCounterVec(
@@ -12,7 +14,7 @@ var (
 			Name: "ollama_proxy_requests_total",
 			Help: "Total number of requests by backend, model, and status",
 		},
-		[]string{"backend_id", "model", "status"},
+		[]string{strBackendID, strModel, "status"},
 	)
 
 	RequestDuration = promauto.NewHistogramVec(
@@ -21,7 +23,7 @@ var (
 			Help:    "Request duration in seconds",
 			Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	TokensGenerated = promauto.NewHistogramVec(
@@ -30,7 +32,7 @@ var (
 			Help:    "Number of tokens generated per request",
 			Buckets: []float64{10, 50, 100, 250, 500, 1000, 2000, 5000, 10000},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	TokensPerSecond = promauto.NewHistogramVec(
@@ -39,7 +41,7 @@ var (
 			Help:    "Tokens generated per second",
 			Buckets: []float64{1, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	// Backend health metrics
@@ -48,7 +50,7 @@ var (
 			Name: "ollama_proxy_backend_health",
 			Help: "Backend health status (1=healthy, 0=unhealthy)",
 		},
-		[]string{"backend_id", "hardware"},
+		[]string{strBackendID, strHardware},
 	)
 
 	BackendQueueDepth = promauto.NewGaugeVec(
@@ -56,7 +58,7 @@ var (
 			Name: "ollama_proxy_backend_queue_depth",
 			Help: "Current queue depth by backend and priority",
 		},
-		[]string{"backend_id", "priority"},
+		[]string{strBackendID, "priority"},
 	)
 
 	// Thermal metrics
@@ -65,7 +67,7 @@ var (
 			Name: "ollama_proxy_backend_temperature_celsius",
 			Help: "Backend temperature in Celsius",
 		},
-		[]string{"backend_id", "hardware"},
+		[]string{strBackendID, strHardware},
 	)
 
 	BackendFanSpeed = promauto.NewGaugeVec(
@@ -73,7 +75,7 @@ var (
 			Name: "ollama_proxy_backend_fan_speed_percent",
 			Help: "Backend fan speed percentage",
 		},
-		[]string{"backend_id", "hardware"},
+		[]string{strBackendID, strHardware},
 	)
 
 	// Power metrics
@@ -82,7 +84,7 @@ var (
 			Name: "ollama_proxy_backend_power_watts",
 			Help: "Backend power consumption in watts",
 		},
-		[]string{"backend_id", "hardware"},
+		[]string{strBackendID, strHardware},
 	)
 
 	EnergyConsumed = promauto.NewCounterVec(
@@ -90,7 +92,7 @@ var (
 			Name: "ollama_proxy_energy_consumed_wh",
 			Help: "Total energy consumed in watt-hours",
 		},
-		[]string{"backend_id", "hardware"},
+		[]string{strBackendID, strHardware},
 	)
 
 	// Routing metrics
@@ -99,7 +101,7 @@ var (
 			Name: "ollama_proxy_routing_decisions_total",
 			Help: "Total routing decisions by reason and backend",
 		},
-		[]string{"reason", "backend_id"},
+		[]string{"reason", strBackendID},
 	)
 
 	ForwardingAttemptsTotal = promauto.NewCounterVec(
@@ -116,11 +118,11 @@ var (
 			Help:    "Confidence scores of responses",
 			Buckets: []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	// Efficiency mode
-	EfficiencyMode = promauto.NewGaugeVec(
+	Mode = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ollama_proxy_efficiency_mode",
 			Help: "Current efficiency mode (0=Performance, 1=Balanced, 2=Efficiency, 3=Quiet, 4=Auto, 5=Ultra)",
@@ -135,7 +137,7 @@ var (
 			Help:    "Time to first token in milliseconds",
 			Buckets: []float64{10, 25, 50, 100, 200, 500, 1000, 2000, 5000},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	InterTokenLatency = promauto.NewHistogramVec(
@@ -144,7 +146,7 @@ var (
 			Help:    "Average inter-token latency in milliseconds",
 			Buckets: []float64{1, 5, 10, 20, 50, 100, 200, 500},
 		},
-		[]string{"backend_id", "model"},
+		[]string{strBackendID, strModel},
 	)
 
 	// Cache metrics
@@ -232,7 +234,7 @@ func RecordConfidenceScore(backendID, model string, score float64) {
 
 // SetEfficiencyMode sets the current efficiency mode
 func SetEfficiencyMode(mode string, value int) {
-	EfficiencyMode.WithLabelValues(mode).Set(float64(value))
+	Mode.WithLabelValues(mode).Set(float64(value))
 }
 
 // RecordTimeToFirstToken records time to first token

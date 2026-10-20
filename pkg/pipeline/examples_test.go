@@ -6,6 +6,7 @@ import (
 
 // Tests for example pipelines
 
+// TestVoiceAssistantPipeline is part of the public API.
 func TestVoiceAssistantPipeline(t *testing.T) {
 	pipeline := VoiceAssistantPipeline()
 
@@ -34,7 +35,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 		t.Error("Expected first stage type to be audio_to_text")
 	}
 
-	if pipeline.Stages[0].PreferredHardware != "npu" {
+	if pipeline.Stages[0].PreferredHardware != strNpu {
 		t.Error("Expected first stage to prefer NPU")
 	}
 
@@ -59,7 +60,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 		t.Error("Expected second stage type to be text_generation")
 	}
 
-	if pipeline.Stages[1].PreferredHardware != "igpu" {
+	if pipeline.Stages[1].PreferredHardware != strIgpu {
 		t.Error("Expected second stage to prefer iGPU")
 	}
 
@@ -72,7 +73,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 	}
 
 	// Check third stage
-	if pipeline.Stages[2].ID != "text-to-voice" {
+	if pipeline.Stages[2].ID != strTextToVoice {
 		t.Error("Expected third stage to be 'text-to-voice'")
 	}
 
@@ -102,6 +103,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 	}
 }
 
+// TestAdaptiveTextPipeline is part of the public API.
 func TestAdaptiveTextPipeline(t *testing.T) {
 	pipeline := AdaptiveTextPipeline()
 
@@ -130,11 +132,11 @@ func TestAdaptiveTextPipeline(t *testing.T) {
 		t.Error("Expected text generation stage type")
 	}
 
-	if stage.PreferredHardware != "npu" {
+	if stage.PreferredHardware != strNpu {
 		t.Error("Expected NPU preference")
 	}
 
-	if stage.Model != "qwen2.5:0.5b" {
+	if stage.Model != strQwen2505b {
 		t.Errorf("Expected model qwen2.5:0.5b, got %s", stage.Model)
 	}
 
@@ -175,6 +177,7 @@ func TestAdaptiveTextPipeline(t *testing.T) {
 	}
 }
 
+// TestCodeGenerationPipeline is part of the public API.
 func TestCodeGenerationPipeline(t *testing.T) {
 	pipeline := CodeGenerationPipeline()
 
@@ -203,7 +206,7 @@ func TestCodeGenerationPipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if pipeline.Stages[0].PreferredHardware != "igpu" {
+	if pipeline.Stages[0].PreferredHardware != strIgpu {
 		t.Error("Expected iGPU preference")
 	}
 
@@ -228,11 +231,11 @@ func TestCodeGenerationPipeline(t *testing.T) {
 		t.Error("Expected second stage to be 'review-code'")
 	}
 
-	if pipeline.Stages[1].PreferredHardware != "nvidia" {
+	if pipeline.Stages[1].PreferredHardware != strNvidia {
 		t.Error("Expected NVIDIA preference")
 	}
 
-	if pipeline.Stages[1].Model != "llama3:70b" {
+	if pipeline.Stages[1].Model != strLlama370b {
 		t.Error("Expected llama3:70b model")
 	}
 
@@ -254,6 +257,7 @@ func TestCodeGenerationPipeline(t *testing.T) {
 	}
 }
 
+// TestThermalFailoverPipeline is part of the public API.
 func TestThermalFailoverPipeline(t *testing.T) {
 	pipeline := ThermalFailoverPipeline()
 
@@ -282,11 +286,11 @@ func TestThermalFailoverPipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if stage.PreferredHardware != "nvidia" {
+	if stage.PreferredHardware != strNvidia {
 		t.Error("Expected NVIDIA preference")
 	}
 
-	if stage.Model != "llama3:70b" {
+	if stage.Model != strLlama370b {
 		t.Error("Expected llama3:70b model")
 	}
 
@@ -328,6 +332,7 @@ func TestThermalFailoverPipeline(t *testing.T) {
 	}
 }
 
+// TestMultiModalRAGPipeline is part of the public API.
 func TestMultiModalRAGPipeline(t *testing.T) {
 	pipeline := MultiModalRAGPipeline()
 
@@ -356,11 +361,11 @@ func TestMultiModalRAGPipeline(t *testing.T) {
 		t.Error("Expected embedding stage type")
 	}
 
-	if pipeline.Stages[0].PreferredHardware != "npu" {
+	if pipeline.Stages[0].PreferredHardware != strNpu {
 		t.Error("Expected NPU preference")
 	}
 
-	if pipeline.Stages[0].Model != "nomic-embed-text" {
+	if pipeline.Stages[0].Model != strNomicEmbedText {
 		t.Error("Expected nomic-embed-text model")
 	}
 
@@ -386,11 +391,11 @@ func TestMultiModalRAGPipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if pipeline.Stages[2].PreferredHardware != "nvidia" {
+	if pipeline.Stages[2].PreferredHardware != strNvidia {
 		t.Error("Expected NVIDIA preference")
 	}
 
-	if pipeline.Stages[2].Model != "llama3:70b" {
+	if pipeline.Stages[2].Model != strLlama370b {
 		t.Error("Expected llama3:70b model")
 	}
 
@@ -412,6 +417,7 @@ func TestMultiModalRAGPipeline(t *testing.T) {
 	}
 }
 
+// TestSpeculativeExecutionPipeline is part of the public API.
 func TestSpeculativeExecutionPipeline(t *testing.T) {
 	pipeline := SpeculativeExecutionPipeline()
 
@@ -440,11 +446,11 @@ func TestSpeculativeExecutionPipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if pipeline.Stages[0].PreferredHardware != "npu" {
+	if pipeline.Stages[0].PreferredHardware != strNpu {
 		t.Error("Expected NPU preference")
 	}
 
-	if pipeline.Stages[0].Model != "qwen2.5:0.5b" {
+	if pipeline.Stages[0].Model != strQwen2505b {
 		t.Error("Expected qwen2.5:0.5b model")
 	}
 
@@ -457,11 +463,11 @@ func TestSpeculativeExecutionPipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if pipeline.Stages[1].PreferredHardware != "nvidia" {
+	if pipeline.Stages[1].PreferredHardware != strNvidia {
 		t.Error("Expected NVIDIA preference")
 	}
 
-	if pipeline.Stages[1].Model != "llama3:70b" {
+	if pipeline.Stages[1].Model != strLlama370b {
 		t.Error("Expected llama3:70b model")
 	}
 
@@ -483,6 +489,7 @@ func TestSpeculativeExecutionPipeline(t *testing.T) {
 	}
 }
 
+// TestBudgetAwarePipeline is part of the public API.
 func TestBudgetAwarePipeline(t *testing.T) {
 	pipeline := BudgetAwarePipeline()
 
@@ -511,7 +518,7 @@ func TestBudgetAwarePipeline(t *testing.T) {
 		t.Error("Expected text generation stage")
 	}
 
-	if stage.Model != "llama3:7b" {
+	if stage.Model != strLlama37b {
 		t.Error("Expected llama3:7b model")
 	}
 
@@ -541,18 +548,19 @@ func TestBudgetAwarePipeline(t *testing.T) {
 	}
 }
 
+// TestAllExamplePipelinesAreValid is part of the public API.
 func TestAllExamplePipelinesAreValid(t *testing.T) {
 	pipelines := []struct {
-		name     string
 		pipeline *Pipeline
+		name     string
 	}{
-		{"VoiceAssistant", VoiceAssistantPipeline()},
-		{"AdaptiveText", AdaptiveTextPipeline()},
-		{"CodeGeneration", CodeGenerationPipeline()},
-		{"ThermalFailover", ThermalFailoverPipeline()},
-		{"MultiModalRAG", MultiModalRAGPipeline()},
-		{"SpeculativeExecution", SpeculativeExecutionPipeline()},
-		{"BudgetAware", BudgetAwarePipeline()},
+		{name: strVoiceAssistant, pipeline: VoiceAssistantPipeline()},
+		{name: strAdaptiveText, pipeline: AdaptiveTextPipeline()},
+		{name: strCodeGeneration, pipeline: CodeGenerationPipeline()},
+		{name: strThermalFailover, pipeline: ThermalFailoverPipeline()},
+		{name: strMultiModalRAG, pipeline: MultiModalRAGPipeline()},
+		{name: strSpeculativeExecution, pipeline: SpeculativeExecutionPipeline()},
+		{name: strBudgetAware, pipeline: BudgetAwarePipeline()},
 	}
 
 	for _, p := range pipelines {
@@ -594,18 +602,19 @@ func TestAllExamplePipelinesAreValid(t *testing.T) {
 	}
 }
 
+// TestExamplePipelinesHaveDifferentIDs is part of the public API.
 func TestExamplePipelinesHaveDifferentIDs(t *testing.T) {
 	pipelines := []struct {
 		name string
 		id   string
 	}{
-		{"VoiceAssistant", VoiceAssistantPipeline().ID},
-		{"AdaptiveText", AdaptiveTextPipeline().ID},
-		{"CodeGeneration", CodeGenerationPipeline().ID},
-		{"ThermalFailover", ThermalFailoverPipeline().ID},
-		{"MultiModalRAG", MultiModalRAGPipeline().ID},
-		{"SpeculativeExecution", SpeculativeExecutionPipeline().ID},
-		{"BudgetAware", BudgetAwarePipeline().ID},
+		{name: strVoiceAssistant, id: VoiceAssistantPipeline().ID},
+		{name: strAdaptiveText, id: AdaptiveTextPipeline().ID},
+		{name: strCodeGeneration, id: CodeGenerationPipeline().ID},
+		{name: strThermalFailover, id: ThermalFailoverPipeline().ID},
+		{name: strMultiModalRAG, id: MultiModalRAGPipeline().ID},
+		{name: strSpeculativeExecution, id: SpeculativeExecutionPipeline().ID},
+		{name: strBudgetAware, id: BudgetAwarePipeline().ID},
 	}
 
 	seenIDs := make(map[string]string)
@@ -617,17 +626,18 @@ func TestExamplePipelinesHaveDifferentIDs(t *testing.T) {
 	}
 }
 
+// TestVoiceAssistantStageSequence is part of the public API.
 func TestVoiceAssistantStageSequence(t *testing.T) {
 	pipeline := VoiceAssistantPipeline()
 
 	// The stages should be in sequence: audio->text->LLM->text->audio
 	expectedSequence := []struct {
-		id   string
-		typ  StageType
+		id  string
+		typ StageType
 	}{
-		{"voice-to-text", StageTypeAudioToText},
-		{"process-text", StageTypeTextGen},
-		{"text-to-voice", StageTypeTextToAudio},
+		{id: "voice-to-text", typ: StageTypeAudioToText},
+		{id: "process-text", typ: StageTypeTextGen},
+		{id: strTextToVoice, typ: StageTypeTextToAudio},
 	}
 
 	for i, expected := range expectedSequence {
@@ -641,6 +651,7 @@ func TestVoiceAssistantStageSequence(t *testing.T) {
 	}
 }
 
+// TestCodeGenerationStageSequence is part of the public API.
 func TestCodeGenerationStageSequence(t *testing.T) {
 	pipeline := CodeGenerationPipeline()
 
@@ -649,7 +660,7 @@ func TestCodeGenerationStageSequence(t *testing.T) {
 		t.Error("Expected draft stage to use deepseek-coder")
 	}
 
-	if pipeline.Stages[1].Model != "llama3:70b" {
+	if pipeline.Stages[1].Model != strLlama370b {
 		t.Error("Expected review stage to use llama3:70b")
 	}
 
@@ -659,6 +670,7 @@ func TestCodeGenerationStageSequence(t *testing.T) {
 	}
 }
 
+// TestRAGPipelineStageSequence is part of the public API.
 func TestRAGPipelineStageSequence(t *testing.T) {
 	pipeline := MultiModalRAGPipeline()
 
@@ -676,6 +688,7 @@ func TestRAGPipelineStageSequence(t *testing.T) {
 	}
 }
 
+// TestRetrieveContextHelper is part of the public API.
 func TestRetrieveContextHelper(t *testing.T) {
 	embedding := []float64{0.1, 0.2, 0.3}
 	context := retrieveContext(embedding)
@@ -689,6 +702,7 @@ func TestRetrieveContextHelper(t *testing.T) {
 	}
 }
 
+// TestExamplePipelinesContainValidForwarding is part of the public API.
 func TestExamplePipelinesContainValidForwarding(t *testing.T) {
 	// Test that pipelines with forwarding policies have valid configurations
 	pipeline := AdaptiveTextPipeline()
@@ -711,6 +725,7 @@ func TestExamplePipelinesContainValidForwarding(t *testing.T) {
 	}
 }
 
+// TestExamplePipelinesInputOutputTransforms is part of the public API.
 func TestExamplePipelinesInputOutputTransforms(t *testing.T) {
 	// Test RAG pipeline which has several input/output transforms
 	pipeline := MultiModalRAGPipeline()
@@ -734,27 +749,28 @@ func TestExamplePipelinesInputOutputTransforms(t *testing.T) {
 	}
 }
 
+// TestExamplePipelinesHardwarePreferences is part of the public API.
 func TestExamplePipelinesHardwarePreferences(t *testing.T) {
 	// Test that examples use realistic hardware preferences
 	validHardware := map[string]bool{
-		"npu":    true,
-		"igpu":   true,
-		"nvidia": true,
-		"cpu":    true,
-		"":       true, // Not specified is also valid
+		strNpu:    true,
+		strIgpu:   true,
+		strNvidia: true,
+		strCPU:    true,
+		"":        true, // Not specified is also valid
 	}
 
 	pipelines := []struct {
-		name string
 		fn   func() *Pipeline
+		name string
 	}{
-		{"VoiceAssistant", VoiceAssistantPipeline},
-		{"AdaptiveText", AdaptiveTextPipeline},
-		{"CodeGeneration", CodeGenerationPipeline},
-		{"ThermalFailover", ThermalFailoverPipeline},
-		{"MultiModalRAG", MultiModalRAGPipeline},
-		{"SpeculativeExecution", SpeculativeExecutionPipeline},
-		{"BudgetAware", BudgetAwarePipeline},
+		{name: strVoiceAssistant, fn: VoiceAssistantPipeline},
+		{name: strAdaptiveText, fn: AdaptiveTextPipeline},
+		{name: strCodeGeneration, fn: CodeGenerationPipeline},
+		{name: strThermalFailover, fn: ThermalFailoverPipeline},
+		{name: strMultiModalRAG, fn: MultiModalRAGPipeline},
+		{name: strSpeculativeExecution, fn: SpeculativeExecutionPipeline},
+		{name: strBudgetAware, fn: BudgetAwarePipeline},
 	}
 
 	for _, p := range pipelines {

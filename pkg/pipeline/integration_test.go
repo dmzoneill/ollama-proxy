@@ -13,17 +13,17 @@ import (
 func TestIntegrationVoiceAssistantWorkflow(t *testing.T) {
 	// Create mock backends for NPU, iGPU, and GPU
 	npuBackend := &mockBackend{
-		id:                "ollama-npu",
+		id:                strOllamaNpu,
 		supportsAudioText: true,
 		supportsTextAudio: true,
 	}
 
 	igpuBackend := &mockBackend{
-		id: "ollama-igpu",
+		id: strOllamaIgpu,
 	}
 
 	gpuBackend := &mockBackend{
-		id:                "ollama-nvidia",
+		id:                strOllamaNvidia,
 		supportsTextAudio: true,
 	}
 
@@ -39,37 +39,37 @@ func TestIntegrationVoiceAssistantWorkflow(t *testing.T) {
 				ID:               "mic-to-text",
 				Type:             StageTypeAudioToText,
 				Description:      "Speech-to-text on NPU",
-				PreferredBackend: "ollama-npu",
-				Model:            "whisper-tiny",
+				PreferredBackend: strOllamaNpu,
+				Model:            strWhisperTiny,
 				ForwardingPolicy: &ForwardingPolicy{
 					EnableConfidenceCheck: false,
-					EscalationPath:        []string{"ollama-npu"},
+					EscalationPath:        []string{strOllamaNpu},
 				},
 			},
 			{
 				ID:               "process-query",
 				Type:             StageTypeTextGen,
 				Description:      "LLM processing on iGPU",
-				PreferredBackend: "ollama-igpu",
-				Model:            "llama3:7b",
+				PreferredBackend: strOllamaIgpu,
+				Model:            strLlama37b,
 				ForwardingPolicy: &ForwardingPolicy{
 					EnableTimeoutForward: true,
 					MaxLatencyMs:         500,
-					EscalationPath:       []string{"ollama-igpu", "ollama-nvidia"},
+					EscalationPath:       []string{strOllamaIgpu, strOllamaNvidia},
 				},
 			},
 			{
-				ID:               "text-to-voice",
+				ID:               strTextToVoice,
 				Type:             StageTypeTextToAudio,
 				Description:      "Text-to-speech on NPU or GPU",
-				PreferredBackend: "ollama-npu",
+				PreferredBackend: strOllamaNpu,
 				Model:            "piper-tts-fast",
 				ForwardingPolicy: &ForwardingPolicy{
-					EscalationPath: []string{"ollama-npu", "ollama-nvidia"},
+					EscalationPath: []string{strOllamaNpu, strOllamaNvidia},
 				},
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			EnableStreaming: true,
 			PreserveContext: true,
 			CollectMetrics:  true,
@@ -105,7 +105,7 @@ func TestIntegrationVoiceAssistantWorkflow(t *testing.T) {
 	if !stage1.Success {
 		t.Errorf("Stage 1 (audio-to-text) failed")
 	}
-	if stage1.Backend != "ollama-npu" {
+	if stage1.Backend != strOllamaNpu {
 		t.Errorf("Expected NPU backend for stage 1, got %s", stage1.Backend)
 	}
 
@@ -117,20 +117,20 @@ func TestIntegrationVoiceAssistantWorkflow(t *testing.T) {
 	if !stage2.Success {
 		t.Errorf("Stage 2 (text generation) failed")
 	}
-	if stage2.Backend != "ollama-igpu" {
+	if stage2.Backend != strOllamaIgpu {
 		t.Errorf("Expected iGPU backend for stage 2, got %s", stage2.Backend)
 	}
 
 	// Verify stage 3: Text-to-audio
 	stage3 := result.StageResults[2]
-	if stage3.StageID != "text-to-voice" {
+	if stage3.StageID != strTextToVoice {
 		t.Errorf("Expected stage ID 'text-to-voice', got '%s'", stage3.StageID)
 	}
 	if !stage3.Success {
 		t.Errorf("Stage 3 (text-to-audio) failed")
 	}
 	// Stage 3 should be on NPU (first in escalation path)
-	if stage3.Backend != "ollama-npu" {
+	if stage3.Backend != strOllamaNpu {
 		t.Errorf("Expected NPU backend for stage 3, got %s", stage3.Backend)
 	}
 
@@ -156,7 +156,7 @@ func TestIntegrationVoiceAssistantWorkflow(t *testing.T) {
 // Integration test for parallel multimedia processing
 func TestIntegrationParallelMultimediaProcessing(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: true,
 		supportsImageText: true,
 	}
@@ -172,17 +172,17 @@ func TestIntegrationParallelMultimediaProcessing(t *testing.T) {
 			{
 				ID:               "audio-analysis",
 				Type:             StageTypeAudioToText,
-				PreferredBackend: "test-backend",
-				Model:            "whisper-tiny",
+				PreferredBackend: strTestBackend,
+				Model:            strWhisperTiny,
 			},
 			{
 				ID:               "image-analysis",
 				Type:             StageTypeImageToText,
-				PreferredBackend: "test-backend",
+				PreferredBackend: strTestBackend,
 				Model:            "llava",
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ParallelStages:  true, // Enable parallel execution
 			CollectMetrics:  true,
 			ContinueOnError: true, // Don't fail if one stage fails
@@ -210,7 +210,7 @@ func TestIntegrationParallelMultimediaProcessing(t *testing.T) {
 // Integration test for streaming voice pipeline
 func TestIntegrationStreamingVoicePipeline(t *testing.T) {
 	backend := &mockBackend{
-		id:                "streaming-backend",
+		id:                strStreamingBackend,
 		supportsAudioText: true,
 		supportsTextAudio: true,
 	}
@@ -224,23 +224,23 @@ func TestIntegrationStreamingVoicePipeline(t *testing.T) {
 			{
 				ID:               "stt",
 				Type:             StageTypeAudioToText,
-				PreferredBackend: "streaming-backend",
-				Model:            "whisper-tiny",
+				PreferredBackend: strStreamingBackend,
+				Model:            strWhisperTiny,
 			},
 			{
 				ID:               "llm",
 				Type:             StageTypeTextGen,
-				PreferredBackend: "streaming-backend",
-				Model:            "llama3",
+				PreferredBackend: strStreamingBackend,
+				Model:            strLlama3,
 			},
 			{
-				ID:               "tts",
+				ID:               strTts,
 				Type:             StageTypeTextToAudio,
-				PreferredBackend: "streaming-backend",
+				PreferredBackend: strStreamingBackend,
 				Model:            "piper",
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			EnableStreaming: true,
 			CollectMetrics:  true,
 		},
@@ -272,7 +272,7 @@ func TestIntegrationErrorHandlingAndFallback(t *testing.T) {
 	backend := &mockBackend{
 		id:                "fallback-backend",
 		supportsAudioText: true,
-		transcribeFunc: func(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+		transcribeFunc: func(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 			// Simulate transient error
 			return nil, io.ErrUnexpectedEOF
 		},
@@ -285,13 +285,13 @@ func TestIntegrationErrorHandlingAndFallback(t *testing.T) {
 		Name: "Error Handling Test",
 		Stages: []*Stage{
 			{
-				ID:               "audio-to-text",
+				ID:               strAudioToText,
 				Type:             StageTypeAudioToText,
 				PreferredBackend: "fallback-backend",
-				Model:            "whisper-tiny",
+				Model:            strWhisperTiny,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}
@@ -312,7 +312,7 @@ func TestIntegrationErrorHandlingAndFallback(t *testing.T) {
 // Integration test for context preservation
 func TestIntegrationContextPreservation(t *testing.T) {
 	backend := &mockBackend{
-		id: "context-backend",
+		id: strContextBackend,
 	}
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
@@ -322,19 +322,19 @@ func TestIntegrationContextPreservation(t *testing.T) {
 		Name: "Context Preservation Test",
 		Stages: []*Stage{
 			{
-				ID:               "stage1",
+				ID:               strStage1,
 				Type:             StageTypeTextGen,
-				PreferredBackend: "context-backend",
-				Model:            "llama3",
+				PreferredBackend: strContextBackend,
+				Model:            strLlama3,
 			},
 			{
-				ID:               "stage2",
+				ID:               strStage2,
 				Type:             StageTypeTextGen,
-				PreferredBackend: "context-backend",
-				Model:            "llama3",
+				PreferredBackend: strContextBackend,
+				Model:            strLlama3,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			PreserveContext: true,
 			CollectMetrics:  true,
 		},
@@ -359,7 +359,7 @@ func TestIntegrationContextPreservation(t *testing.T) {
 // Benchmark voice assistant pipeline
 func BenchmarkVoiceAssistantPipeline(b *testing.B) {
 	backend := &mockBackend{
-		id:                "bench-backend",
+		id:                strBenchBackend,
 		supportsAudioText: true,
 		supportsTextAudio: true,
 	}
@@ -373,23 +373,23 @@ func BenchmarkVoiceAssistantPipeline(b *testing.B) {
 			{
 				ID:               "stt",
 				Type:             StageTypeAudioToText,
-				PreferredBackend: "bench-backend",
-				Model:            "whisper-tiny",
+				PreferredBackend: strBenchBackend,
+				Model:            strWhisperTiny,
 			},
 			{
 				ID:               "llm",
 				Type:             StageTypeTextGen,
-				PreferredBackend: "bench-backend",
-				Model:            "llama3",
+				PreferredBackend: strBenchBackend,
+				Model:            strLlama3,
 			},
 			{
-				ID:               "tts",
+				ID:               strTts,
 				Type:             StageTypeTextToAudio,
-				PreferredBackend: "bench-backend",
+				PreferredBackend: strBenchBackend,
 				Model:            "piper",
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			EnableStreaming: true,
 		},
 	}

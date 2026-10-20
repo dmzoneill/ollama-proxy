@@ -10,63 +10,122 @@ import (
 
 // mockBackend implements backends.Backend for testing
 type mockBackend struct {
-	id                 string
-	supportsAudioText  bool
-	supportsTextAudio  bool
-	supportsImageText  bool
-	supportsTextImage  bool
-	transcribeFunc     func(context.Context, *backends.TranscribeRequest) (*backends.TranscribeResponse, error)
-	synthesizeFunc     func(context.Context, *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error)
-	analyzeImageFunc   func(context.Context, *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error)
-	generateImageFunc  func(context.Context, *backends.ImageGenRequest) (*backends.ImageGenResponse, error)
+	transcribeFunc    func(context.Context, *backends.TranscribeRequest) (*backends.TranscribeResponse, error)
+	synthesizeFunc    func(context.Context, *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error)
+	analyzeImageFunc  func(context.Context, *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error)
+	generateImageFunc func(context.Context, *backends.ImageGenRequest) (*backends.ImageGenResponse, error)
+	id                string
+	supportsAudioText bool
+	supportsTextAudio bool
+	supportsImageText bool
+	supportsTextImage bool
 }
 
-func (m *mockBackend) ID() string                                   { return m.id }
-func (m *mockBackend) Type() string                                 { return "mock" }
-func (m *mockBackend) Name() string                                 { return "Mock Backend" }
-func (m *mockBackend) Hardware() string                             { return "test" }
-func (m *mockBackend) IsHealthy() bool                              { return true }
-func (m *mockBackend) HealthCheck(ctx context.Context) error        { return nil }
-func (m *mockBackend) PowerWatts() float64                          { return 10.0 }
-func (m *mockBackend) AvgLatencyMs() int32                           { return 100 }
-func (m *mockBackend) Priority() int                                { return 5 }
-func (m *mockBackend) SupportsGenerate() bool                       { return true }
-func (m *mockBackend) SupportsStream() bool                         { return true }
-func (m *mockBackend) SupportsEmbed() bool                          { return true }
-func (m *mockBackend) SupportsAudioToText() bool                    { return m.supportsAudioText }
-func (m *mockBackend) SupportsTextToAudio() bool                    { return m.supportsTextAudio }
-func (m *mockBackend) SupportsImageToText() bool                    { return m.supportsImageText }
-func (m *mockBackend) SupportsTextToImage() bool                    { return m.supportsTextImage }
-func (m *mockBackend) SupportsVideoToText() bool                    { return false }
-func (m *mockBackend) SupportsTextToVideo() bool                    { return false }
-func (m *mockBackend) ListModels(ctx context.Context) ([]string, error)      { return []string{"test-model"}, nil }
-func (m *mockBackend) SupportsModel(modelName string) bool          { return true }
-func (m *mockBackend) GetMaxModelSizeGB() int                       { return 10 }
-func (m *mockBackend) GetSupportedModelPatterns() []string          { return []string{"*"} }
-func (m *mockBackend) GetPreferredModels() []string                 { return []string{} }
-func (m *mockBackend) UpdateMetrics(latencyMs int32, success bool)  {}
-func (m *mockBackend) GetMetrics() *backends.BackendMetrics         { return &backends.BackendMetrics{} }
-func (m *mockBackend) Start(ctx context.Context) error              { return nil }
-func (m *mockBackend) Stop(ctx context.Context) error               { return nil }
+// ID is part of the public API.
+func (m *mockBackend) ID() string { return m.id }
 
-func (m *mockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// Type is part of the public API.
+func (m *mockBackend) Type() string { return "mock" }
+
+// Name is part of the public API.
+func (m *mockBackend) Name() string { return "Mock Backend" }
+
+// Hardware is part of the public API.
+func (m *mockBackend) Hardware() string { return strTest }
+
+// IsHealthy reports whether the condition holds.
+func (m *mockBackend) IsHealthy() bool { return true }
+
+// HealthCheck is part of the public API.
+func (m *mockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// PowerWatts is part of the public API.
+func (m *mockBackend) PowerWatts() float64 { return 10.0 }
+
+// AvgLatencyMs is part of the public API.
+func (m *mockBackend) AvgLatencyMs() int32 { return 100 }
+
+// Priority is part of the public API.
+func (m *mockBackend) Priority() int { return 5 }
+
+// SupportsGenerate is part of the public API.
+func (m *mockBackend) SupportsGenerate() bool { return true }
+
+// SupportsStream is part of the public API.
+func (m *mockBackend) SupportsStream() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *mockBackend) SupportsEmbed() bool { return true }
+
+// SupportsAudioToText is part of the public API.
+func (m *mockBackend) SupportsAudioToText() bool { return m.supportsAudioText }
+
+// SupportsTextToAudio is part of the public API.
+func (m *mockBackend) SupportsTextToAudio() bool { return m.supportsTextAudio }
+
+// SupportsImageToText is part of the public API.
+func (m *mockBackend) SupportsImageToText() bool { return m.supportsImageText }
+
+// SupportsTextToImage is part of the public API.
+func (m *mockBackend) SupportsTextToImage() bool { return m.supportsTextImage }
+
+// SupportsVideoToText is part of the public API.
+func (m *mockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *mockBackend) SupportsTextToVideo() bool { return false }
+
+// ListModels is part of the public API.
+func (m *mockBackend) ListModels(_ context.Context) ([]string, error) {
+	return []string{strTestModel}, nil
+}
+
+// SupportsModel is part of the public API.
+func (m *mockBackend) SupportsModel(_ string) bool { return true }
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *mockBackend) GetMaxModelSizeGB() int { return 10 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *mockBackend) GetSupportedModelPatterns() []string { return []string{"*"} }
+
+// GetPreferredModels is part of the public API.
+func (m *mockBackend) GetPreferredModels() []string { return []string{} }
+
+// UpdateMetrics is part of the public API.
+func (m *mockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// GetMetrics is part of the public API.
+func (m *mockBackend) GetMetrics() *backends.BackendMetrics { return &backends.BackendMetrics{} }
+
+// Start is part of the public API.
+func (m *mockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *mockBackend) Stop(_ context.Context) error { return nil }
+
+// Generate is part of the public API.
+func (m *mockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	return &backends.GenerateResponse{
 		Response: "Generated text",
 		Stats:    &backends.GenerationStats{},
 	}, nil
 }
 
-func (m *mockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *mockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return &backends.EmbedResponse{
 		Embedding: []float32{0.1, 0.2, 0.3},
 		Stats:     &backends.GenerationStats{},
 	}, nil
 }
 
+// TranscribeAudio is part of the public API.
 func (m *mockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 	if m.transcribeFunc != nil {
 		return m.transcribeFunc(ctx, req)
@@ -80,10 +139,12 @@ func (m *mockBackend) TranscribeAudio(ctx context.Context, req *backends.Transcr
 	}, nil
 }
 
-func (m *mockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+// TranscribeAudioStream is part of the public API.
+func (m *mockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
 	return nil, nil
 }
 
+// SynthesizeSpeech is part of the public API.
 func (m *mockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
 	if m.synthesizeFunc != nil {
 		return m.synthesizeFunc(ctx, req)
@@ -97,10 +158,12 @@ func (m *mockBackend) SynthesizeSpeech(ctx context.Context, req *backends.Synthe
 	}, nil
 }
 
-func (m *mockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+// SynthesizeSpeechStream is part of the public API.
+func (m *mockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
 	return nil, io.ErrUnexpectedEOF // Force fallback to non-streaming
 }
 
+// AnalyzeImage is part of the public API.
 func (m *mockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
 	if m.analyzeImageFunc != nil {
 		return m.analyzeImageFunc(ctx, req)
@@ -113,6 +176,7 @@ func (m *mockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnaly
 	}, nil
 }
 
+// GenerateImage is part of the public API.
 func (m *mockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
 	if m.generateImageFunc != nil {
 		return m.generateImageFunc(ctx, req)
@@ -131,40 +195,45 @@ func (m *mockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenR
 	}, nil
 }
 
-func (m *mockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+// GenerateImageStream is part of the public API.
+func (m *mockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
 	return nil, io.ErrUnexpectedEOF // Force fallback
 }
 
-func (m *mockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+// AnalyzeVideo is part of the public API.
+func (m *mockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+// AnalyzeVideoStream is part of the public API.
+func (m *mockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+// GenerateVideo is part of the public API.
+func (m *mockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
 	return nil, nil
 }
 
-func (m *mockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+// GenerateVideoStream is part of the public API.
+func (m *mockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
 	return nil, nil
 }
 
 // Test audio-to-text execution
 func TestExecuteAudioToText(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: true,
 	}
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:                "audio-to-text",
-		Type:              StageTypeAudioToText,
-		Model:             "whisper-tiny",
-		PreferredBackend:  "test-backend",
+		ID:               strAudioToText,
+		Type:             StageTypeAudioToText,
+		Model:            strWhisperTiny,
+		PreferredBackend: strTestBackend,
 	}
 
 	// Test with raw audio bytes
@@ -188,7 +257,7 @@ func TestExecuteAudioToText(t *testing.T) {
 // Test text-to-audio execution
 func TestExecuteTextToAudio(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsTextAudio: true,
 	}
 
@@ -198,7 +267,7 @@ func TestExecuteTextToAudio(t *testing.T) {
 		ID:               "text-to-audio",
 		Type:             StageTypeTextToAudio,
 		Model:            "piper-tts",
-		PreferredBackend: "test-backend",
+		PreferredBackend: strTestBackend,
 	}
 
 	// Test with text input
@@ -222,7 +291,7 @@ func TestExecuteTextToAudio(t *testing.T) {
 // Test image-to-text execution
 func TestExecuteImageToText(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsImageText: true,
 	}
 
@@ -232,7 +301,7 @@ func TestExecuteImageToText(t *testing.T) {
 		ID:               "image-to-text",
 		Type:             StageTypeImageToText,
 		Model:            "llava",
-		PreferredBackend: "test-backend",
+		PreferredBackend: strTestBackend,
 	}
 
 	// Test with raw image bytes
@@ -256,7 +325,7 @@ func TestExecuteImageToText(t *testing.T) {
 // Test text-to-image execution
 func TestExecuteTextToImage(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsTextImage: true,
 	}
 
@@ -266,7 +335,7 @@ func TestExecuteTextToImage(t *testing.T) {
 		ID:               "text-to-image",
 		Type:             StageTypeTextToImage,
 		Model:            "stable-diffusion",
-		PreferredBackend: "test-backend",
+		PreferredBackend: strTestBackend,
 	}
 
 	// Test with text prompt
@@ -290,7 +359,7 @@ func TestExecuteTextToImage(t *testing.T) {
 // Test full voice assistant pipeline with multimedia stages
 func TestVoiceAssistantMultimediaPipeline(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: true,
 		supportsTextAudio: true,
 	}
@@ -302,25 +371,25 @@ func TestVoiceAssistantMultimediaPipeline(t *testing.T) {
 		Name: "Voice Assistant Test",
 		Stages: []*Stage{
 			{
-				ID:               "audio-to-text",
+				ID:               strAudioToText,
 				Type:             StageTypeAudioToText,
-				Model:            "whisper-tiny",
-				PreferredBackend: "test-backend",
+				Model:            strWhisperTiny,
+				PreferredBackend: strTestBackend,
 			},
 			{
 				ID:               "llm-response",
 				Type:             StageTypeTextGen,
-				Model:            "llama3",
-				PreferredBackend: "test-backend",
+				Model:            strLlama3,
+				PreferredBackend: strTestBackend,
 			},
 			{
 				ID:               "text-to-audio",
 				Type:             StageTypeTextToAudio,
 				Model:            "piper-tts",
-				PreferredBackend: "test-backend",
+				PreferredBackend: strTestBackend,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			EnableStreaming: true,
 			PreserveContext: true,
 			CollectMetrics:  true,
@@ -357,7 +426,7 @@ func TestVoiceAssistantMultimediaPipeline(t *testing.T) {
 // Test parallel pipeline execution
 func TestParallelPipelineExecution(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: true,
 		supportsTextAudio: true,
 	}
@@ -369,19 +438,19 @@ func TestParallelPipelineExecution(t *testing.T) {
 		Name: "Parallel Test",
 		Stages: []*Stage{
 			{
-				ID:               "stage1",
+				ID:               strStage1,
 				Type:             StageTypeTextGen,
-				Model:            "llama3",
-				PreferredBackend: "test-backend",
+				Model:            strLlama3,
+				PreferredBackend: strTestBackend,
 			},
 			{
-				ID:               "stage2",
+				ID:               strStage2,
 				Type:             StageTypeEmbed,
 				Model:            "nomic-embed",
-				PreferredBackend: "test-backend",
+				PreferredBackend: strTestBackend,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ParallelStages: true, // Enable parallel execution
 		},
 	}
@@ -406,17 +475,17 @@ func TestParallelPipelineExecution(t *testing.T) {
 // Test backend capability check
 func TestBackendCapabilityCheck(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: false, // Doesn't support audio
 	}
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:               "audio-to-text",
+		ID:               strAudioToText,
 		Type:             StageTypeAudioToText,
-		Model:            "whisper-tiny",
-		PreferredBackend: "test-backend",
+		Model:            strWhisperTiny,
+		PreferredBackend: strTestBackend,
 	}
 
 	audioData := []byte{0x00, 0x01, 0x02, 0x03}
@@ -430,9 +499,9 @@ func TestBackendCapabilityCheck(t *testing.T) {
 // Test error handling in pipeline
 func TestPipelineErrorHandling(t *testing.T) {
 	backend := &mockBackend{
-		id:                "test-backend",
+		id:                strTestBackend,
 		supportsAudioText: true,
-		transcribeFunc: func(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+		transcribeFunc: func(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 			return nil, io.ErrUnexpectedEOF // Simulate error
 		},
 	}
@@ -444,13 +513,13 @@ func TestPipelineErrorHandling(t *testing.T) {
 		Name: "Error Test",
 		Stages: []*Stage{
 			{
-				ID:               "audio-to-text",
+				ID:               strAudioToText,
 				Type:             StageTypeAudioToText,
-				Model:            "whisper-tiny",
-				PreferredBackend: "test-backend",
+				Model:            strWhisperTiny,
+				PreferredBackend: strTestBackend,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// TestNewPolicy is part of the public API.
 func TestNewPolicy(t *testing.T) {
 	p := NewPolicy()
 	if p == nil {
@@ -17,6 +18,7 @@ func TestNewPolicy(t *testing.T) {
 	}
 }
 
+// TestGetOrCreateBudget_Free is part of the public API.
 func TestGetOrCreateBudget_Free(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
@@ -35,6 +37,7 @@ func TestGetOrCreateBudget_Free(t *testing.T) {
 	}
 }
 
+// TestGetOrCreateBudget_Basic is part of the public API.
 func TestGetOrCreateBudget_Basic(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user2", TierBasic)
@@ -50,6 +53,7 @@ func TestGetOrCreateBudget_Basic(t *testing.T) {
 	}
 }
 
+// TestGetOrCreateBudget_Premium is part of the public API.
 func TestGetOrCreateBudget_Premium(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user3", TierPremium)
@@ -65,6 +69,7 @@ func TestGetOrCreateBudget_Premium(t *testing.T) {
 	}
 }
 
+// TestGetOrCreateBudget_Enterprise is part of the public API.
 func TestGetOrCreateBudget_Enterprise(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user4", TierEnterprise)
@@ -80,6 +85,7 @@ func TestGetOrCreateBudget_Enterprise(t *testing.T) {
 	}
 }
 
+// TestGetOrCreateBudget_ReturnsExisting is part of the public API.
 func TestGetOrCreateBudget_ReturnsExisting(t *testing.T) {
 	p := NewPolicy()
 	budget1 := p.GetOrCreateBudget("user1", TierFree)
@@ -96,11 +102,12 @@ func TestGetOrCreateBudget_ReturnsExisting(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_Success is part of the public API.
 func TestCheckAndDeduct_Success(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
 
-	err := budget.CheckAndDeduct("ollama-igpu", 2.0)
+	err := budget.CheckAndDeduct(strOllamaIgpu, 2.0)
 	if err != nil {
 		t.Errorf("CheckAndDeduct should succeed, got: %v", err)
 	}
@@ -110,12 +117,13 @@ func TestCheckAndDeduct_Success(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_EnergyBudgetExceeded is part of the public API.
 func TestCheckAndDeduct_EnergyBudgetExceeded(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree) // 10 Wh budget
 
 	budget.usedTodayWh = 9.0
-	err := budget.CheckAndDeduct("ollama-nvidia", 2.0) // Would exceed
+	err := budget.CheckAndDeduct(strOllamaNvidia, 2.0) // Would exceed
 
 	if err == nil {
 		t.Error("Expected error for budget exceeded")
@@ -125,12 +133,13 @@ func TestCheckAndDeduct_EnergyBudgetExceeded(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_NvidiaQuotaExceeded is part of the public API.
 func TestCheckAndDeduct_NvidiaQuotaExceeded(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree) // 5 NVIDIA/hour quota
 
 	budget.nvidiaUsedThisHour = 5
-	err := budget.CheckAndDeduct("ollama-nvidia", 0.5)
+	err := budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 
 	if err == nil {
 		t.Error("Expected error for NVIDIA quota exceeded")
@@ -140,11 +149,12 @@ func TestCheckAndDeduct_NvidiaQuotaExceeded(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_NvidiaCountIncremented is part of the public API.
 func TestCheckAndDeduct_NvidiaCountIncremented(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierBasic)
 
-	err := budget.CheckAndDeduct("ollama-nvidia", 1.0)
+	err := budget.CheckAndDeduct(strOllamaNvidia, 1.0)
 	if err != nil {
 		t.Fatalf("CheckAndDeduct failed: %v", err)
 	}
@@ -154,11 +164,12 @@ func TestCheckAndDeduct_NvidiaCountIncremented(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_NonNvidiaNoQuotaCount is part of the public API.
 func TestCheckAndDeduct_NonNvidiaNoQuotaCount(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
 
-	err := budget.CheckAndDeduct("ollama-igpu", 1.0)
+	err := budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	if err != nil {
 		t.Fatalf("CheckAndDeduct failed: %v", err)
 	}
@@ -168,6 +179,7 @@ func TestCheckAndDeduct_NonNvidiaNoQuotaCount(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_DailyReset is part of the public API.
 func TestCheckAndDeduct_DailyReset(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
@@ -177,7 +189,7 @@ func TestCheckAndDeduct_DailyReset(t *testing.T) {
 	budget.usedTodayUSD = 0.5
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour) // Over 24 hours ago
 
-	err := budget.CheckAndDeduct("ollama-igpu", 1.0)
+	err := budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	if err != nil {
 		t.Fatalf("CheckAndDeduct failed: %v", err)
 	}
@@ -191,6 +203,7 @@ func TestCheckAndDeduct_DailyReset(t *testing.T) {
 	}
 }
 
+// TestCheckAndDeduct_NvidiaHourlyReset is part of the public API.
 func TestCheckAndDeduct_NvidiaHourlyReset(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
@@ -199,7 +212,7 @@ func TestCheckAndDeduct_NvidiaHourlyReset(t *testing.T) {
 	budget.nvidiaUsedThisHour = 5
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute) // Over 1 hour ago
 
-	err := budget.CheckAndDeduct("ollama-nvidia", 0.5)
+	err := budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 	if err != nil {
 		t.Fatalf("CheckAndDeduct failed: %v", err)
 	}
@@ -210,52 +223,57 @@ func TestCheckAndDeduct_NvidiaHourlyReset(t *testing.T) {
 	}
 }
 
+// TestSuggestAlternative_VeryLowBudget is part of the public API.
 func TestSuggestAlternative_VeryLowBudget(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
 	budget.usedTodayWh = 9.5 // 0.5 Wh remaining
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
-	if suggestion != "ollama-npu" {
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
+	if suggestion != strOllamaNpu {
 		t.Errorf("Expected NPU for very low budget, got %s", suggestion)
 	}
 }
 
+// TestSuggestAlternative_ModerateBudget is part of the public API.
 func TestSuggestAlternative_ModerateBudget(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
 	budget.usedTodayWh = 5.0 // 5 Wh remaining
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
-	if suggestion != "ollama-igpu" {
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
+	if suggestion != strOllamaIgpu {
 		t.Errorf("Expected Intel GPU for moderate budget, got %s", suggestion)
 	}
 }
 
+// TestSuggestAlternative_HighBudgetWithQuota is part of the public API.
 func TestSuggestAlternative_HighBudgetWithQuota(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierPremium)
-	budget.usedTodayWh = 50.0 // 150 Wh remaining
+	budget.usedTodayWh = 50.0      // 150 Wh remaining
 	budget.nvidiaUsedThisHour = 10 // Under quota (100)
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
-	if suggestion != "ollama-nvidia" {
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
+	if suggestion != strOllamaNvidia {
 		t.Errorf("Expected NVIDIA when budget and quota available, got %s", suggestion)
 	}
 }
 
+// TestSuggestAlternative_HighBudgetNoQuota is part of the public API.
 func TestSuggestAlternative_HighBudgetNoQuota(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
-	budget.usedTodayWh = 0.0 // 10 Wh remaining (> 10)
+	budget.usedTodayWh = 0.0      // 10 Wh remaining (> 10)
 	budget.nvidiaUsedThisHour = 5 // Quota exceeded
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
-	if suggestion != "ollama-igpu" {
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
+	if suggestion != strOllamaIgpu {
 		t.Errorf("Expected Intel GPU when NVIDIA quota exceeded, got %s", suggestion)
 	}
 }
 
+// TestSetBatteryMode is part of the public API.
 func TestSetBatteryMode(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 45)
@@ -268,6 +286,7 @@ func TestSetBatteryMode(t *testing.T) {
 	}
 }
 
+// TestMaxAllowedPower_OnACPower is part of the public API.
 func TestMaxAllowedPower_OnACPower(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(false, 100)
@@ -278,6 +297,7 @@ func TestMaxAllowedPower_OnACPower(t *testing.T) {
 	}
 }
 
+// TestMaxAllowedPower_BatteryUnder20 is part of the public API.
 func TestMaxAllowedPower_BatteryUnder20(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 15)
@@ -288,6 +308,7 @@ func TestMaxAllowedPower_BatteryUnder20(t *testing.T) {
 	}
 }
 
+// TestMaxAllowedPower_Battery20to50 is part of the public API.
 func TestMaxAllowedPower_Battery20to50(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 35)
@@ -298,6 +319,7 @@ func TestMaxAllowedPower_Battery20to50(t *testing.T) {
 	}
 }
 
+// TestMaxAllowedPower_Battery50to80 is part of the public API.
 func TestMaxAllowedPower_Battery50to80(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 65)
@@ -308,6 +330,7 @@ func TestMaxAllowedPower_Battery50to80(t *testing.T) {
 	}
 }
 
+// TestMaxAllowedPower_BatteryOver80 is part of the public API.
 func TestMaxAllowedPower_BatteryOver80(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 90)
@@ -318,6 +341,7 @@ func TestMaxAllowedPower_BatteryOver80(t *testing.T) {
 	}
 }
 
+// TestShouldThrottle_QuietHoursLate is part of the public API.
 func TestShouldThrottle_QuietHoursLate(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(false, 100)
@@ -335,11 +359,12 @@ func TestShouldThrottle_QuietHoursLate(t *testing.T) {
 		t.Logf("Current hour: %d, shouldThrottle: %v, expected: %v", hour, shouldThrottle, expected)
 		// Only error if not in quiet hours and we're not on low battery
 		if !expected && !p.batteryMode {
-			// This is fine - we're not in quiet hours and not on battery
+			t.Errorf("throttle mismatch outside quiet hours: got %v want %v", shouldThrottle, expected)
 		}
 	}
 }
 
+// TestShouldThrottle_LowBattery is part of the public API.
 func TestShouldThrottle_LowBattery(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 25)
@@ -350,6 +375,7 @@ func TestShouldThrottle_LowBattery(t *testing.T) {
 	}
 }
 
+// TestShouldThrottle_FullBatteryDaytime is part of the public API.
 func TestShouldThrottle_FullBatteryDaytime(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 90)
@@ -366,21 +392,23 @@ func TestShouldThrottle_FullBatteryDaytime(t *testing.T) {
 	}
 }
 
+// TestGetRecommendedBackend_WithinBudget is part of the public API.
 func TestGetRecommendedBackend_WithinBudget(t *testing.T) {
 	p := NewPolicy()
 	// Pre-create the budget to avoid deadlock in GetRecommendedBackend
 	_ = p.GetOrCreateBudget("user1", TierPremium)
 	p.SetBatteryMode(false, 100)
 
-	backend, err := p.GetRecommendedBackend("user1", TierPremium, "ollama-nvidia", 100)
+	backend, err := p.GetRecommendedBackend("user1", TierPremium, strOllamaNvidia, 100)
 	if err != nil {
 		t.Errorf("Expected no error for premium user with budget, got: %v", err)
 	}
-	if backend != "ollama-nvidia" {
+	if backend != strOllamaNvidia {
 		t.Errorf("Expected ollama-nvidia, got %s", backend)
 	}
 }
 
+// TestGetRecommendedBackend_BudgetExceeded is part of the public API.
 func TestGetRecommendedBackend_BudgetExceeded(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
@@ -390,7 +418,7 @@ func TestGetRecommendedBackend_BudgetExceeded(t *testing.T) {
 
 	// 5000 tokens on NVIDIA: 5000 / 65 ~= 76.9 seconds
 	// 55W * 76.9s / 3600 = 1.176 Wh (definitely exceeds 0.5 Wh remaining)
-	backend, err := p.GetRecommendedBackend("user1", TierFree, "ollama-nvidia", 5000)
+	backend, err := p.GetRecommendedBackend("user1", TierFree, strOllamaNvidia, 5000)
 	if err == nil {
 		t.Error("Expected error for budget exceeded")
 		return
@@ -399,16 +427,17 @@ func TestGetRecommendedBackend_BudgetExceeded(t *testing.T) {
 		t.Errorf("Expected 'budget exceeded' in error, got: %v", err)
 	}
 	// Should suggest alternative
-	if backend == "ollama-nvidia" {
+	if backend == strOllamaNvidia {
 		t.Error("Should not return original backend when budget exceeded")
 	}
 }
 
+// TestGetRecommendedBackend_PowerConstraint is part of the public API.
 func TestGetRecommendedBackend_PowerConstraint(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 15) // Very low battery, maxPower = 5W
 
-	backend, err := p.GetRecommendedBackend("user1", TierPremium, "ollama-nvidia", 100)
+	backend, err := p.GetRecommendedBackend("user1", TierPremium, strOllamaNvidia, 100)
 	if err == nil {
 		t.Error("Expected error for power constraint")
 		return
@@ -416,27 +445,29 @@ func TestGetRecommendedBackend_PowerConstraint(t *testing.T) {
 	if !strings.Contains(err.Error(), "battery") {
 		t.Errorf("Expected 'battery' in error message, got: %v", err)
 	}
-	if backend != "ollama-npu" {
+	if backend != strOllamaNpu {
 		t.Errorf("Expected downgrade to NPU for low battery, got %s", backend)
 	}
 }
 
+// TestGetRecommendedBackend_ModerateDowngrade is part of the public API.
 func TestGetRecommendedBackend_ModerateDowngrade(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 40) // Moderate battery, maxPower = 15W
 
-	backend, err := p.GetRecommendedBackend("user1", TierPremium, "ollama-nvidia", 100)
+	backend, err := p.GetRecommendedBackend("user1", TierPremium, strOllamaNvidia, 100)
 	if err == nil {
 		t.Error("Expected error for power constraint")
 		return
 	}
-	if backend != "ollama-igpu" {
+	if backend != strOllamaIgpu {
 		t.Errorf("Expected downgrade to Intel GPU, got %s", backend)
 	}
 }
 
+// TestEstimateEnergy_NPU is part of the public API.
 func TestEstimateEnergy_NPU(t *testing.T) {
-	energy := estimateEnergy("ollama-npu", 100)
+	energy := estimateEnergy(strOllamaNpu, 100)
 
 	// NPU: 10 tokens/sec, 3W
 	// Time: 100/10 = 10 seconds
@@ -448,8 +479,9 @@ func TestEstimateEnergy_NPU(t *testing.T) {
 	}
 }
 
+// TestEstimateEnergy_IntelGPU is part of the public API.
 func TestEstimateEnergy_IntelGPU(t *testing.T) {
-	energy := estimateEnergy("ollama-igpu", 220)
+	energy := estimateEnergy(strOllamaIgpu, 220)
 
 	// Intel GPU: 22 tokens/sec, 12W
 	// Time: 220/22 = 10 seconds
@@ -461,8 +493,9 @@ func TestEstimateEnergy_IntelGPU(t *testing.T) {
 	}
 }
 
+// TestEstimateEnergy_Nvidia is part of the public API.
 func TestEstimateEnergy_Nvidia(t *testing.T) {
-	energy := estimateEnergy("ollama-nvidia", 650)
+	energy := estimateEnergy(strOllamaNvidia, 650)
 
 	// NVIDIA: 65 tokens/sec, 55W
 	// Time: 650/65 = 10 seconds
@@ -474,6 +507,7 @@ func TestEstimateEnergy_Nvidia(t *testing.T) {
 	}
 }
 
+// TestEstimateEnergy_CPU is part of the public API.
 func TestEstimateEnergy_CPU(t *testing.T) {
 	energy := estimateEnergy("ollama-cpu", 60)
 
@@ -487,6 +521,7 @@ func TestEstimateEnergy_CPU(t *testing.T) {
 	}
 }
 
+// TestEstimateEnergy_UnknownBackend is part of the public API.
 func TestEstimateEnergy_UnknownBackend(t *testing.T) {
 	energy := estimateEnergy("unknown-backend", 220)
 
@@ -498,6 +533,7 @@ func TestEstimateEnergy_UnknownBackend(t *testing.T) {
 	}
 }
 
+// TestGetUsageStats is part of the public API.
 func TestGetUsageStats(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierFree)
@@ -533,7 +569,7 @@ func TestCheckAndDeduct_CostTracking(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierBasic)
 	budget.usedTodayUSD = 0.5
 
-	err := budget.CheckAndDeduct("ollama-igpu", 1.0)
+	err := budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	if err != nil {
 		t.Errorf("CheckAndDeduct should succeed, got: %v", err)
 	}
@@ -566,7 +602,7 @@ func TestCheckAndDeduct_ExactBudgetLimit(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree) // 10 Wh budget
 
 	budget.usedTodayWh = 8.0
-	err := budget.CheckAndDeduct("ollama-igpu", 2.0) // Exactly fills budget
+	err := budget.CheckAndDeduct(strOllamaIgpu, 2.0) // Exactly fills budget
 
 	if err != nil {
 		t.Errorf("Deduction to exact budget limit should succeed, got: %v", err)
@@ -583,7 +619,7 @@ func TestCheckAndDeduct_OnlySlightlyOver(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree) // 10 Wh budget
 
 	budget.usedTodayWh = 9.5
-	err := budget.CheckAndDeduct("ollama-igpu", 0.6) // 0.1 Wh over
+	err := budget.CheckAndDeduct(strOllamaIgpu, 0.6) // 0.1 Wh over
 
 	if err == nil {
 		t.Error("Deduction over budget should fail")
@@ -610,7 +646,7 @@ func TestCheckAndDeduct_NPU(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierBasic)
 
-	err := budget.CheckAndDeduct("ollama-npu", 0.5)
+	err := budget.CheckAndDeduct(strOllamaNpu, 0.5)
 	if err != nil {
 		t.Errorf("CheckAndDeduct NPU should succeed, got: %v", err)
 	}
@@ -670,8 +706,8 @@ func TestSuggestAlternative_EdgeCase1Wh(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree)
 	budget.usedTodayWh = 9.0 // 1.0 Wh remaining (edge case)
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
-	if suggestion != "ollama-igpu" {
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
+	if suggestion != strOllamaIgpu {
 		t.Errorf("Expected Intel GPU for 1 Wh remaining, got %s", suggestion)
 	}
 }
@@ -682,9 +718,9 @@ func TestSuggestAlternative_Exactly10Wh(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree)
 	budget.usedTodayWh = 0.0 // 10 Wh remaining (exact boundary)
 
-	suggestion := budget.SuggestAlternative("ollama-nvidia")
+	suggestion := budget.SuggestAlternative(strOllamaNvidia)
 	// At exactly 10.0, it's not < 10.0, so should try NVIDIA if quota available
-	if suggestion != "ollama-nvidia" {
+	if suggestion != strOllamaNvidia {
 		t.Errorf("Expected NVIDIA for exactly 10 Wh remaining, got %s", suggestion)
 	}
 }
@@ -764,7 +800,7 @@ func TestShouldThrottle_LowBatteryDaytime(t *testing.T) {
 
 // TestEstimateEnergy_ZeroTokens tests edge case
 func TestEstimateEnergy_ZeroTokens(t *testing.T) {
-	energy := estimateEnergy("ollama-nvidia", 0)
+	energy := estimateEnergy(strOllamaNvidia, 0)
 
 	if energy != 0.0 {
 		t.Errorf("Expected 0 energy for 0 tokens, got %.6f", energy)
@@ -773,7 +809,7 @@ func TestEstimateEnergy_ZeroTokens(t *testing.T) {
 
 // TestEstimateEnergy_LargeTokenCount tests realistic scenario
 func TestEstimateEnergy_LargeTokenCount(t *testing.T) {
-	energy := estimateEnergy("ollama-nvidia", 10000)
+	energy := estimateEnergy(strOllamaNvidia, 10000)
 
 	// NVIDIA: 65 tokens/sec, 55W
 	// Time: 10000/65 ~= 153.85 seconds
@@ -811,22 +847,22 @@ func TestCheckAndDeduct_MultipleDeductions(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierBasic) // 50 Wh
 
-	err := budget.CheckAndDeduct("ollama-igpu", 10.0)
+	err := budget.CheckAndDeduct(strOllamaIgpu, 10.0)
 	if err != nil {
 		t.Errorf("First deduction should succeed: %v", err)
 	}
 
-	err = budget.CheckAndDeduct("ollama-igpu", 15.0)
+	err = budget.CheckAndDeduct(strOllamaIgpu, 15.0)
 	if err != nil {
 		t.Errorf("Second deduction should succeed: %v", err)
 	}
 
-	err = budget.CheckAndDeduct("ollama-igpu", 20.0)
+	err = budget.CheckAndDeduct(strOllamaIgpu, 20.0)
 	if err != nil {
 		t.Errorf("Third deduction should succeed: %v", err)
 	}
 
-	err = budget.CheckAndDeduct("ollama-igpu", 10.0)
+	err = budget.CheckAndDeduct(strOllamaIgpu, 10.0)
 	if err == nil {
 		t.Error("Fourth deduction should fail, exceeds budget")
 	}
@@ -842,14 +878,14 @@ func TestCheckAndDeduct_NvidiaQuotaMultiple(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierBasic) // 20 NVIDIA/hour
 
 	for i := 0; i < 20; i++ {
-		err := budget.CheckAndDeduct("ollama-nvidia", 0.5)
+		err := budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 		if err != nil {
 			t.Errorf("Deduction %d should succeed: %v", i+1, err)
 		}
 	}
 
 	// Should fail on 21st
-	err := budget.CheckAndDeduct("ollama-nvidia", 0.5)
+	err := budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 	if err == nil {
 		t.Error("21st NVIDIA deduction should fail, quota exceeded")
 	}
@@ -861,8 +897,8 @@ func TestCheckAndDeduct_MixedBackends(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree) // 5 NVIDIA/hour
 
 	// Use non-NVIDIA backends - should not affect NVIDIA quota
-	_ = budget.CheckAndDeduct("ollama-npu", 1.0)
-	_ = budget.CheckAndDeduct("ollama-igpu", 1.0)
+	_ = budget.CheckAndDeduct(strOllamaNpu, 1.0)
+	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	_ = budget.CheckAndDeduct("ollama-cpu", 1.0)
 
 	if budget.nvidiaUsedThisHour != 0 {
@@ -870,7 +906,7 @@ func TestCheckAndDeduct_MixedBackends(t *testing.T) {
 	}
 
 	// Now use NVIDIA - should count
-	_ = budget.CheckAndDeduct("ollama-nvidia", 1.0)
+	_ = budget.CheckAndDeduct(strOllamaNvidia, 1.0)
 	if budget.nvidiaUsedThisHour != 1 {
 		t.Error("NVIDIA deduction should increment NVIDIA quota")
 	}
@@ -901,7 +937,7 @@ func TestGetRecommendedBackend_AllBackends(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(false, 100)
 
-	backends := []string{"ollama-npu", "ollama-igpu", "ollama-cpu", "ollama-nvidia"}
+	backends := []string{strOllamaNpu, strOllamaIgpu, "ollama-cpu", strOllamaNvidia}
 
 	for i, backend := range backends {
 		userID := fmt.Sprintf("user%d", i)
@@ -922,11 +958,11 @@ func TestGetRecommendedBackend_IGPUDowngrade(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(true, 55) // maxPower = 30W, NVIDIA = 55W too much
 
-	backend, err := p.GetRecommendedBackend("user1", TierPremium, "ollama-nvidia", 100)
+	backend, err := p.GetRecommendedBackend("user1", TierPremium, strOllamaNvidia, 100)
 	if err == nil {
 		t.Error("Should have returned error for power constraint")
 	}
-	if backend != "ollama-igpu" {
+	if backend != strOllamaIgpu {
 		t.Errorf("Expected downgrade to IGPU (12W), got %s", backend)
 	}
 }
@@ -934,13 +970,13 @@ func TestGetRecommendedBackend_IGPUDowngrade(t *testing.T) {
 // TestEstimateEnergy_AllBackends tests energy estimation for all backends
 func TestEstimateEnergy_AllBackends(t *testing.T) {
 	backends := map[string]struct {
-		tokens   int
-		minWh    float64
-		maxWh    float64
+		tokens int
+		minWh  float64
+		maxWh  float64
 	}{
-		"ollama-npu":    {tokens: 100, minWh: 0.008, maxWh: 0.009},
-		"ollama-igpu":   {tokens: 220, minWh: 0.033, maxWh: 0.034},
-		"ollama-nvidia": {tokens: 650, minWh: 0.15, maxWh: 0.16},
+		strOllamaNpu:    {tokens: 100, minWh: 0.008, maxWh: 0.009},
+		strOllamaIgpu:   {tokens: 220, minWh: 0.033, maxWh: 0.034},
+		strOllamaNvidia: {tokens: 650, minWh: 0.15, maxWh: 0.16},
 		"ollama-cpu":    {tokens: 60, minWh: 0.077, maxWh: 0.078},
 	}
 
@@ -983,12 +1019,12 @@ func TestCheckAndDeduct_MultipleDailyResets(t *testing.T) {
 	budget.usedTodayWh = 5.0
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
 
-	_ = budget.CheckAndDeduct("ollama-igpu", 1.0)
+	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	firstUsed := budget.usedTodayWh
 
 	// Second reset simulation
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
-	_ = budget.CheckAndDeduct("ollama-igpu", 1.0)
+	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
 	secondUsed := budget.usedTodayWh
 
 	if firstUsed != 1.0 || secondUsed != 1.0 {
@@ -1005,12 +1041,12 @@ func TestCheckAndDeduct_MultipleHourlyResets(t *testing.T) {
 	budget.nvidiaUsedThisHour = 10
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
 
-	_ = budget.CheckAndDeduct("ollama-nvidia", 0.5)
+	_ = budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 	firstCount := budget.nvidiaUsedThisHour
 
 	// Second reset simulation
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
-	_ = budget.CheckAndDeduct("ollama-nvidia", 0.5)
+	_ = budget.CheckAndDeduct(strOllamaNvidia, 0.5)
 	secondCount := budget.nvidiaUsedThisHour
 
 	if firstCount != 1 || secondCount != 1 {

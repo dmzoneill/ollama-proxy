@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// TestInitLogger is part of the public API.
 func TestInitLogger(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -16,13 +17,13 @@ func TestInitLogger(t *testing.T) {
 	}{
 		{
 			name:       "debug level development",
-			level:      "debug",
+			level:      strDebug,
 			production: false,
 			wantErr:    false,
 		},
 		{
 			name:       "info level development",
-			level:      "info",
+			level:      strInfo,
 			production: false,
 			wantErr:    false,
 		},
@@ -76,6 +77,7 @@ func TestInitLogger(t *testing.T) {
 	}
 }
 
+// TestSync is part of the public API.
 func TestSync(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -94,7 +96,7 @@ func TestSync(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.initLogger {
-				if err := InitLogger("info", false); err != nil {
+				if err := InitLogger(strInfo, false); err != nil {
 					t.Fatalf("Failed to initialize logger: %v", err)
 				}
 			} else {
@@ -107,15 +109,16 @@ func TestSync(t *testing.T) {
 	}
 }
 
+// TestLoggingFunctions is part of the public API.
 func TestLoggingFunctions(t *testing.T) {
 	// Initialize logger for testing
-	if err := InitLogger("debug", false); err != nil {
+	if err := InitLogger(strDebug, false); err != nil {
 		t.Fatalf("Failed to initialize logger: %v", err)
 	}
 
 	tests := []struct {
-		name string
 		fn   func()
+		name string
 	}{
 		{
 			name: "Info",
@@ -144,19 +147,20 @@ func TestLoggingFunctions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Should not panic
 			tt.fn()
 		})
 	}
 }
 
+// TestLoggingFunctionsWithNilLogger is part of the public API.
 func TestLoggingFunctionsWithNilLogger(t *testing.T) {
 	Logger = nil
 
 	tests := []struct {
-		name string
 		fn   func()
+		name string
 	}{
 		{
 			name: "Info with nil logger",
@@ -185,23 +189,24 @@ func TestLoggingFunctionsWithNilLogger(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Should not panic even with nil logger
 			tt.fn()
 		})
 	}
 }
 
+// TestLogLevels is part of the public API.
 func TestLogLevels(t *testing.T) {
 	tests := []struct {
 		level         string
 		expectedLevel zapcore.Level
 	}{
-		{"debug", zapcore.DebugLevel},
-		{"info", zapcore.InfoLevel},
-		{"warn", zapcore.WarnLevel},
-		{"error", zapcore.ErrorLevel},
-		{"invalid", zapcore.InfoLevel}, // defaults to info
+		{level: strDebug, expectedLevel: zapcore.DebugLevel},
+		{level: strInfo, expectedLevel: zapcore.InfoLevel},
+		{level: "warn", expectedLevel: zapcore.WarnLevel},
+		{level: "error", expectedLevel: zapcore.ErrorLevel},
+		{level: "invalid", expectedLevel: zapcore.InfoLevel}, // defaults to info
 	}
 
 	for _, tt := range tests {
@@ -216,18 +221,20 @@ func TestLogLevels(t *testing.T) {
 
 			// Verify logger is at the expected level by checking if it would log at that level
 			// This is a basic sanity check
-			if tt.level == "debug" {
+			switch tt.level {
+			case strDebug:
 				Debug("debug message")
-			} else if tt.level == "info" {
+			case strInfo:
 				Info("info message")
 			}
 		})
 	}
 }
 
+// TestProductionVsDevelopmentMode is part of the public API.
 func TestProductionVsDevelopmentMode(t *testing.T) {
 	t.Run("production mode", func(t *testing.T) {
-		if err := InitLogger("info", true); err != nil {
+		if err := InitLogger(strInfo, true); err != nil {
 			t.Fatalf("Failed to initialize logger: %v", err)
 		}
 
@@ -240,7 +247,7 @@ func TestProductionVsDevelopmentMode(t *testing.T) {
 	})
 
 	t.Run("development mode", func(t *testing.T) {
-		if err := InitLogger("debug", false); err != nil {
+		if err := InitLogger(strDebug, false); err != nil {
 			t.Fatalf("Failed to initialize logger: %v", err)
 		}
 

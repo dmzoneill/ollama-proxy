@@ -5,6 +5,7 @@ import (
 
 	"github.com/daoneill/ollama-proxy/pkg/efficiency"
 	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
@@ -19,12 +20,12 @@ const (
 // SystemService exposes system state via D-Bus
 type SystemService struct {
 	conn    *dbus.Conn
-	manager *efficiency.EfficiencyManager
+	manager *efficiency.Manager
 	props   *prop.Properties
 }
 
 // NewSystemService creates a D-Bus service for system state
-func NewSystemService(manager *efficiency.EfficiencyManager) (*SystemService, error) {
+func NewSystemService(manager *efficiency.Manager) (*SystemService, error) {
 	if manager == nil {
 		return nil, fmt.Errorf("efficiency manager is nil")
 	}
@@ -75,19 +76,19 @@ func (ss *SystemService) Start() error {
 					{
 						Name: "GetSystemState",
 						Args: []introspect.Arg{
-							{Name: "state", Type: "a{sv}", Direction: "out"},
+							{Name: strState, Type: strASv, Direction: strOut},
 						},
 					},
 					{
 						Name: "GetAutoModeReasoning",
 						Args: []introspect.Arg{
-							{Name: "reasoning", Type: "s", Direction: "out"},
+							{Name: "reasoning", Type: "s", Direction: strOut},
 						},
 					},
 					{
 						Name: "IsQuietHours",
 						Args: []introspect.Arg{
-							{Name: "quiet_hours", Type: "b", Direction: "out"},
+							{Name: "quiet_hours", Type: "b", Direction: strOut},
 						},
 					},
 				},
@@ -95,17 +96,17 @@ func (ss *SystemService) Start() error {
 					{
 						Name:   "BatteryPercent",
 						Type:   "i",
-						Access: "read",
+						Access: strRead,
 					},
 					{
 						Name:   "OnBattery",
 						Type:   "b",
-						Access: "read",
+						Access: strRead,
 					},
 					{
 						Name:   "QuietHours",
 						Type:   "b",
-						Access: "read",
+						Access: strRead,
 					},
 				},
 				Signals: []introspect.Signal{
@@ -137,8 +138,11 @@ func (ss *SystemService) Start() error {
 		return fmt.Errorf("failed to export introspection: %w", err)
 	}
 
-	// Setup properties
-	ss.props, _ = prop.Export(ss.conn, systemPath, ss.makePropertyMap())
+	props, err := prop.Export(ss.conn, systemPath, ss.makePropertyMap())
+	if err != nil {
+		return fmt.Errorf("failed to export properties: %w", err)
+	}
+	ss.props = props
 
 	logging.Logger.Info("D-Bus System State service started",
 		zap.String("interface", systemInterface),
@@ -151,10 +155,10 @@ func (ss *SystemService) GetSystemState() (map[string]dbus.Variant, *dbus.Error)
 	state := ss.manager.GetSystemState()
 
 	result := map[string]dbus.Variant{
-		"battery_percent": dbus.MakeVariant(int32(state.BatteryPercent)),
+		"battery_percent": dbus.MakeVariant(safeconv.Int32FromInt(state.BatteryPercent)),
 		"on_battery":      dbus.MakeVariant(state.OnBattery),
 		"avg_temp":        dbus.MakeVariant(state.AvgTemp),
-		"avg_fan_speed":   dbus.MakeVariant(int32(state.AvgFanSpeed)),
+		"avg_fan_speed":   dbus.MakeVariant(safeconv.Int32FromInt(state.AvgFanSpeed)),
 		"quiet_hours":     dbus.MakeVariant(state.QuietHours),
 	}
 
@@ -202,10 +206,7 @@ func (ss *SystemService) IsQuietHours() (bool, *dbus.Error) {
 
 // EmitPowerSourceChanged emits power source changed signal (called by application)
 func (ss *SystemService) EmitPowerSourceChanged(onBattery bool) {
-	if ss.conn != nil {
-		ss.conn.Emit(systemPath, systemInterface+".PowerSourceChanged",
-			onBattery)
-	}
+	emitOrLog(ss.conn, systemPath, systemInterface+".PowerSourceChanged", onBattery)
 
 	// Update property
 	if ss.props != nil {
@@ -215,23 +216,17 @@ func (ss *SystemService) EmitPowerSourceChanged(onBattery bool) {
 
 // EmitBatteryLevelChanged emits battery level changed signal (called by application)
 func (ss *SystemService) EmitBatteryLevelChanged(percent int) {
-	if ss.conn != nil {
-		ss.conn.Emit(systemPath, systemInterface+".BatteryLevelChanged",
-			int32(percent))
-	}
+	emitOrLog(ss.conn, systemPath, systemInterface+".BatteryLevelChanged", safeconv.Int32FromInt(percent))
 
 	// Update property
 	if ss.props != nil {
-		ss.props.SetMust(systemInterface, "BatteryPercent", int32(percent))
+		ss.props.SetMust(systemInterface, "BatteryPercent", safeconv.Int32FromInt(percent))
 	}
 }
 
 // EmitQuietHoursChanged emits quiet hours changed signal (called by application)
 func (ss *SystemService) EmitQuietHoursChanged(active bool) {
-	if ss.conn != nil {
-		ss.conn.Emit(systemPath, systemInterface+".QuietHoursChanged",
-			active)
-	}
+	emitOrLog(ss.conn, systemPath, systemInterface+".QuietHoursChanged", active)
 
 	// Update property
 	if ss.props != nil {
@@ -246,7 +241,7 @@ func (ss *SystemService) makePropertyMap() map[string]map[string]*prop.Prop {
 	return map[string]map[string]*prop.Prop{
 		systemInterface: {
 			"BatteryPercent": {
-				Value:    int32(state.BatteryPercent),
+				Value:    safeconv.Int32FromInt(state.BatteryPercent),
 				Writable: false,
 				Emit:     prop.EmitTrue,
 			},
@@ -269,7 +264,7 @@ func (ss *SystemService) UpdateProperties() {
 	state := ss.manager.GetSystemState()
 
 	if ss.props != nil {
-		ss.props.SetMust(systemInterface, "BatteryPercent", int32(state.BatteryPercent))
+		ss.props.SetMust(systemInterface, "BatteryPercent", safeconv.Int32FromInt(state.BatteryPercent))
 		ss.props.SetMust(systemInterface, "OnBattery", state.OnBattery)
 		ss.props.SetMust(systemInterface, "QuietHours", state.QuietHours)
 	}
@@ -277,7 +272,5 @@ func (ss *SystemService) UpdateProperties() {
 
 // Stop stops the D-Bus service
 func (ss *SystemService) Stop() {
-	if ss.conn != nil {
-		ss.conn.Close()
-	}
+	closeConn(ss.conn)
 }

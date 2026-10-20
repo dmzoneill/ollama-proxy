@@ -1,3 +1,4 @@
+// Package workload detects workload characteristics used for routing.
 package workload
 
 import (
@@ -6,26 +7,26 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
-// WorkloadProfile defines routing preferences for a workload type
-type WorkloadProfile struct {
-	MediaType         backends.MediaType
-	PreferLowLatency  bool   // Prefer low-latency backends
-	PreferLowPower    bool   // Prefer power-efficient backends
-	PreferredModel    string // Recommended model for this workload
-	MaxModelSizeGB    int    // Maximum model size needed
-	MinTokensPerSec   int    // Minimum throughput needed
-	Description       string
+// Profile defines routing preferences for a workload type
+type Profile struct {
+	MediaType        backends.MediaType
+	PreferredModel   string
+	Description      string
+	MaxModelSizeGB   int
+	MinTokensPerSec  int
+	PreferLowLatency bool
+	PreferLowPower   bool
 }
 
 // Detector analyzes prompts to determine workload type
 type Detector struct {
-	profiles map[backends.MediaType]*WorkloadProfile
+	profiles map[backends.MediaType]*Profile
 }
 
 // NewDetector creates a new workload detector
 func NewDetector() *Detector {
 	return &Detector{
-		profiles: map[backends.MediaType]*WorkloadProfile{
+		profiles: map[backends.MediaType]*Profile{
 			backends.MediaTypeRealtime: {
 				MediaType:        backends.MediaTypeRealtime,
 				PreferLowLatency: true,
@@ -168,8 +169,8 @@ func (d *Detector) isCode(prompt string, model string) bool {
 	// Check model name first (code-specific models)
 	modelLower := strings.ToLower(model)
 	if strings.Contains(modelLower, "code") ||
-	   strings.Contains(modelLower, "starcoder") ||
-	   strings.Contains(modelLower, "codellama") {
+		strings.Contains(modelLower, "starcoder") ||
+		strings.Contains(modelLower, "codellama") {
 		return true
 	}
 
@@ -214,7 +215,7 @@ func (d *Detector) isImage(prompt string) bool {
 }
 
 // GetProfile returns the workload profile for a media type
-func (d *Detector) GetProfile(mediaType backends.MediaType) *WorkloadProfile {
+func (d *Detector) GetProfile(mediaType backends.MediaType) *Profile {
 	if profile, ok := d.profiles[mediaType]; ok {
 		return profile
 	}
@@ -227,14 +228,14 @@ func (d *Detector) GetRoutingHints(prompt string, model string, annotations *bac
 	profile := d.GetProfile(mediaType)
 
 	hints := &RoutingHints{
-		DetectedMediaType:  mediaType,
-		Profile:            profile,
-		PreferredModel:     profile.PreferredModel,
-		PreferLowLatency:   profile.PreferLowLatency,
-		PreferLowPower:     profile.PreferLowPower,
-		MaxModelSizeGB:     profile.MaxModelSizeGB,
-		MinTokensPerSec:    profile.MinTokensPerSec,
-		ReasoningChain:     []string{},
+		DetectedMediaType: mediaType,
+		Profile:           profile,
+		PreferredModel:    profile.PreferredModel,
+		PreferLowLatency:  profile.PreferLowLatency,
+		PreferLowPower:    profile.PreferLowPower,
+		MaxModelSizeGB:    profile.MaxModelSizeGB,
+		MinTokensPerSec:   profile.MinTokensPerSec,
+		ReasoningChain:    []string{},
 	}
 
 	// Add reasoning
@@ -259,12 +260,12 @@ func (d *Detector) GetRoutingHints(prompt string, model string, annotations *bac
 
 // RoutingHints contains recommendations for routing
 type RoutingHints struct {
+	Profile           *Profile
 	DetectedMediaType backends.MediaType
-	Profile           *WorkloadProfile
 	PreferredModel    string
-	PreferLowLatency  bool
-	PreferLowPower    bool
+	ReasoningChain    []string
 	MaxModelSizeGB    int
 	MinTokensPerSec   int
-	ReasoningChain    []string // Explanation of decisions
+	PreferLowLatency  bool
+	PreferLowPower    bool
 }

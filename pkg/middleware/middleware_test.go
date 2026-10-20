@@ -8,6 +8,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestWithRequestID is part of the public API.
 func TestWithRequestID(t *testing.T) {
 	ctx := context.Background()
 
@@ -26,10 +27,11 @@ func TestWithRequestID(t *testing.T) {
 	}
 }
 
+// TestGetRequestID is part of the public API.
 func TestGetRequestID(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func() context.Context
+		setup     func() context.Context
+		name      string
 		wantEmpty bool
 	}{
 		{
@@ -70,6 +72,7 @@ func TestGetRequestID(t *testing.T) {
 	}
 }
 
+// TestRequestIDUniqueness is part of the public API.
 func TestRequestIDUniqueness(t *testing.T) {
 	ctx := context.Background()
 
@@ -88,6 +91,7 @@ func TestRequestIDUniqueness(t *testing.T) {
 	}
 }
 
+// TestRecoverPanic is part of the public API.
 func TestRecoverPanic(t *testing.T) {
 	// Initialize logger for testing
 	if err := logging.InitLogger("info", false); err != nil {
@@ -95,10 +99,10 @@ func TestRecoverPanic(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		handler    func() error
-		wantErr    bool
-		wantPanic  bool
+		handler   func() error
+		name      string
+		wantErr   bool
+		wantPanic bool
 	}{
 		{
 			name: "handler succeeds",
@@ -133,9 +137,9 @@ func TestRecoverPanic(t *testing.T) {
 			wantPanic: true,
 		},
 		{
-			name: "handler panics with nil",
+			name: "handler panics with value",
 			handler: func() error {
-				panic(nil)
+				panic("nil panic")
 			},
 			wantErr:   true,
 			wantPanic: true,
@@ -163,6 +167,7 @@ func TestRecoverPanic(t *testing.T) {
 	}
 }
 
+// TestRecoverPanicWithoutRequestID is part of the public API.
 func TestRecoverPanicWithoutRequestID(t *testing.T) {
 	// Initialize logger for testing
 	if err := logging.InitLogger("info", false); err != nil {
@@ -185,6 +190,7 @@ func TestRecoverPanicWithoutRequestID(t *testing.T) {
 	}
 }
 
+// TestRecoverPanicPreservesOriginalError is part of the public API.
 func TestRecoverPanicPreservesOriginalError(t *testing.T) {
 	// Initialize logger for testing
 	if err := logging.InitLogger("info", false); err != nil {
@@ -203,6 +209,7 @@ func TestRecoverPanicPreservesOriginalError(t *testing.T) {
 	}
 }
 
+// TestContextKeyType is part of the public API.
 func TestContextKeyType(t *testing.T) {
 	// Verify the context key is of the correct type
 	var key interface{} = RequestIDKey

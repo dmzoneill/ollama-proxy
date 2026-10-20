@@ -1,3 +1,4 @@
+// Package validation checks request fields before routing.
 package validation
 
 import (
@@ -12,6 +13,7 @@ var (
 	backendIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-]+$`)
 )
 
+// MaxPromptLength is an exported const.
 const (
 	MaxPromptLength    = 100000 // 100KB
 	MaxModelNameLength = 256

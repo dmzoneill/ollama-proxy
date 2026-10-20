@@ -24,7 +24,7 @@ func TestRoutingDecisionInfo(t *testing.T) {
 	now := time.Now().Unix()
 	info := RoutingDecisionInfo{
 		Timestamp:        now,
-		Backend:          "backend1",
+		Backend:          strBackend1,
 		Reason:           "power efficient",
 		EstimatedPowerW:  10.5,
 		EstimatedLatency: 100,
@@ -33,7 +33,7 @@ func TestRoutingDecisionInfo(t *testing.T) {
 	if info.Timestamp != now {
 		t.Errorf("Expected Timestamp %d, got %d", now, info.Timestamp)
 	}
-	if info.Backend != "backend1" {
+	if info.Backend != strBackend1 {
 		t.Errorf("Expected Backend 'backend1', got '%s'", info.Backend)
 	}
 	if info.Reason != "power efficient" {
@@ -90,7 +90,7 @@ func TestGetRoutingStatsMethod(t *testing.T) {
 
 	// Create backends with different metrics
 	backend1 := &mockBackend{
-		id: "backend1",
+		id: strBackend1,
 		metrics: &backends.BackendMetrics{
 			RequestCount: 100,
 			SuccessCount: 95,
@@ -98,7 +98,7 @@ func TestGetRoutingStatsMethod(t *testing.T) {
 		},
 	}
 	backend2 := &mockBackend{
-		id: "backend2",
+		id: strBackend2,
 		metrics: &backends.BackendMetrics{
 			RequestCount: 50,
 			SuccessCount: 48,
@@ -183,9 +183,9 @@ func TestGetLastDecisionsMethod(t *testing.T) {
 	svc := &RoutingService{
 		router: r,
 		recentDecisions: []RoutingDecisionInfo{
-			{Timestamp: 1000, Backend: "backend1", Reason: "reason1", EstimatedPowerW: 10, EstimatedLatency: 50},
-			{Timestamp: 2000, Backend: "backend2", Reason: "reason2", EstimatedPowerW: 15, EstimatedLatency: 100},
-			{Timestamp: 3000, Backend: "backend3", Reason: "reason3", EstimatedPowerW: 20, EstimatedLatency: 150},
+			{Timestamp: 1000, Backend: strBackend1, Reason: "reason1", EstimatedPowerW: 10, EstimatedLatency: 50},
+			{Timestamp: 2000, Backend: strBackend2, Reason: "reason2", EstimatedPowerW: 15, EstimatedLatency: 100},
+			{Timestamp: 3000, Backend: strBackend3, Reason: "reason3", EstimatedPowerW: 20, EstimatedLatency: 150},
 		},
 	}
 
@@ -208,10 +208,10 @@ func TestGetLastDecisionsMethod(t *testing.T) {
 	}
 
 	// Should get the most recent ones (backend2 and backend3)
-	if decisions[0].Backend != "backend2" {
+	if decisions[0].Backend != strBackend2 {
 		t.Errorf("Expected first decision backend2, got %s", decisions[0].Backend)
 	}
-	if decisions[1].Backend != "backend3" {
+	if decisions[1].Backend != strBackend3 {
 		t.Errorf("Expected second decision backend3, got %s", decisions[1].Backend)
 	}
 
@@ -249,13 +249,13 @@ func TestGetBackendDistributionMethod(t *testing.T) {
 
 	// Create backends with different request counts
 	backend1 := &mockBackend{
-		id: "backend1",
+		id: strBackend1,
 		metrics: &backends.BackendMetrics{
 			RequestCount: 80,
 		},
 	}
 	backend2 := &mockBackend{
-		id: "backend2",
+		id: strBackend2,
 		metrics: &backends.BackendMetrics{
 			RequestCount: 20,
 		},
@@ -278,14 +278,14 @@ func TestGetBackendDistributionMethod(t *testing.T) {
 	}
 
 	// backend1 should have 80% (80 out of 100 total)
-	if dist, ok := distribution["backend1"]; !ok {
+	if dist, ok := distribution[strBackend1]; !ok {
 		t.Error("backend1 not found in distribution")
 	} else if dist < 79.9 || dist > 80.1 {
 		t.Errorf("Expected backend1 distribution ~80%%, got %.2f%%", dist)
 	}
 
 	// backend2 should have 20%
-	if dist, ok := distribution["backend2"]; !ok {
+	if dist, ok := distribution[strBackend2]; !ok {
 		t.Error("backend2 not found in distribution")
 	} else if dist < 19.9 || dist > 20.1 {
 		t.Errorf("Expected backend2 distribution ~20%%, got %.2f%%", dist)
@@ -297,7 +297,7 @@ func TestGetBackendDistributionEmpty(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	backend := &mockBackend{
-		id: "backend1",
+		id: strBackend1,
 		metrics: &backends.BackendMetrics{
 			RequestCount: 0,
 		},
@@ -323,13 +323,13 @@ func TestGetBackendDistributionEmpty(t *testing.T) {
 // TestSimulateRoutingMethod tests the SimulateRouting D-Bus method
 func TestSimulateRoutingMethod(t *testing.T) {
 	r := router.NewRouter(router.Config{
-		DefaultBackendID: "backend1",
+		DefaultBackendID: strBackend1,
 	})
 
 	backend := &mockBackend{
-		id:       "backend1",
-		healthy:  true,
-		name:     "Test Backend",
+		id:      strBackend1,
+		healthy: true,
+		name:    strTestBackend2,
 	}
 
 	r.RegisterBackend(backend)
@@ -340,7 +340,7 @@ func TestSimulateRoutingMethod(t *testing.T) {
 
 	// Test basic simulation
 	annotations := map[string]dbus.Variant{
-		"target": dbus.MakeVariant("backend1"),
+		"target": dbus.MakeVariant(strBackend1),
 	}
 
 	backendID, reason, dbusErr := svc.SimulateRouting(annotations)
@@ -348,7 +348,7 @@ func TestSimulateRoutingMethod(t *testing.T) {
 		t.Fatalf("Expected no D-Bus error, got %v", dbusErr)
 	}
 
-	if backendID != "backend1" {
+	if backendID != strBackend1 {
 		t.Errorf("Expected backend1, got %s", backendID)
 	}
 	if reason == "" {
@@ -367,6 +367,9 @@ func TestSimulateRoutingMethod(t *testing.T) {
 	if backendID == "" {
 		t.Error("Expected backend to be selected")
 	}
+	if reason == "" {
+		t.Error("Expected non-empty reason")
+	}
 
 	// Test with power efficiency annotation
 	annotations = map[string]dbus.Variant{
@@ -380,11 +383,14 @@ func TestSimulateRoutingMethod(t *testing.T) {
 	if backendID == "" {
 		t.Error("Expected backend to be selected")
 	}
+	if reason == "" {
+		t.Error("Expected non-empty reason")
+	}
 
 	// Test with numeric constraints
 	annotations = map[string]dbus.Variant{
-		"max_latency_ms":   dbus.MakeVariant(int32(100)),
-		"max_power_watts":  dbus.MakeVariant(int32(50)),
+		"max_latency_ms":  dbus.MakeVariant(int32(100)),
+		"max_power_watts": dbus.MakeVariant(int32(50)),
 	}
 
 	backendID, reason, dbusErr = svc.SimulateRouting(annotations)
@@ -393,6 +399,9 @@ func TestSimulateRoutingMethod(t *testing.T) {
 	}
 	if backendID == "" {
 		t.Error("Expected backend to be selected")
+	}
+	if reason == "" {
+		t.Error("Expected non-empty reason")
 	}
 }
 
@@ -425,7 +434,7 @@ func TestRecordDecision(t *testing.T) {
 	}
 
 	// Record first decision
-	svc.RecordDecision("backend1", "reason1", 10.5, 50)
+	svc.RecordDecision(strBackend1, "reason1", 10.5, 50)
 
 	if len(svc.recentDecisions) != 1 {
 		t.Fatalf("Expected 1 decision, got %d", len(svc.recentDecisions))
@@ -435,7 +444,7 @@ func TestRecordDecision(t *testing.T) {
 	}
 
 	decision := svc.recentDecisions[0]
-	if decision.Backend != "backend1" {
+	if decision.Backend != strBackend1 {
 		t.Errorf("Expected Backend 'backend1', got '%s'", decision.Backend)
 	}
 	if decision.Reason != "reason1" {
@@ -449,8 +458,8 @@ func TestRecordDecision(t *testing.T) {
 	}
 
 	// Record more decisions
-	svc.RecordDecision("backend2", "reason2", 15.0, 100)
-	svc.RecordDecision("backend3", "reason3", 20.0, 150)
+	svc.RecordDecision(strBackend2, "reason2", 15.0, 100)
+	svc.RecordDecision(strBackend3, "reason3", 20.0, 150)
 
 	if len(svc.recentDecisions) != 3 {
 		t.Fatalf("Expected 3 decisions, got %d", len(svc.recentDecisions))
@@ -471,7 +480,7 @@ func TestRecordDecision(t *testing.T) {
 	}
 
 	// First decision should now be backend2 (backend1 removed)
-	if svc.recentDecisions[0].Backend != "backend2" {
+	if svc.recentDecisions[0].Backend != strBackend2 {
 		t.Errorf("Expected first decision backend2, got %s", svc.recentDecisions[0].Backend)
 	}
 }
@@ -490,9 +499,9 @@ func TestRecordDecisionConcurrent(t *testing.T) {
 	// Record decisions concurrently
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
-		go func(id int) {
+		go func(_ int) {
 			for j := 0; j < 10; j++ {
-				svc.RecordDecision("backend1", "reason", 10.0, 50)
+				svc.RecordDecision(strBackend1, "reason", 10.0, 50)
 			}
 			done <- true
 		}(i)
@@ -544,7 +553,7 @@ func TestMakePropertyMapRouting(t *testing.T) {
 }
 
 // TestStopRoutingService tests the Stop method
-func TestStopRoutingService(t *testing.T) {
+func TestStopRoutingService(_ *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	svc := &RoutingService{
@@ -588,7 +597,7 @@ func TestRecordDecisionTimestamp(t *testing.T) {
 	}
 
 	beforeTime := time.Now().Unix()
-	svc.RecordDecision("backend1", "reason1", 10.0, 50)
+	svc.RecordDecision(strBackend1, "reason1", 10.0, 50)
 	afterTime := time.Now().Unix()
 
 	if len(svc.recentDecisions) != 1 {

@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// TestCircuitBreaker_InitialState is part of the public API.
 func TestCircuitBreaker_InitialState(t *testing.T) {
 	cb := NewCircuitBreaker(3, 1*time.Second)
 	if cb.GetState() != StateClosed {
@@ -13,6 +14,7 @@ func TestCircuitBreaker_InitialState(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_SuccessfulCalls is part of the public API.
 func TestCircuitBreaker_SuccessfulCalls(t *testing.T) {
 	cb := NewCircuitBreaker(3, 1*time.Second)
 
@@ -30,6 +32,7 @@ func TestCircuitBreaker_SuccessfulCalls(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_OpenAfterFailures is part of the public API.
 func TestCircuitBreaker_OpenAfterFailures(t *testing.T) {
 	cb := NewCircuitBreaker(3, 1*time.Second)
 
@@ -57,6 +60,7 @@ func TestCircuitBreaker_OpenAfterFailures(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_HalfOpenAfterTimeout is part of the public API.
 func TestCircuitBreaker_HalfOpenAfterTimeout(t *testing.T) {
 	cb := NewCircuitBreaker(2, 100*time.Millisecond)
 
@@ -88,6 +92,7 @@ func TestCircuitBreaker_HalfOpenAfterTimeout(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_CloseAfterHalfOpenSuccesses is part of the public API.
 func TestCircuitBreaker_CloseAfterHalfOpenSuccesses(t *testing.T) {
 	cb := NewCircuitBreaker(2, 100*time.Millisecond)
 
@@ -118,6 +123,7 @@ func TestCircuitBreaker_CloseAfterHalfOpenSuccesses(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_FailureInHalfOpenGoesBackToOpen is part of the public API.
 func TestCircuitBreaker_FailureInHalfOpenGoesBackToOpen(t *testing.T) {
 	cb := NewCircuitBreaker(2, 100*time.Millisecond)
 
@@ -143,6 +149,7 @@ func TestCircuitBreaker_FailureInHalfOpenGoesBackToOpen(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_Reset is part of the public API.
 func TestCircuitBreaker_Reset(t *testing.T) {
 	cb := NewCircuitBreaker(2, 1*time.Second)
 
@@ -171,15 +178,16 @@ func TestCircuitBreaker_Reset(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_StateString is part of the public API.
 func TestCircuitBreaker_StateString(t *testing.T) {
 	tests := []struct {
-		state    State
 		expected string
+		state    State
 	}{
-		{StateClosed, "closed"},
-		{StateOpen, "open"},
-		{StateHalfOpen, "half-open"},
-		{State(99), "unknown"}, // Test default case
+		{state: StateClosed, expected: "closed"},
+		{state: StateOpen, expected: "open"},
+		{state: StateHalfOpen, expected: "half-open"},
+		{state: State(99), expected: "unknown"}, // Test default case
 	}
 
 	for _, tt := range tests {
@@ -188,4 +196,3 @@ func TestCircuitBreaker_StateString(t *testing.T) {
 		}
 	}
 }
-

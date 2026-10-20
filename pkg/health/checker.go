@@ -1,3 +1,4 @@
+// Package health reports backend health.
 package health
 
 import (
@@ -15,6 +16,7 @@ import (
 // Status represents the health status
 type Status string
 
+// StatusHealthy is an exported const.
 const (
 	StatusHealthy   Status = "healthy"
 	StatusDegraded  Status = "degraded"
@@ -23,27 +25,27 @@ const (
 
 // Check represents a health check result
 type Check struct {
-	Status  Status                 `json:"status"`
 	Details map[string]interface{} `json:"details,omitempty"`
+	Status  Status                 `json:"status"`
 }
 
-// HealthChecker performs health checks
-type HealthChecker struct {
-	mu       sync.RWMutex
-	backends map[string]backends.Backend
-	lastCheck time.Time
+// Checker performs health checks
+type Checker struct {
+	lastCheck  time.Time
+	backends   map[string]backends.Backend
 	lastResult *Check
+	mu         sync.RWMutex
 }
 
 // NewHealthChecker creates a new health checker
-func NewHealthChecker() *HealthChecker {
-	return &HealthChecker{
+func NewHealthChecker() *Checker {
+	return &Checker{
 		backends: make(map[string]backends.Backend),
 	}
 }
 
 // RegisterBackend registers a backend for health checking
-func (h *HealthChecker) RegisterBackend(backend backends.Backend) {
+func (h *Checker) RegisterBackend(backend backends.Backend) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.backends[backend.ID()] = backend
@@ -51,18 +53,18 @@ func (h *HealthChecker) RegisterBackend(backend backends.Backend) {
 
 // LivenessCheck checks if the server is running
 // This is the simplest check - if we can respond, we're alive
-func (h *HealthChecker) LivenessCheck(w http.ResponseWriter, r *http.Request) {
+func (h *Checker) LivenessCheck(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "ok",
-		"time":   time.Now().Unix(),
+	writeJSON(w, map[string]interface{}{
+		strStatus: "ok",
+		strTime:   time.Now().Unix(),
 	})
 }
 
 // ReadinessCheck checks if the server can serve traffic
 // Returns 200 if at least one backend is healthy
-func (h *HealthChecker) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
+func (h *Checker) ReadinessCheck(w http.ResponseWriter, _ *http.Request) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -82,16 +84,16 @@ func (h *HealthChecker) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":        map[bool]string{true: "ready", false: "not_ready"}[healthyCount > 0],
-		"healthy":       healthyCount,
-		"total":         totalCount,
-		"time":          time.Now().Unix(),
+	writeJSON(w, map[string]interface{}{
+		strStatus:             map[bool]string{true: "ready", false: "not_ready"}[healthyCount > 0],
+		string(StatusHealthy): healthyCount,
+		strTotal:              totalCount,
+		strTime:               time.Now().Unix(),
 	})
 }
 
 // DeepHealthCheck performs a deep health check by actually running inference
-func (h *HealthChecker) DeepHealthCheck(w http.ResponseWriter, r *http.Request) {
+func (h *Checker) DeepHealthCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
@@ -112,8 +114,8 @@ func (h *HealthChecker) DeepHealthCheck(w http.ResponseWriter, r *http.Request) 
 		elapsed := time.Since(start)
 
 		backendStatus := map[string]interface{}{
-			"healthy":     err == nil,
-			"latency_ms":  elapsed.Milliseconds(),
+			string(StatusHealthy): err == nil,
+			"latency_ms":          elapsed.Milliseconds(),
 		}
 
 		if err != nil {
@@ -143,17 +145,17 @@ func (h *HealthChecker) DeepHealthCheck(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  overallStatus,
-		"healthy": healthyCount,
-		"total":   totalCount,
-		"backends": results,
-		"time":    time.Now().Unix(),
+	writeJSON(w, map[string]interface{}{
+		strStatus:             overallStatus,
+		string(StatusHealthy): healthyCount,
+		strTotal:              totalCount,
+		"backends":            results,
+		strTime:               time.Now().Unix(),
 	})
 }
 
 // PerformCheck performs a health check and caches the result
-func (h *HealthChecker) PerformCheck(ctx context.Context) *Check {
+func (h *Checker) PerformCheck(_ context.Context) *Check {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -167,8 +169,8 @@ func (h *HealthChecker) PerformCheck(ctx context.Context) *Check {
 			healthyCount++
 		}
 		details[id] = map[string]interface{}{
-			"healthy": isHealthy,
-			"type":    backend.Type(),
+			string(StatusHealthy): isHealthy,
+			"type":                backend.Type(),
 		}
 	}
 
@@ -184,9 +186,9 @@ func (h *HealthChecker) PerformCheck(ctx context.Context) *Check {
 	check := &Check{
 		Status: status,
 		Details: map[string]interface{}{
-			"healthy":  healthyCount,
-			"total":    totalCount,
-			"backends": details,
+			string(StatusHealthy): healthyCount,
+			strTotal:              totalCount,
+			"backends":            details,
 		},
 	}
 
@@ -197,7 +199,7 @@ func (h *HealthChecker) PerformCheck(ctx context.Context) *Check {
 }
 
 // GetLastCheck returns the last health check result
-func (h *HealthChecker) GetLastCheck() *Check {
+func (h *Checker) GetLastCheck() *Check {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.lastResult
@@ -205,14 +207,20 @@ func (h *HealthChecker) GetLastCheck() *Check {
 
 // VersionHandler returns version information
 func VersionHandler(version, gitCommit, buildTime string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeJSON(w, map[string]interface{}{
 			"version":    version,
 			"git_commit": gitCommit,
 			"build_time": buildTime,
-			"time":       time.Now().Unix(),
+			strTime:      time.Now().Unix(),
 		})
+	}
+}
+
+func writeJSON(w http.ResponseWriter, payload interface{}) {
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		logging.Warn("failed to encode health response", zap.Error(err))
 	}
 }

@@ -225,7 +225,7 @@ func TestIsQuietHoursMethod(t *testing.T) {
 }
 
 // TestEmitPowerSourceChanged tests the EmitPowerSourceChanged method
-func TestEmitPowerSourceChanged(t *testing.T) {
+func TestEmitPowerSourceChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -240,7 +240,7 @@ func TestEmitPowerSourceChanged(t *testing.T) {
 }
 
 // TestEmitBatteryLevelChanged tests the EmitBatteryLevelChanged method
-func TestEmitBatteryLevelChanged(t *testing.T) {
+func TestEmitBatteryLevelChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -256,7 +256,7 @@ func TestEmitBatteryLevelChanged(t *testing.T) {
 }
 
 // TestEmitQuietHoursChanged tests the EmitQuietHoursChanged method
-func TestEmitQuietHoursChanged(t *testing.T) {
+func TestEmitQuietHoursChanged(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -331,7 +331,7 @@ func TestMakePropertyMapSystem(t *testing.T) {
 }
 
 // TestUpdatePropertiesSystem tests the UpdateProperties method
-func TestUpdatePropertiesSystem(t *testing.T) {
+func TestUpdatePropertiesSystem(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -353,7 +353,7 @@ func TestUpdatePropertiesSystem(t *testing.T) {
 }
 
 // TestStopSystemService tests the Stop method
-func TestStopSystemService(t *testing.T) {
+func TestStopSystemService(_ *testing.T) {
 	manager := efficiency.NewEfficiencyManager(efficiency.ModeBalanced)
 
 	svc := &SystemService{
@@ -429,7 +429,7 @@ func TestGetAutoModeReasoningDifferentStates(t *testing.T) {
 
 // TestSystemStateDifferentModes tests GetSystemState with different efficiency modes
 func TestSystemStateDifferentModes(t *testing.T) {
-	modes := []efficiency.EfficiencyMode{
+	modes := []efficiency.Mode{
 		efficiency.ModePerformance,
 		efficiency.ModeBalanced,
 		efficiency.ModeEfficiency,
@@ -477,21 +477,21 @@ func TestEmitMethodsWithNilProps(t *testing.T) {
 
 	// All these should not panic
 	tests := []struct {
-		name string
 		fn   func()
+		name string
 	}{
-		{"EmitPowerSourceChanged true", func() { svc.EmitPowerSourceChanged(true) }},
-		{"EmitPowerSourceChanged false", func() { svc.EmitPowerSourceChanged(false) }},
-		{"EmitBatteryLevelChanged 0", func() { svc.EmitBatteryLevelChanged(0) }},
-		{"EmitBatteryLevelChanged 50", func() { svc.EmitBatteryLevelChanged(50) }},
-		{"EmitBatteryLevelChanged 100", func() { svc.EmitBatteryLevelChanged(100) }},
-		{"EmitQuietHoursChanged true", func() { svc.EmitQuietHoursChanged(true) }},
-		{"EmitQuietHoursChanged false", func() { svc.EmitQuietHoursChanged(false) }},
-		{"UpdateProperties", func() { svc.UpdateProperties() }},
+		{name: "EmitPowerSourceChanged true", fn: func() { svc.EmitPowerSourceChanged(true) }},
+		{name: "EmitPowerSourceChanged false", fn: func() { svc.EmitPowerSourceChanged(false) }},
+		{name: "EmitBatteryLevelChanged 0", fn: func() { svc.EmitBatteryLevelChanged(0) }},
+		{name: "EmitBatteryLevelChanged 50", fn: func() { svc.EmitBatteryLevelChanged(50) }},
+		{name: "EmitBatteryLevelChanged 100", fn: func() { svc.EmitBatteryLevelChanged(100) }},
+		{name: "EmitQuietHoursChanged true", fn: func() { svc.EmitQuietHoursChanged(true) }},
+		{name: "EmitQuietHoursChanged false", fn: func() { svc.EmitQuietHoursChanged(false) }},
+		{name: "UpdateProperties", fn: func() { svc.UpdateProperties() }},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Should not panic
 			tt.fn()
 		})

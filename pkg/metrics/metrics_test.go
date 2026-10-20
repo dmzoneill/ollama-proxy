@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+// TestRecordRequest is part of the public API.
 func TestRecordRequest(t *testing.T) {
 	// Reset metrics before test
 	RequestsTotal.Reset()
@@ -21,15 +22,15 @@ func TestRecordRequest(t *testing.T) {
 	}{
 		{
 			name:        "successful request",
-			backendID:   "backend-1",
-			model:       "llama2",
+			backendID:   strBackend1,
+			model:       strLlama2,
 			status:      "success",
 			durationSec: 1.5,
 		},
 		{
 			name:        "failed request",
-			backendID:   "backend-2",
-			model:       "gpt-4",
+			backendID:   strBackend2,
+			model:       strGpt4,
 			status:      "error",
 			durationSec: 0.5,
 		},
@@ -53,6 +54,7 @@ func TestRecordRequest(t *testing.T) {
 	}
 }
 
+// TestRecordTokens is part of the public API.
 func TestRecordTokens(t *testing.T) {
 	TokensGenerated.Reset()
 	TokensPerSecond.Reset()
@@ -66,35 +68,36 @@ func TestRecordTokens(t *testing.T) {
 	}{
 		{
 			name:            "normal token generation",
-			backendID:       "backend-1",
-			model:           "llama2",
+			backendID:       strBackend1,
+			model:           strLlama2,
 			tokensGenerated: 100,
 			tokensPerSec:    25.5,
 		},
 		{
 			name:            "zero tokens",
-			backendID:       "backend-2",
-			model:           "gpt-4",
+			backendID:       strBackend2,
+			model:           strGpt4,
 			tokensGenerated: 0,
 			tokensPerSec:    0,
 		},
 		{
 			name:            "high token generation",
-			backendID:       "backend-3",
-			model:           "claude",
+			backendID:       strBackend3,
+			model:           strClaude,
 			tokensGenerated: 5000,
 			tokensPerSec:    150.0,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			RecordTokens(tt.backendID, tt.model, tt.tokensGenerated, tt.tokensPerSec)
 			// Just verify it doesn't panic - actual metric verification is complex for histograms
 		})
 	}
 }
 
+// TestSetBackendHealth is part of the public API.
 func TestSetBackendHealth(t *testing.T) {
 	BackendHealth.Reset()
 
@@ -107,15 +110,15 @@ func TestSetBackendHealth(t *testing.T) {
 	}{
 		{
 			name:      "healthy backend",
-			backendID: "backend-1",
-			hardware:  "GPU",
+			backendID: strBackend1,
+			hardware:  strGPU,
 			healthy:   true,
 			wantValue: 1.0,
 		},
 		{
 			name:      "unhealthy backend",
-			backendID: "backend-2",
-			hardware:  "CPU",
+			backendID: strBackend2,
+			hardware:  strCPU,
 			healthy:   false,
 			wantValue: 0.0,
 		},
@@ -138,6 +141,7 @@ func TestSetBackendHealth(t *testing.T) {
 	}
 }
 
+// TestSetBackendQueueDepth is part of the public API.
 func TestSetBackendQueueDepth(t *testing.T) {
 	BackendQueueDepth.Reset()
 
@@ -149,19 +153,19 @@ func TestSetBackendQueueDepth(t *testing.T) {
 	}{
 		{
 			name:      "empty queue",
-			backendID: "backend-1",
+			backendID: strBackend1,
 			priority:  "high",
 			depth:     0,
 		},
 		{
 			name:      "normal queue",
-			backendID: "backend-2",
+			backendID: strBackend2,
 			priority:  "normal",
 			depth:     5,
 		},
 		{
 			name:      "full queue",
-			backendID: "backend-3",
+			backendID: strBackend3,
 			priority:  "low",
 			depth:     100,
 		},
@@ -184,6 +188,7 @@ func TestSetBackendQueueDepth(t *testing.T) {
 	}
 }
 
+// TestSetBackendTemperature is part of the public API.
 func TestSetBackendTemperature(t *testing.T) {
 	BackendTemperature.Reset()
 
@@ -195,19 +200,19 @@ func TestSetBackendTemperature(t *testing.T) {
 	}{
 		{
 			name:        "cool temperature",
-			backendID:   "backend-1",
-			hardware:    "GPU",
+			backendID:   strBackend1,
+			hardware:    strGPU,
 			tempCelsius: 45.5,
 		},
 		{
 			name:        "warm temperature",
-			backendID:   "backend-2",
-			hardware:    "CPU",
+			backendID:   strBackend2,
+			hardware:    strCPU,
 			tempCelsius: 75.0,
 		},
 		{
 			name:        "hot temperature",
-			backendID:   "backend-3",
+			backendID:   strBackend3,
 			hardware:    "NPU",
 			tempCelsius: 95.5,
 		},
@@ -230,6 +235,7 @@ func TestSetBackendTemperature(t *testing.T) {
 	}
 }
 
+// TestSetBackendFanSpeed is part of the public API.
 func TestSetBackendFanSpeed(t *testing.T) {
 	BackendFanSpeed.Reset()
 
@@ -241,19 +247,19 @@ func TestSetBackendFanSpeed(t *testing.T) {
 	}{
 		{
 			name:       "fan off",
-			backendID:  "backend-1",
-			hardware:   "GPU",
+			backendID:  strBackend1,
+			hardware:   strGPU,
 			fanPercent: 0,
 		},
 		{
 			name:       "fan moderate",
-			backendID:  "backend-2",
-			hardware:   "CPU",
+			backendID:  strBackend2,
+			hardware:   strCPU,
 			fanPercent: 50,
 		},
 		{
 			name:       "fan max",
-			backendID:  "backend-3",
+			backendID:  strBackend3,
 			hardware:   "NPU",
 			fanPercent: 100,
 		},
@@ -276,6 +282,7 @@ func TestSetBackendFanSpeed(t *testing.T) {
 	}
 }
 
+// TestSetBackendPower is part of the public API.
 func TestSetBackendPower(t *testing.T) {
 	BackendPower.Reset()
 
@@ -287,20 +294,20 @@ func TestSetBackendPower(t *testing.T) {
 	}{
 		{
 			name:      "low power",
-			backendID: "backend-1",
-			hardware:  "CPU",
+			backendID: strBackend1,
+			hardware:  strCPU,
 			watts:     15.5,
 		},
 		{
 			name:      "medium power",
-			backendID: "backend-2",
-			hardware:  "GPU",
+			backendID: strBackend2,
+			hardware:  strGPU,
 			watts:     150.0,
 		},
 		{
 			name:      "high power",
-			backendID: "backend-3",
-			hardware:  "GPU",
+			backendID: strBackend3,
+			hardware:  strGPU,
 			watts:     300.5,
 		},
 	}
@@ -322,6 +329,7 @@ func TestSetBackendPower(t *testing.T) {
 	}
 }
 
+// TestRecordEnergyConsumed is part of the public API.
 func TestRecordEnergyConsumed(t *testing.T) {
 	EnergyConsumed.Reset()
 
@@ -334,15 +342,15 @@ func TestRecordEnergyConsumed(t *testing.T) {
 	}{
 		{
 			name:       "single consumption",
-			backendID:  "backend-1",
-			hardware:   "GPU",
+			backendID:  strBackend1,
+			hardware:   strGPU,
 			wattHours:  10.5,
 			iterations: 1,
 		},
 		{
 			name:       "multiple consumptions",
-			backendID:  "backend-2",
-			hardware:   "CPU",
+			backendID:  strBackend2,
+			hardware:   strCPU,
 			wattHours:  5.0,
 			iterations: 3,
 		},
@@ -368,6 +376,7 @@ func TestRecordEnergyConsumed(t *testing.T) {
 	}
 }
 
+// TestRecordRoutingDecision is part of the public API.
 func TestRecordRoutingDecision(t *testing.T) {
 	RoutingDecisionsTotal.Reset()
 
@@ -379,17 +388,17 @@ func TestRecordRoutingDecision(t *testing.T) {
 		{
 			name:      "latency routing",
 			reason:    "latency",
-			backendID: "backend-1",
+			backendID: strBackend1,
 		},
 		{
 			name:      "power routing",
 			reason:    "power_efficient",
-			backendID: "backend-2",
+			backendID: strBackend2,
 		},
 		{
 			name:      "thermal routing",
 			reason:    "thermal_limit",
-			backendID: "backend-3",
+			backendID: strBackend3,
 		},
 	}
 
@@ -410,6 +419,7 @@ func TestRecordRoutingDecision(t *testing.T) {
 	}
 }
 
+// TestRecordForwardingAttempt is part of the public API.
 func TestRecordForwardingAttempt(t *testing.T) {
 	ForwardingAttemptsTotal.Reset()
 
@@ -421,14 +431,14 @@ func TestRecordForwardingAttempt(t *testing.T) {
 	}{
 		{
 			name:        "successful forward",
-			fromBackend: "backend-1",
-			toBackend:   "backend-2",
+			fromBackend: strBackend1,
+			toBackend:   strBackend2,
 			result:      "success",
 		},
 		{
 			name:        "failed forward",
-			fromBackend: "backend-2",
-			toBackend:   "backend-3",
+			fromBackend: strBackend2,
+			toBackend:   strBackend3,
 			result:      "failure",
 		},
 	}
@@ -450,6 +460,7 @@ func TestRecordForwardingAttempt(t *testing.T) {
 	}
 }
 
+// TestRecordConfidenceScore is part of the public API.
 func TestRecordConfidenceScore(t *testing.T) {
 	ConfidenceScores.Reset()
 
@@ -461,28 +472,29 @@ func TestRecordConfidenceScore(t *testing.T) {
 	}{
 		{
 			name:      "low confidence",
-			backendID: "backend-1",
-			model:     "llama2",
+			backendID: strBackend1,
+			model:     strLlama2,
 			score:     0.3,
 		},
 		{
 			name:      "high confidence",
-			backendID: "backend-2",
-			model:     "gpt-4",
+			backendID: strBackend2,
+			model:     strGpt4,
 			score:     0.95,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			RecordConfidenceScore(tt.backendID, tt.model, tt.score)
 			// Histograms are harder to verify, just ensure no panic
 		})
 	}
 }
 
+// TestSetEfficiencyMode is part of the public API.
 func TestSetEfficiencyMode(t *testing.T) {
-	EfficiencyMode.Reset()
+	Mode.Reset()
 
 	tests := []struct {
 		name  string
@@ -510,7 +522,7 @@ func TestSetEfficiencyMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			SetEfficiencyMode(tt.mode, tt.value)
 
-			gauge, err := EfficiencyMode.GetMetricWithLabelValues(tt.mode)
+			gauge, err := Mode.GetMetricWithLabelValues(tt.mode)
 			if err != nil {
 				t.Fatalf("Failed to get metric: %v", err)
 			}
@@ -523,6 +535,7 @@ func TestSetEfficiencyMode(t *testing.T) {
 	}
 }
 
+// TestRecordTimeToFirstToken is part of the public API.
 func TestRecordTimeToFirstToken(t *testing.T) {
 	TimeToFirstToken.Reset()
 
@@ -534,69 +547,71 @@ func TestRecordTimeToFirstToken(t *testing.T) {
 	}{
 		{
 			name:      "fast TTFT",
-			backendID: "backend-1",
-			model:     "llama2",
+			backendID: strBackend1,
+			model:     strLlama2,
 			ttftMs:    50,
 		},
 		{
 			name:      "slow TTFT",
-			backendID: "backend-2",
-			model:     "gpt-4",
+			backendID: strBackend2,
+			model:     strGpt4,
 			ttftMs:    500,
 		},
 		{
 			name:      "zero TTFT",
-			backendID: "backend-3",
-			model:     "claude",
+			backendID: strBackend3,
+			model:     strClaude,
 			ttftMs:    0, // Should not record
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			RecordTimeToFirstToken(tt.backendID, tt.model, tt.ttftMs)
 			// Histograms are harder to verify, just ensure no panic
 		})
 	}
 }
 
+// TestRecordInterTokenLatency is part of the public API.
 func TestRecordInterTokenLatency(t *testing.T) {
 	InterTokenLatency.Reset()
 
 	tests := []struct {
-		name       string
-		backendID  string
-		model      string
-		latencyMs  float64
+		name      string
+		backendID string
+		model     string
+		latencyMs float64
 	}{
 		{
-			name:       "low latency",
-			backendID:  "backend-1",
-			model:      "llama2",
-			latencyMs:  10.5,
+			name:      "low latency",
+			backendID: strBackend1,
+			model:     strLlama2,
+			latencyMs: 10.5,
 		},
 		{
-			name:       "high latency",
-			backendID:  "backend-2",
-			model:      "gpt-4",
-			latencyMs:  100.0,
+			name:      "high latency",
+			backendID: strBackend2,
+			model:     strGpt4,
+			latencyMs: 100.0,
 		},
 		{
-			name:       "zero latency",
-			backendID:  "backend-3",
-			model:      "claude",
-			latencyMs:  0.0, // Should not record
+			name:      "zero latency",
+			backendID: strBackend3,
+			model:     strClaude,
+			latencyMs: 0.0, // Should not record
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			RecordInterTokenLatency(tt.backendID, tt.model, tt.latencyMs)
 			// Histograms are harder to verify, just ensure no panic
 		})
 	}
 }
 
+// TestRecordCacheHit is part of the public API.
 func TestRecordCacheHit(t *testing.T) {
 	CacheHits.Reset()
 
@@ -610,7 +625,7 @@ func TestRecordCacheHit(t *testing.T) {
 		},
 		{
 			name:      "model cache hit",
-			cacheType: "model",
+			cacheType: strModel,
 		},
 	}
 
@@ -631,6 +646,7 @@ func TestRecordCacheHit(t *testing.T) {
 	}
 }
 
+// TestRecordCacheMiss is part of the public API.
 func TestRecordCacheMiss(t *testing.T) {
 	CacheMisses.Reset()
 
@@ -644,7 +660,7 @@ func TestRecordCacheMiss(t *testing.T) {
 		},
 		{
 			name:      "model cache miss",
-			cacheType: "model",
+			cacheType: strModel,
 		},
 	}
 
@@ -665,7 +681,8 @@ func TestRecordCacheMiss(t *testing.T) {
 	}
 }
 
-func TestMetricsCollectionNoPanic(t *testing.T) {
+// TestMetricsCollectionNoPanic is part of the public API.
+func TestMetricsCollectionNoPanic(_ *testing.T) {
 	// Test that all metric collectors are properly registered
 	// This ensures they can be collected by Prometheus without panic
 	prometheus.DefaultGatherer.Gather()

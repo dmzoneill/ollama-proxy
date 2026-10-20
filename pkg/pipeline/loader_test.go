@@ -5,8 +5,9 @@ import (
 	"testing"
 )
 
-// Tests for PipelineLoader
+// Tests for Loader
 
+// TestNewPipelineLoader is part of the public API.
 func TestNewPipelineLoader(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -23,6 +24,7 @@ func TestNewPipelineLoader(t *testing.T) {
 	}
 }
 
+// TestListPipelinesEmpty is part of the public API.
 func TestListPipelinesEmpty(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -32,6 +34,7 @@ func TestListPipelinesEmpty(t *testing.T) {
 	}
 }
 
+// TestGetPipelineNotFound is part of the public API.
 func TestGetPipelineNotFound(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -41,6 +44,7 @@ func TestGetPipelineNotFound(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToOptionsBasic is part of the public API.
 func TestConvertYAMLToOptionsBasic(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -76,6 +80,7 @@ func TestConvertYAMLToOptionsBasic(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToOptionsDefaults is part of the public API.
 func TestConvertYAMLToOptionsDefaults(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -96,15 +101,16 @@ func TestConvertYAMLToOptionsDefaults(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToStageBasic is part of the public API.
 func TestConvertYAMLToStageBasic(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	yamlStage := StageYAML{
-		ID:               "test-stage",
-		Type:             "text_generation",
+		ID:               strTestStage,
+		Type:             string(StageTypeTextGen),
 		Description:      "Test stage",
-		PreferredBackend: "backend1",
-		Model:            "llama3:7b",
+		PreferredBackend: strBackend1,
+		Model:            strLlama37b,
 	}
 
 	stage, err := loader.convertYAMLToStage(yamlStage)
@@ -116,7 +122,7 @@ func TestConvertYAMLToStageBasic(t *testing.T) {
 		t.Fatal("Expected non-nil stage")
 	}
 
-	if stage.ID != "test-stage" {
+	if stage.ID != strTestStage {
 		t.Errorf("Expected ID 'test-stage', got %s", stage.ID)
 	}
 
@@ -128,15 +134,16 @@ func TestConvertYAMLToStageBasic(t *testing.T) {
 		t.Errorf("Expected description 'Test stage', got %s", stage.Description)
 	}
 
-	if stage.PreferredBackend != "backend1" {
+	if stage.PreferredBackend != strBackend1 {
 		t.Errorf("Expected backend 'backend1', got %s", stage.PreferredBackend)
 	}
 
-	if stage.Model != "llama3:7b" {
+	if stage.Model != strLlama37b {
 		t.Errorf("Expected model 'llama3:7b', got %s", stage.Model)
 	}
 }
 
+// TestConvertYAMLToStageAllTypes is part of the public API.
 func TestConvertYAMLToStageAllTypes(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -144,18 +151,18 @@ func TestConvertYAMLToStageAllTypes(t *testing.T) {
 		yamlType  string
 		stageType StageType
 	}{
-		{"audio_to_text", StageTypeAudioToText},
-		{"text_generation", StageTypeTextGen},
-		{"text_to_audio", StageTypeTextToAudio},
-		{"embedding", StageTypeEmbed},
-		{"custom", StageTypeCustom},
+		{yamlType: "audio_to_text", stageType: StageTypeAudioToText},
+		{yamlType: string(StageTypeTextGen), stageType: StageTypeTextGen},
+		{yamlType: "text_to_audio", stageType: StageTypeTextToAudio},
+		{yamlType: string(StageTypeEmbed), stageType: StageTypeEmbed},
+		{yamlType: string(StageTypeCustom), stageType: StageTypeCustom},
 	}
 
 	for _, tt := range tests {
 		yamlStage := StageYAML{
-			ID:    "test-stage",
+			ID:    strTestStage,
 			Type:  tt.yamlType,
-			Model: "test-model",
+			Model: strTestModel,
 		}
 
 		stage, err := loader.convertYAMLToStage(yamlStage)
@@ -169,18 +176,19 @@ func TestConvertYAMLToStageAllTypes(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToStageWithForwardingPolicy is part of the public API.
 func TestConvertYAMLToStageWithForwardingPolicy(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	yamlStage := StageYAML{
-		ID:    "test-stage",
-		Type:  "text_generation",
-		Model: "llama3:7b",
+		ID:    strTestStage,
+		Type:  string(StageTypeTextGen),
+		Model: strLlama37b,
 		ForwardingPolicy: ForwardingPolicyYAML{
 			EnableConfidenceCheck: true,
 			MinConfidence:         0.75,
-			MaxRetries:           3,
-			EscalationPath:        []string{"backend1", "backend2"},
+			MaxRetries:            3,
+			EscalationPath:        []string{strBackend1, strBackend2},
 			EnableThermalCheck:    true,
 			MaxTemperature:        85.0,
 			MaxFanPercent:         80,
@@ -231,13 +239,14 @@ func TestConvertYAMLToStageWithForwardingPolicy(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToStageNoForwardingPolicy is part of the public API.
 func TestConvertYAMLToStageNoForwardingPolicy(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	yamlStage := StageYAML{
-		ID:    "test-stage",
-		Type:  "text_generation",
-		Model: "llama3:7b",
+		ID:    strTestStage,
+		Type:  string(StageTypeTextGen),
+		Model: strLlama37b,
 		ForwardingPolicy: ForwardingPolicyYAML{
 			EnableConfidenceCheck: false,
 			EnableThermalCheck:    false,
@@ -256,23 +265,24 @@ func TestConvertYAMLToStageNoForwardingPolicy(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToPipelineBasic is part of the public API.
 func TestConvertYAMLToPipelineBasic(t *testing.T) {
 	loader := NewPipelineLoader()
 
-	yamlPipeline := PipelineYAML{
-		ID:          "test-pipeline",
-		Name:        "Test Pipeline",
-		Description: "A test pipeline",
+	yamlPipeline := YAML{
+		ID:          strTestPipeline,
+		Name:        strTestPipeline2,
+		Description: strATestPipeline,
 		Stages: []StageYAML{
 			{
-				ID:    "stage1",
-				Type:  "text_generation",
-				Model: "llama3:7b",
+				ID:    strStage1,
+				Type:  string(StageTypeTextGen),
+				Model: strLlama37b,
 			},
 			{
-				ID:    "stage2",
-				Type:  "embedding",
-				Model: "nomic-embed-text",
+				ID:    strStage2,
+				Type:  string(StageTypeEmbed),
+				Model: strNomicEmbedText,
 			},
 		},
 		Options: OptionsYAML{
@@ -290,15 +300,15 @@ func TestConvertYAMLToPipelineBasic(t *testing.T) {
 		t.Fatal("Expected non-nil pipeline")
 	}
 
-	if pipeline.ID != "test-pipeline" {
+	if pipeline.ID != strTestPipeline {
 		t.Errorf("Expected ID 'test-pipeline', got %s", pipeline.ID)
 	}
 
-	if pipeline.Name != "Test Pipeline" {
+	if pipeline.Name != strTestPipeline2 {
 		t.Errorf("Expected name 'Test Pipeline', got %s", pipeline.Name)
 	}
 
-	if pipeline.Description != "A test pipeline" {
+	if pipeline.Description != strATestPipeline {
 		t.Errorf("Expected description 'A test pipeline', got %s", pipeline.Description)
 	}
 
@@ -306,11 +316,11 @@ func TestConvertYAMLToPipelineBasic(t *testing.T) {
 		t.Errorf("Expected 2 stages, got %d", len(pipeline.Stages))
 	}
 
-	if pipeline.Stages[0].ID != "stage1" {
+	if pipeline.Stages[0].ID != strStage1 {
 		t.Errorf("Expected first stage ID 'stage1', got %s", pipeline.Stages[0].ID)
 	}
 
-	if pipeline.Stages[1].ID != "stage2" {
+	if pipeline.Stages[1].ID != strStage2 {
 		t.Errorf("Expected second stage ID 'stage2', got %s", pipeline.Stages[1].ID)
 	}
 
@@ -327,13 +337,14 @@ func TestConvertYAMLToPipelineBasic(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToPipelineEmptyStages is part of the public API.
 func TestConvertYAMLToPipelineEmptyStages(t *testing.T) {
 	loader := NewPipelineLoader()
 
-	yamlPipeline := PipelineYAML{
-		ID:     "test-pipeline",
-		Name:   "Test Pipeline",
-		Stages: []StageYAML{},
+	yamlPipeline := YAML{
+		ID:      strTestPipeline,
+		Name:    strTestPipeline2,
+		Stages:  []StageYAML{},
 		Options: OptionsYAML{},
 	}
 
@@ -347,23 +358,24 @@ func TestConvertYAMLToPipelineEmptyStages(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToPipelineComplexForwarding is part of the public API.
 func TestConvertYAMLToPipelineComplexForwarding(t *testing.T) {
 	loader := NewPipelineLoader()
 
-	yamlPipeline := PipelineYAML{
+	yamlPipeline := YAML{
 		ID:   "complex-pipeline",
 		Name: "Complex Pipeline",
 		Stages: []StageYAML{
 			{
-				ID:               "adaptive-stage",
-				Type:             "text_generation",
-				PreferredHardware: "npu",
-				Model:            "qwen2.5:0.5b",
+				ID:                "adaptive-stage",
+				Type:              string(StageTypeTextGen),
+				PreferredHardware: strNpu,
+				Model:             strQwen2505b,
 				ForwardingPolicy: ForwardingPolicyYAML{
 					EnableConfidenceCheck: true,
 					MinConfidence:         0.75,
-					MaxRetries:           3,
-					EscalationPath:        []string{"backend1", "backend2", "backend3"},
+					MaxRetries:            3,
+					EscalationPath:        []string{strBackend1, strBackend2, "backend3"},
 					EnableThermalCheck:    true,
 					MaxTemperature:        85.0,
 				},
@@ -378,7 +390,7 @@ func TestConvertYAMLToPipelineComplexForwarding(t *testing.T) {
 	}
 
 	stage := pipeline.Stages[0]
-	if stage.PreferredHardware != "npu" {
+	if stage.PreferredHardware != strNpu {
 		t.Errorf("Expected hardware 'npu', got %s", stage.PreferredHardware)
 	}
 
@@ -391,14 +403,15 @@ func TestConvertYAMLToPipelineComplexForwarding(t *testing.T) {
 	}
 }
 
+// TestGetPipelineAfterManualAdd is part of the public API.
 func TestGetPipelineAfterManualAdd(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	pipeline := &Pipeline{
-		ID:     "manual-pipeline",
-		Name:   "Manual Pipeline",
-		Stages: make([]*Stage, 0),
-		Options: &PipelineOptions{},
+		ID:      "manual-pipeline",
+		Name:    "Manual Pipeline",
+		Stages:  make([]*Stage, 0),
+		Options: &Options{},
 	}
 
 	loader.pipelines["manual-pipeline"] = pipeline
@@ -413,11 +426,12 @@ func TestGetPipelineAfterManualAdd(t *testing.T) {
 	}
 }
 
+// TestListPipelinesAfterManualAdd is part of the public API.
 func TestListPipelinesAfterManualAdd(t *testing.T) {
 	loader := NewPipelineLoader()
 
-	loader.pipelines["pipeline1"] = &Pipeline{ID: "pipeline1"}
-	loader.pipelines["pipeline2"] = &Pipeline{ID: "pipeline2"}
+	loader.pipelines[strPipeline1] = &Pipeline{ID: strPipeline1}
+	loader.pipelines[strPipeline2] = &Pipeline{ID: strPipeline2}
 	loader.pipelines["pipeline3"] = &Pipeline{ID: "pipeline3"}
 
 	ids := loader.ListPipelines()
@@ -432,11 +446,11 @@ func TestListPipelinesAfterManualAdd(t *testing.T) {
 		idMap[id] = true
 	}
 
-	if !idMap["pipeline1"] {
+	if !idMap[strPipeline1] {
 		t.Error("Expected pipeline1 in list")
 	}
 
-	if !idMap["pipeline2"] {
+	if !idMap[strPipeline2] {
 		t.Error("Expected pipeline2 in list")
 	}
 
@@ -445,30 +459,31 @@ func TestListPipelinesAfterManualAdd(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToPipelineWithHardwarePreference is part of the public API.
 func TestConvertYAMLToPipelineWithHardwarePreference(t *testing.T) {
 	loader := NewPipelineLoader()
 
-	yamlPipeline := PipelineYAML{
+	yamlPipeline := YAML{
 		ID:   "hardware-test",
 		Name: "Hardware Test",
 		Stages: []StageYAML{
 			{
-				ID:               "npu-stage",
-				Type:             "embedding",
-				PreferredHardware: "npu",
-				Model:            "nomic-embed-text",
+				ID:                "npu-stage",
+				Type:              string(StageTypeEmbed),
+				PreferredHardware: strNpu,
+				Model:             strNomicEmbedText,
 			},
 			{
-				ID:               "gpu-stage",
-				Type:             "text_generation",
-				PreferredHardware: "nvidia",
-				Model:            "llama3:70b",
+				ID:                "gpu-stage",
+				Type:              string(StageTypeTextGen),
+				PreferredHardware: strNvidia,
+				Model:             strLlama370b,
 			},
 			{
-				ID:               "igpu-stage",
-				Type:             "text_generation",
-				PreferredHardware: "igpu",
-				Model:            "llama3:7b",
+				ID:                "igpu-stage",
+				Type:              string(StageTypeTextGen),
+				PreferredHardware: strIgpu,
+				Model:             strLlama37b,
 			},
 		},
 		Options: OptionsYAML{},
@@ -483,26 +498,27 @@ func TestConvertYAMLToPipelineWithHardwarePreference(t *testing.T) {
 		t.Errorf("Expected 3 stages, got %d", len(pipeline.Stages))
 	}
 
-	if pipeline.Stages[0].PreferredHardware != "npu" {
+	if pipeline.Stages[0].PreferredHardware != strNpu {
 		t.Error("Expected first stage to prefer npu")
 	}
 
-	if pipeline.Stages[1].PreferredHardware != "nvidia" {
+	if pipeline.Stages[1].PreferredHardware != strNvidia {
 		t.Error("Expected second stage to prefer nvidia")
 	}
 
-	if pipeline.Stages[2].PreferredHardware != "igpu" {
+	if pipeline.Stages[2].PreferredHardware != strIgpu {
 		t.Error("Expected third stage to prefer igpu")
 	}
 }
 
+// TestForwardingPolicyYAMLDefaults is part of the public API.
 func TestForwardingPolicyYAMLDefaults(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	yamlStage := StageYAML{
-		ID:    "test",
-		Type:  "text_generation",
-		Model: "test",
+		ID:    strTest,
+		Type:  string(StageTypeTextGen),
+		Model: strTest,
 		ForwardingPolicy: ForwardingPolicyYAML{
 			EnableConfidenceCheck: true,
 			// Other fields use zero values
@@ -531,13 +547,14 @@ func TestForwardingPolicyYAMLDefaults(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToStageWithMultipleForwardingTypes is part of the public API.
 func TestConvertYAMLToStageWithMultipleForwardingTypes(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	yamlStage := StageYAML{
 		ID:    "multi-check",
-		Type:  "text_generation",
-		Model: "test",
+		Type:  string(StageTypeTextGen),
+		Model: strTest,
 		ForwardingPolicy: ForwardingPolicyYAML{
 			EnableConfidenceCheck: true,
 			MinConfidence:         0.7,
@@ -545,7 +562,7 @@ func TestConvertYAMLToStageWithMultipleForwardingTypes(t *testing.T) {
 			MaxTemperature:        80.0,
 			EnableQualityCheck:    true,
 			QualityThreshold:      0.75,
-			MaxRetries:           2,
+			MaxRetries:            2,
 			EscalationPath:        []string{"b1", "b2"},
 		},
 	}
@@ -577,18 +594,19 @@ func TestConvertYAMLToStageWithMultipleForwardingTypes(t *testing.T) {
 	}
 }
 
+// TestConvertYAMLToStagePartialForwarding is part of the public API.
 func TestConvertYAMLToStagePartialForwarding(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	// Only enable confidence check, not others
 	yamlStage := StageYAML{
 		ID:    "confidence-only",
-		Type:  "text_generation",
-		Model: "test",
+		Type:  string(StageTypeTextGen),
+		Model: strTest,
 		ForwardingPolicy: ForwardingPolicyYAML{
 			EnableConfidenceCheck: true,
 			MinConfidence:         0.8,
-			MaxRetries:           2,
+			MaxRetries:            2,
 			EscalationPath:        []string{"b1", "b2"},
 			EnableThermalCheck:    false,
 			EnableQualityCheck:    false,
@@ -613,15 +631,16 @@ func TestConvertYAMLToStagePartialForwarding(t *testing.T) {
 	}
 }
 
+// TestPipelineConfigStructure is part of the public API.
 func TestPipelineConfigStructure(t *testing.T) {
-	config := PipelineConfig{
-		Pipelines: []PipelineYAML{
+	config := Config{
+		Pipelines: []YAML{
 			{
-				ID:   "pipeline1",
+				ID:   strPipeline1,
 				Name: "First Pipeline",
 			},
 			{
-				ID:   "pipeline2",
+				ID:   strPipeline2,
 				Name: "Second Pipeline",
 			},
 		},
@@ -631,36 +650,37 @@ func TestPipelineConfigStructure(t *testing.T) {
 		t.Errorf("Expected 2 pipelines in config, got %d", len(config.Pipelines))
 	}
 
-	if config.Pipelines[0].ID != "pipeline1" {
+	if config.Pipelines[0].ID != strPipeline1 {
 		t.Error("Expected first pipeline ID to be pipeline1")
 	}
 
-	if config.Pipelines[1].ID != "pipeline2" {
+	if config.Pipelines[1].ID != strPipeline2 {
 		t.Error("Expected second pipeline ID to be pipeline2")
 	}
 }
 
+// TestStageYAMLStructure is part of the public API.
 func TestStageYAMLStructure(t *testing.T) {
 	stage := StageYAML{
-		ID:               "test-stage",
-		Type:             "text_generation",
-		Description:      "Test description",
-		PreferredBackend: "backend1",
+		ID:                strTestStage,
+		Type:              string(StageTypeTextGen),
+		Description:       "Test description",
+		PreferredBackend:  strBackend1,
 		PreferredHardware: "gpu",
-		Model:            "llama3:7b",
-		InputTransform:   map[string]interface{}{"type": "prefix", "value": "test"},
-		OutputTransform:  map[string]interface{}{"type": "suffix", "value": "done"},
+		Model:             strLlama37b,
+		InputTransform:    map[string]interface{}{"type": "prefix", "value": strTest},
+		OutputTransform:   map[string]interface{}{"type": "suffix", "value": "done"},
 	}
 
-	if stage.ID != "test-stage" {
+	if stage.ID != strTestStage {
 		t.Error("Expected stage ID")
 	}
 
-	if stage.Type != "text_generation" {
+	if stage.Type != string(StageTypeTextGen) {
 		t.Error("Expected stage type")
 	}
 
-	if stage.PreferredBackend != "backend1" {
+	if stage.PreferredBackend != strBackend1 {
 		t.Error("Expected preferred backend")
 	}
 
@@ -668,7 +688,7 @@ func TestStageYAMLStructure(t *testing.T) {
 		t.Error("Expected preferred hardware")
 	}
 
-	if stage.Model != "llama3:7b" {
+	if stage.Model != strLlama37b {
 		t.Error("Expected model")
 	}
 
@@ -681,6 +701,7 @@ func TestStageYAMLStructure(t *testing.T) {
 	}
 }
 
+// TestOptionsYAMLStructure is part of the public API.
 func TestOptionsYAMLStructure(t *testing.T) {
 	options := OptionsYAML{
 		EnableStreaming: true,
@@ -716,15 +737,16 @@ func TestOptionsYAMLStructure(t *testing.T) {
 	}
 }
 
+// TestAddPipeline is part of the public API.
 func TestAddPipeline(t *testing.T) {
 	loader := NewPipelineLoader()
 
 	pipeline := &Pipeline{
-		ID:          "test-pipeline",
-		Name:        "Test Pipeline",
-		Description: "A test pipeline",
+		ID:          strTestPipeline,
+		Name:        strTestPipeline2,
+		Description: strATestPipeline,
 		Stages:      make([]*Stage, 0),
-		Options:     &PipelineOptions{},
+		Options:     &Options{},
 	}
 
 	// Add pipeline
@@ -736,25 +758,26 @@ func TestAddPipeline(t *testing.T) {
 		t.Errorf("Expected 1 pipeline, got %d", len(ids))
 	}
 
-	if ids[0] != "test-pipeline" {
+	if ids[0] != strTestPipeline {
 		t.Errorf("Expected pipeline ID 'test-pipeline', got %s", ids[0])
 	}
 
 	// Verify we can retrieve it
-	retrieved, err := loader.GetPipeline("test-pipeline")
+	retrieved, err := loader.GetPipeline(strTestPipeline)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if retrieved.ID != "test-pipeline" {
+	if retrieved.ID != strTestPipeline {
 		t.Errorf("Expected ID 'test-pipeline', got %s", retrieved.ID)
 	}
 
-	if retrieved.Name != "Test Pipeline" {
+	if retrieved.Name != strTestPipeline2 {
 		t.Errorf("Expected name 'Test Pipeline', got %s", retrieved.Name)
 	}
 }
 
+// TestLoadFromFileNotFound is part of the public API.
 func TestLoadFromFileNotFound(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -765,6 +788,7 @@ func TestLoadFromFileNotFound(t *testing.T) {
 	}
 }
 
+// TestLoadFromFileInvalidYAML is part of the public API.
 func TestLoadFromFileInvalidYAML(t *testing.T) {
 	loader := NewPipelineLoader()
 
@@ -788,6 +812,7 @@ func TestLoadFromFileInvalidYAML(t *testing.T) {
 	}
 }
 
+// TestLoadFromFileValidYAML is part of the public API.
 func TestLoadFromFileValidYAML(t *testing.T) {
 	loader := NewPipelineLoader()
 

@@ -1,3 +1,4 @@
+// Package ratelimit limits request rates per client.
 package ratelimit
 
 import (
@@ -11,26 +12,24 @@ import (
 
 // IPRateLimiter manages rate limiting per IP address
 type IPRateLimiter struct {
-	mu       sync.RWMutex
-	limiters map[string]*rate.Limiter
-	rate     rate.Limit
-	burst    int
-
-	// Cleanup
-	lastSeen map[string]time.Time
+	limiters        map[string]*rate.Limiter
+	lastSeen        map[string]time.Time
+	rate            rate.Limit
+	burst           int
 	cleanupInterval time.Duration
-	expiryDuration time.Duration
+	expiryDuration  time.Duration
+	mu              sync.RWMutex
 }
 
 // NewIPRateLimiter creates a new IP-based rate limiter
 func NewIPRateLimiter(r rate.Limit, b int) *IPRateLimiter {
 	rl := &IPRateLimiter{
-		limiters: make(map[string]*rate.Limiter),
-		lastSeen: make(map[string]time.Time),
-		rate:     r,
-		burst:    b,
+		limiters:        make(map[string]*rate.Limiter),
+		lastSeen:        make(map[string]time.Time),
+		rate:            r,
+		burst:           b,
 		cleanupInterval: 5 * time.Minute,
-		expiryDuration: 10 * time.Minute,
+		expiryDuration:  10 * time.Minute,
 	}
 
 	// Start cleanup goroutine

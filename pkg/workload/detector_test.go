@@ -7,6 +7,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestNewDetector is part of the public API.
 func TestNewDetector(t *testing.T) {
 	d := NewDetector()
 	if d == nil {
@@ -20,6 +21,7 @@ func TestNewDetector(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_Realtime is part of the public API.
 func TestDetectMediaType_Realtime(t *testing.T) {
 	d := NewDetector()
 
@@ -27,14 +29,14 @@ func TestDetectMediaType_Realtime(t *testing.T) {
 		name   string
 		prompt string
 	}{
-		{"Real-time keyword", "Start a real-time conversation with me"},
-		{"Realtime keyword", "Enable realtime transcription please"},
-		{"Live keyword", "I need live streaming translation"},
-		{"Interactive chat", "Start an interactive chat session"},
-		{"Voice chat", "Begin voice chat mode"},
-		{"Instant keyword", "I need instant responses"},
-		{"Transcribe", "Transcribe this audio in realtime"},
-		{"Dictation", "Enable dictation mode"},
+		{name: "Real-time keyword", prompt: "Start a real-time conversation with me"},
+		{name: "Realtime keyword", prompt: "Enable realtime transcription please"},
+		{name: "Live keyword", prompt: "I need live streaming translation"},
+		{name: "Interactive chat", prompt: "Start an interactive chat session"},
+		{name: "Voice chat", prompt: "Begin voice chat mode"},
+		{name: "Instant keyword", prompt: "I need instant responses"},
+		{name: "Transcribe", prompt: "Transcribe this audio in realtime"},
+		{name: "Dictation", prompt: "Enable dictation mode"},
 	}
 
 	for _, tt := range tests {
@@ -50,6 +52,7 @@ func TestDetectMediaType_Realtime(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_Audio is part of the public API.
 func TestDetectMediaType_Audio(t *testing.T) {
 	d := NewDetector()
 
@@ -57,14 +60,14 @@ func TestDetectMediaType_Audio(t *testing.T) {
 		name   string
 		prompt string
 	}{
-		{"Audio keyword", "Process this audio file"},
-		{"Sound keyword", "Analyze this sound recording"},
-		{"Voice keyword", "Transcribe this voice message"},
-		{"Speech keyword", "Convert speech to text"},
-		{"Podcast keyword", "Summarize this podcast episode"},
-		{"TTS keyword", "Use text to speech for this"},
-		{"STT keyword", "Speech to text conversion needed"},
-		{"Transcribe keyword", "Transcribe this recording"},
+		{name: "Audio keyword", prompt: "Process this audio file"},
+		{name: "Sound keyword", prompt: "Analyze this sound recording"},
+		{name: "Voice keyword", prompt: "Transcribe this voice message"},
+		{name: "Speech keyword", prompt: "Convert speech to text"},
+		{name: "Podcast keyword", prompt: "Summarize this podcast episode"},
+		{name: "TTS keyword", prompt: "Use text to speech for this"},
+		{name: "STT keyword", prompt: "Speech to text conversion needed"},
+		{name: "Transcribe keyword", prompt: "Transcribe this recording"},
 	}
 
 	for _, tt := range tests {
@@ -80,6 +83,7 @@ func TestDetectMediaType_Audio(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_Code is part of the public API.
 func TestDetectMediaType_Code(t *testing.T) {
 	d := NewDetector()
 
@@ -88,19 +92,19 @@ func TestDetectMediaType_Code(t *testing.T) {
 		prompt string
 		model  string
 	}{
-		{"Code keyword", "Write code for a REST API", ""},
-		{"Program keyword", "Create a program that sorts arrays", ""},
-		{"Function keyword", "Write a function to calculate fibonacci", ""},
-		{"Implement keyword", "Implement a binary search tree", ""},
-		{"Python keyword", "Write a python script to parse JSON", ""},
-		{"JavaScript keyword", "Create a javascript function for validation", ""},
-		{"Algorithm keyword", "Implement this algorithm in Go", ""},
-		{"API keyword", "Design an API for user management", ""},
-		{"Bug keyword", "Fix this bug in my code", ""},
-		{"SQL keyword", "Write a SQL query to join these tables", ""},
-		{"React keyword", "Create a react component", ""},
-		{"CodeLlama model", "Test prompt", "codellama:7b"},
-		{"StarCoder model", "Test prompt", "starcoder"},
+		{name: "Code keyword", prompt: "Write code for a REST API", model: ""},
+		{name: "Program keyword", prompt: "Create a program that sorts arrays", model: ""},
+		{name: "Function keyword", prompt: "Write a function to calculate fibonacci", model: ""},
+		{name: "Implement keyword", prompt: "Implement a binary search tree", model: ""},
+		{name: "Python keyword", prompt: "Write a python script to parse JSON", model: ""},
+		{name: "JavaScript keyword", prompt: "Create a javascript function for validation", model: ""},
+		{name: "Algorithm keyword", prompt: "Implement this algorithm in Go", model: ""},
+		{name: "API keyword", prompt: "Design an API for user management", model: ""},
+		{name: "Bug keyword", prompt: "Fix this bug in my code", model: ""},
+		{name: "SQL keyword", prompt: "Write a SQL query to join these tables", model: ""},
+		{name: "React keyword", prompt: "Create a react component", model: ""},
+		{name: "CodeLlama model", prompt: "Test prompt", model: "codellama:7b"},
+		{name: "StarCoder model", prompt: "Test prompt", model: "starcoder"},
 	}
 
 	for _, tt := range tests {
@@ -114,6 +118,7 @@ func TestDetectMediaType_Code(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_Image is part of the public API.
 func TestDetectMediaType_Image(t *testing.T) {
 	d := NewDetector()
 
@@ -121,14 +126,14 @@ func TestDetectMediaType_Image(t *testing.T) {
 		name   string
 		prompt string
 	}{
-		{"Image keyword", "Analyze this image for me"},
-		{"Picture keyword", "Describe this picture"},
-		{"Photo keyword", "What's in this photo?"},
-		{"Visual keyword", "Explain the visual elements"},
-		{"Draw keyword", "Draw a diagram of the architecture"},
-		{"Generate image", "Generate an image of a sunset"},
-		{"Vision keyword", "Use vision to analyze this"},
-		{"Screenshot keyword", "Analyze this screenshot"},
+		{name: "Image keyword", prompt: "Analyze this image for me"},
+		{name: "Picture keyword", prompt: "Describe this picture"},
+		{name: "Photo keyword", prompt: "What's in this photo?"},
+		{name: "Visual keyword", prompt: "Explain the visual elements"},
+		{name: "Draw keyword", prompt: "Draw a diagram of the architecture"},
+		{name: "Generate image", prompt: "Generate an image of a sunset"},
+		{name: "Vision keyword", prompt: "Use vision to analyze this"},
+		{name: "Screenshot keyword", prompt: "Analyze this screenshot"},
 	}
 
 	for _, tt := range tests {
@@ -142,6 +147,7 @@ func TestDetectMediaType_Image(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_Text is part of the public API.
 func TestDetectMediaType_Text(t *testing.T) {
 	d := NewDetector()
 
@@ -149,10 +155,10 @@ func TestDetectMediaType_Text(t *testing.T) {
 		name   string
 		prompt string
 	}{
-		{"General question", "What's the main city of France?"},
-		{"Explanation request", "Explain biology concepts to me"},
-		{"Summary request", "Summarize the history of mathematics"},
-		{"Default case", "Tell me about quantum mechanics"},
+		{name: "General question", prompt: "What's the main city of France?"},
+		{name: "Explanation request", prompt: "Explain biology concepts to me"},
+		{name: "Summary request", prompt: "Summarize the history of mathematics"},
+		{name: "Default case", prompt: "Tell me about quantum mechanics"},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +172,7 @@ func TestDetectMediaType_Text(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_ExplicitOverride is part of the public API.
 func TestDetectMediaType_ExplicitOverride(t *testing.T) {
 	d := NewDetector()
 
@@ -179,6 +186,7 @@ func TestDetectMediaType_ExplicitOverride(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_AutoIgnored is part of the public API.
 func TestDetectMediaType_AutoIgnored(t *testing.T) {
 	d := NewDetector()
 
@@ -192,6 +200,7 @@ func TestDetectMediaType_AutoIgnored(t *testing.T) {
 	}
 }
 
+// TestIsRealtime_RequiresLatencyCritical is part of the public API.
 func TestIsRealtime_RequiresLatencyCritical(t *testing.T) {
 	d := NewDetector()
 
@@ -206,6 +215,7 @@ func TestIsRealtime_RequiresLatencyCritical(t *testing.T) {
 	}
 }
 
+// TestIsRealtime_AudioPlusLatency is part of the public API.
 func TestIsRealtime_AudioPlusLatency(t *testing.T) {
 	d := NewDetector()
 
@@ -220,6 +230,7 @@ func TestIsRealtime_AudioPlusLatency(t *testing.T) {
 	}
 }
 
+// TestGetProfile is part of the public API.
 func TestGetProfile(t *testing.T) {
 	d := NewDetector()
 
@@ -227,11 +238,11 @@ func TestGetProfile(t *testing.T) {
 		mediaType backends.MediaType
 		expected  string
 	}{
-		{backends.MediaTypeRealtime, "qwen2.5:0.5b"},
-		{backends.MediaTypeAudio, "qwen2.5:1.5b"},
-		{backends.MediaTypeCode, "llama3:70b"},
-		{backends.MediaTypeImage, "llama3:7b"},
-		{backends.MediaTypeText, "llama3:7b"},
+		{mediaType: backends.MediaTypeRealtime, expected: "qwen2.5:0.5b"},
+		{mediaType: backends.MediaTypeAudio, expected: "qwen2.5:1.5b"},
+		{mediaType: backends.MediaTypeCode, expected: "llama3:70b"},
+		{mediaType: backends.MediaTypeImage, expected: "llama3:7b"},
+		{mediaType: backends.MediaTypeText, expected: "llama3:7b"},
 	}
 
 	for _, tt := range tests {
@@ -247,6 +258,7 @@ func TestGetProfile(t *testing.T) {
 	}
 }
 
+// TestGetProfile_Unknown is part of the public API.
 func TestGetProfile_Unknown(t *testing.T) {
 	d := NewDetector()
 
@@ -260,6 +272,7 @@ func TestGetProfile_Unknown(t *testing.T) {
 	}
 }
 
+// TestGetRoutingHints_Basic is part of the public API.
 func TestGetRoutingHints_Basic(t *testing.T) {
 	d := NewDetector()
 
@@ -280,6 +293,7 @@ func TestGetRoutingHints_Basic(t *testing.T) {
 	}
 }
 
+// TestGetRoutingHints_LatencyCriticalOverride is part of the public API.
 func TestGetRoutingHints_LatencyCriticalOverride(t *testing.T) {
 	d := NewDetector()
 
@@ -297,6 +311,7 @@ func TestGetRoutingHints_LatencyCriticalOverride(t *testing.T) {
 	}
 }
 
+// TestGetRoutingHints_PowerEfficiencyOverride is part of the public API.
 func TestGetRoutingHints_PowerEfficiencyOverride(t *testing.T) {
 	d := NewDetector()
 
@@ -314,6 +329,7 @@ func TestGetRoutingHints_PowerEfficiencyOverride(t *testing.T) {
 	}
 }
 
+// TestWorkloadProfiles_Realtime is part of the public API.
 func TestWorkloadProfiles_Realtime(t *testing.T) {
 	d := NewDetector()
 	profile := d.GetProfile(backends.MediaTypeRealtime)
@@ -332,6 +348,7 @@ func TestWorkloadProfiles_Realtime(t *testing.T) {
 	}
 }
 
+// TestWorkloadProfiles_Code is part of the public API.
 func TestWorkloadProfiles_Code(t *testing.T) {
 	d := NewDetector()
 	profile := d.GetProfile(backends.MediaTypeCode)
@@ -346,6 +363,7 @@ func TestWorkloadProfiles_Code(t *testing.T) {
 
 // Additional comprehensive tests for edge cases and full coverage
 
+// TestIsRealtime_WithRealtimeKeywordButNoLatency is part of the public API.
 func TestIsRealtime_WithRealtimeKeywordButNoLatency(t *testing.T) {
 	d := NewDetector()
 
@@ -360,6 +378,7 @@ func TestIsRealtime_WithRealtimeKeywordButNoLatency(t *testing.T) {
 	}
 }
 
+// TestIsRealtime_AllRealtimeKeywords is part of the public API.
 func TestIsRealtime_AllRealtimeKeywords(t *testing.T) {
 	d := NewDetector()
 	annotations := &backends.Annotations{
@@ -394,6 +413,7 @@ func TestIsRealtime_AllRealtimeKeywords(t *testing.T) {
 	}
 }
 
+// TestIsAudio_AllAudioKeywords is part of the public API.
 func TestIsAudio_AllAudioKeywords(t *testing.T) {
 	d := NewDetector()
 
@@ -427,6 +447,7 @@ func TestIsAudio_AllAudioKeywords(t *testing.T) {
 	}
 }
 
+// TestIsAudio_NoKeywords is part of the public API.
 func TestIsAudio_NoKeywords(t *testing.T) {
 	d := NewDetector()
 
@@ -436,6 +457,7 @@ func TestIsAudio_NoKeywords(t *testing.T) {
 	}
 }
 
+// TestIsCode_AllCodeKeywords is part of the public API.
 func TestIsCode_AllCodeKeywords(t *testing.T) {
 	d := NewDetector()
 
@@ -482,6 +504,7 @@ func TestIsCode_AllCodeKeywords(t *testing.T) {
 	}
 }
 
+// TestIsCode_ModelNameDetection is part of the public API.
 func TestIsCode_ModelNameDetection(t *testing.T) {
 	d := NewDetector()
 
@@ -489,9 +512,9 @@ func TestIsCode_ModelNameDetection(t *testing.T) {
 		name  string
 		model string
 	}{
-		{"code model", "code-llama:13b"},
-		{"starcoder model", "starcoder:7b"},
-		{"codellama model", "codellama:34b"},
+		{name: "code model", model: "code-llama:13b"},
+		{name: "starcoder model", model: "starcoder:7b"},
+		{name: "codellama model", model: "codellama:34b"},
 	}
 
 	for _, tt := range tests {
@@ -504,6 +527,7 @@ func TestIsCode_ModelNameDetection(t *testing.T) {
 	}
 }
 
+// TestIsCode_NoCodeIndicators is part of the public API.
 func TestIsCode_NoCodeIndicators(t *testing.T) {
 	d := NewDetector()
 
@@ -513,6 +537,7 @@ func TestIsCode_NoCodeIndicators(t *testing.T) {
 	}
 }
 
+// TestIsImage_AllImageKeywords is part of the public API.
 func TestIsImage_AllImageKeywords(t *testing.T) {
 	d := NewDetector()
 
@@ -543,6 +568,7 @@ func TestIsImage_AllImageKeywords(t *testing.T) {
 	}
 }
 
+// TestIsImage_NoKeywords is part of the public API.
 func TestIsImage_NoKeywords(t *testing.T) {
 	d := NewDetector()
 
@@ -552,6 +578,7 @@ func TestIsImage_NoKeywords(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_CaseSensitivity is part of the public API.
 func TestDetectMediaType_CaseSensitivity(t *testing.T) {
 	d := NewDetector()
 	annotations := &backends.Annotations{}
@@ -560,10 +587,10 @@ func TestDetectMediaType_CaseSensitivity(t *testing.T) {
 		prompt       string
 		expectedType backends.MediaType
 	}{
-		{"AUDIO processing", backends.MediaTypeAudio},
-		{"Code generation", backends.MediaTypeCode},
-		{"IMAGE analysis", backends.MediaTypeImage},
-		{"WRITE a story", backends.MediaTypeText},
+		{prompt: "AUDIO processing", expectedType: backends.MediaTypeAudio},
+		{prompt: "Code generation", expectedType: backends.MediaTypeCode},
+		{prompt: "IMAGE analysis", expectedType: backends.MediaTypeImage},
+		{prompt: "WRITE a story", expectedType: backends.MediaTypeText},
 	}
 
 	for _, tt := range tests {
@@ -576,6 +603,7 @@ func TestDetectMediaType_CaseSensitivity(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_PriorityOrder is part of the public API.
 func TestDetectMediaType_PriorityOrder(t *testing.T) {
 	d := NewDetector()
 
@@ -607,6 +635,7 @@ func TestDetectMediaType_PriorityOrder(t *testing.T) {
 	}
 }
 
+// TestGetRoutingHints_AllMediaTypes is part of the public API.
 func TestGetRoutingHints_AllMediaTypes(t *testing.T) {
 	d := NewDetector()
 
@@ -614,10 +643,10 @@ func TestGetRoutingHints_AllMediaTypes(t *testing.T) {
 		prompt    string
 		mediaType backends.MediaType
 	}{
-		{"realtime transcription", backends.MediaTypeAudio}, // Without latency critical
-		{"code in python", backends.MediaTypeCode},
-		{"analyze this image", backends.MediaTypeImage},
-		{"tell me a story", backends.MediaTypeText},
+		{prompt: "realtime transcription", mediaType: backends.MediaTypeAudio}, // Without latency critical
+		{prompt: "code in python", mediaType: backends.MediaTypeCode},
+		{prompt: "analyze this image", mediaType: backends.MediaTypeImage},
+		{prompt: "tell me a story", mediaType: backends.MediaTypeText},
 	}
 
 	for _, tt := range tests {
@@ -641,6 +670,7 @@ func TestGetRoutingHints_AllMediaTypes(t *testing.T) {
 	}
 }
 
+// TestGetRoutingHints_BothAnnotationOverrides is part of the public API.
 func TestGetRoutingHints_BothAnnotationOverrides(t *testing.T) {
 	d := NewDetector()
 
@@ -664,6 +694,7 @@ func TestGetRoutingHints_BothAnnotationOverrides(t *testing.T) {
 	}
 }
 
+// TestWorkloadProfiles_Audio is part of the public API.
 func TestWorkloadProfiles_Audio(t *testing.T) {
 	d := NewDetector()
 	profile := d.GetProfile(backends.MediaTypeAudio)
@@ -679,6 +710,7 @@ func TestWorkloadProfiles_Audio(t *testing.T) {
 	}
 }
 
+// TestWorkloadProfiles_Image is part of the public API.
 func TestWorkloadProfiles_Image(t *testing.T) {
 	d := NewDetector()
 	profile := d.GetProfile(backends.MediaTypeImage)
@@ -691,6 +723,7 @@ func TestWorkloadProfiles_Image(t *testing.T) {
 	}
 }
 
+// TestWorkloadProfiles_Text is part of the public API.
 func TestWorkloadProfiles_Text(t *testing.T) {
 	d := NewDetector()
 	profile := d.GetProfile(backends.MediaTypeText)
@@ -703,6 +736,7 @@ func TestWorkloadProfiles_Text(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_MultipleKeywordsOrder is part of the public API.
 func TestDetectMediaType_MultipleKeywordsOrder(t *testing.T) {
 	d := NewDetector()
 	annotations := &backends.Annotations{}
@@ -714,17 +748,18 @@ func TestDetectMediaType_MultipleKeywordsOrder(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_MixedCaseKeywords is part of the public API.
 func TestDetectMediaType_MixedCaseKeywords(t *testing.T) {
 	d := NewDetector()
 
 	tests := []struct {
+		annotations  *backends.Annotations
 		prompt       string
 		expectedType backends.MediaType
-		annotations  *backends.Annotations
 	}{
-		{"ReAlTiMe conversation", backends.MediaTypeRealtime, &backends.Annotations{LatencyCritical: true}},
-		{"CoDeGENeRaTioN", backends.MediaTypeCode, &backends.Annotations{}},
-		{"ImAgE analysis", backends.MediaTypeImage, &backends.Annotations{}},
+		{prompt: "ReAlTiMe conversation", expectedType: backends.MediaTypeRealtime, annotations: &backends.Annotations{LatencyCritical: true}},
+		{prompt: "CoDeGENeRaTioN", expectedType: backends.MediaTypeCode, annotations: &backends.Annotations{}},
+		{prompt: "ImAgE analysis", expectedType: backends.MediaTypeImage, annotations: &backends.Annotations{}},
 	}
 
 	for _, tt := range tests {
@@ -737,6 +772,7 @@ func TestDetectMediaType_MixedCaseKeywords(t *testing.T) {
 	}
 }
 
+// TestGetProfile_AllTypes is part of the public API.
 func TestGetProfile_AllTypes(t *testing.T) {
 	d := NewDetector()
 
@@ -770,6 +806,7 @@ func TestGetProfile_AllTypes(t *testing.T) {
 	}
 }
 
+// TestNewDetector_ProfilesInitialized is part of the public API.
 func TestNewDetector_ProfilesInitialized(t *testing.T) {
 	d := NewDetector()
 
@@ -788,6 +825,7 @@ func TestNewDetector_ProfilesInitialized(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_EmptyPrompt is part of the public API.
 func TestDetectMediaType_EmptyPrompt(t *testing.T) {
 	d := NewDetector()
 	annotations := &backends.Annotations{}
@@ -798,6 +836,7 @@ func TestDetectMediaType_EmptyPrompt(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_WithModel is part of the public API.
 func TestDetectMediaType_WithModel(t *testing.T) {
 	d := NewDetector()
 	annotations := &backends.Annotations{}
@@ -809,6 +848,7 @@ func TestDetectMediaType_WithModel(t *testing.T) {
 	}
 }
 
+// TestIsRealtime_AudioKeywordWithLatency is part of the public API.
 func TestIsRealtime_AudioKeywordWithLatency(t *testing.T) {
 	d := NewDetector()
 
@@ -823,6 +863,7 @@ func TestIsRealtime_AudioKeywordWithLatency(t *testing.T) {
 	}
 }
 
+// TestIsRealtime_AudioKeywordButNoRealtimeKeyword is part of the public API.
 func TestIsRealtime_AudioKeywordButNoRealtimeKeyword(t *testing.T) {
 	d := NewDetector()
 
@@ -838,16 +879,17 @@ func TestIsRealtime_AudioKeywordButNoRealtimeKeyword(t *testing.T) {
 	}
 }
 
+// TestRoutingHints_ReasoningChainContent is part of the public API.
 func TestRoutingHints_ReasoningChainContent(t *testing.T) {
 	d := NewDetector()
 
 	tests := []struct {
 		prompt string
-		count  int
 		name   string
+		count  int
 	}{
-		{"code generation", 1, "basic"},
-		{"code with latency requirement", 2, "with_override"},
+		{prompt: "code generation", count: 1, name: "basic"},
+		{prompt: "code with latency requirement", count: 2, name: "with_override"},
 	}
 
 	for _, tt := range tests {
@@ -870,6 +912,7 @@ func TestRoutingHints_ReasoningChainContent(t *testing.T) {
 	}
 }
 
+// TestDetectMediaType_NilAnnotations is part of the public API.
 func TestDetectMediaType_NilAnnotations(t *testing.T) {
 	d := NewDetector()
 

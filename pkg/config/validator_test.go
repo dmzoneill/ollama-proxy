@@ -10,37 +10,34 @@ func validConfig() *Config {
 	cfg := &Config{}
 	cfg.Server.GRPCPort = 50051
 	cfg.Server.HTTPPort = 8080
-	cfg.Server.Host = "localhost"
+	cfg.Server.Host = strLocalhost
 
 	// Add at least one enabled backend
 	cfg.Backends = []struct {
-		ID       string `yaml:"id"`
-		Type     string `yaml:"type"`
-		Name     string `yaml:"name"`
-		Hardware string `yaml:"hardware"`
-		Enabled  bool   `yaml:"enabled"`
-		Endpoint string `yaml:"endpoint"`
-
-		// OpenVINO-specific fields
-		Device    string `yaml:"device"`     // "CPU", "GPU", "NPU" for OpenVINO backends
-		ModelPath string `yaml:"model_path"` // Path to OpenVINO model directory
-		ModelName string `yaml:"model_name"` // Model name/identifier
-
+		ID              string `yaml:"id"`
+		Type            string `yaml:"type"`
+		Name            string `yaml:"name"`
+		Hardware        string `yaml:"hardware"`
+		Endpoint        string `yaml:"endpoint"`
+		Device          string `yaml:"device"`
+		ModelPath       string `yaml:"model_path"`
+		ModelName       string `yaml:"model_name"`
+		ModelCapability struct {
+			SupportedModelPatterns []string `yaml:"supported_model_patterns"`
+			PreferredModels        []string `yaml:"preferred_models"`
+			ExcludedPatterns       []string `yaml:"excluded_patterns"`
+			MaxModelSizeGB         int      `yaml:"max_model_size_gb"`
+		} `yaml:"model_capability"`
 		Characteristics struct {
 			PowerWatts         float64 `yaml:"power_watts"`
 			AvgLatencyMs       int32   `yaml:"avg_latency_ms"`
 			MaxTokensPerSecond int32   `yaml:"max_tokens_per_second"`
 			Priority           int     `yaml:"priority"`
 		} `yaml:"characteristics"`
-		ModelCapability struct {
-			MaxModelSizeGB         int      `yaml:"max_model_size_gb"`
-			SupportedModelPatterns []string `yaml:"supported_model_patterns"`
-			PreferredModels        []string `yaml:"preferred_models"`
-			ExcludedPatterns       []string `yaml:"excluded_patterns"`
-		} `yaml:"model_capability"`
+		Enabled bool `yaml:"enabled"`
 	}{
 		{
-			ID:       "backend-1",
+			ID:       strBackend1,
 			Type:     "ollama",
 			Name:     "Test Backend",
 			Hardware: "cpu",
@@ -52,7 +49,7 @@ func validConfig() *Config {
 	cfg.Backends[0].Characteristics.AvgLatencyMs = 100
 	cfg.Backends[0].Characteristics.Priority = 5
 
-	cfg.Routing.DefaultBackend = "backend-1"
+	cfg.Routing.DefaultBackend = strBackend1
 	cfg.Routing.Confidence.LengthWeight = 0.5
 	cfg.Routing.Confidence.PatternWeight = 0.3
 	cfg.Routing.Confidence.ModelWeight = 0.2
@@ -60,6 +57,7 @@ func validConfig() *Config {
 	return cfg
 }
 
+// TestValidateConfig_ValidConfig is part of the public API.
 func TestValidateConfig_ValidConfig(t *testing.T) {
 	cfg := validConfig()
 	err := ValidateConfig(cfg)
@@ -68,6 +66,7 @@ func TestValidateConfig_ValidConfig(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_InvalidGRPCPort_TooLow is part of the public API.
 func TestValidateConfig_InvalidGRPCPort_TooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.GRPCPort = 0
@@ -81,6 +80,7 @@ func TestValidateConfig_InvalidGRPCPort_TooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_InvalidGRPCPort_TooHigh is part of the public API.
 func TestValidateConfig_InvalidGRPCPort_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.GRPCPort = 65536
@@ -94,6 +94,7 @@ func TestValidateConfig_InvalidGRPCPort_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_InvalidHTTPPort_TooLow is part of the public API.
 func TestValidateConfig_InvalidHTTPPort_TooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.HTTPPort = 0
@@ -107,6 +108,7 @@ func TestValidateConfig_InvalidHTTPPort_TooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_InvalidHTTPPort_TooHigh is part of the public API.
 func TestValidateConfig_InvalidHTTPPort_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.HTTPPort = 70000
@@ -120,6 +122,7 @@ func TestValidateConfig_InvalidHTTPPort_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_SameGRPCAndHTTPPort is part of the public API.
 func TestValidateConfig_SameGRPCAndHTTPPort(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.GRPCPort = 8080
@@ -134,6 +137,7 @@ func TestValidateConfig_SameGRPCAndHTTPPort(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_TLSEnabled_MissingCertFile is part of the public API.
 func TestValidateConfig_TLSEnabled_MissingCertFile(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.TLS.Enabled = true
@@ -149,6 +153,7 @@ func TestValidateConfig_TLSEnabled_MissingCertFile(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_TLSEnabled_MissingKeyFile is part of the public API.
 func TestValidateConfig_TLSEnabled_MissingKeyFile(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.TLS.Enabled = true
@@ -164,6 +169,7 @@ func TestValidateConfig_TLSEnabled_MissingKeyFile(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_TLSEnabled_ValidConfig is part of the public API.
 func TestValidateConfig_TLSEnabled_ValidConfig(t *testing.T) {
 	cfg := validConfig()
 	cfg.Server.TLS.Enabled = true
@@ -176,6 +182,7 @@ func TestValidateConfig_TLSEnabled_ValidConfig(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_NoBackendsEnabled is part of the public API.
 func TestValidateConfig_NoBackendsEnabled(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Enabled = false
@@ -189,12 +196,13 @@ func TestValidateConfig_NoBackendsEnabled(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_DuplicateBackendID is part of the public API.
 func TestValidateConfig_DuplicateBackendID(t *testing.T) {
 	cfg := validConfig()
 
 	// Add a second backend with the same ID
 	backend2 := cfg.Backends[0]
-	backend2.ID = "backend-1" // Same as first
+	backend2.ID = strBackend1 // Same as first
 	backend2.Endpoint = "http://localhost:11435"
 	cfg.Backends = append(cfg.Backends, backend2)
 
@@ -207,6 +215,7 @@ func TestValidateConfig_DuplicateBackendID(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendMissingID is part of the public API.
 func TestValidateConfig_BackendMissingID(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].ID = ""
@@ -220,6 +229,7 @@ func TestValidateConfig_BackendMissingID(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendMissingType is part of the public API.
 func TestValidateConfig_BackendMissingType(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Type = ""
@@ -233,6 +243,7 @@ func TestValidateConfig_BackendMissingType(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendMissingEndpoint is part of the public API.
 func TestValidateConfig_BackendMissingEndpoint(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Endpoint = ""
@@ -246,6 +257,7 @@ func TestValidateConfig_BackendMissingEndpoint(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendNegativePowerWatts is part of the public API.
 func TestValidateConfig_BackendNegativePowerWatts(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Characteristics.PowerWatts = -5.0
@@ -259,6 +271,7 @@ func TestValidateConfig_BackendNegativePowerWatts(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendNegativeLatency is part of the public API.
 func TestValidateConfig_BackendNegativeLatency(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Characteristics.AvgLatencyMs = -100
@@ -272,6 +285,7 @@ func TestValidateConfig_BackendNegativeLatency(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_BackendNegativePriority is part of the public API.
 func TestValidateConfig_BackendNegativePriority(t *testing.T) {
 	cfg := validConfig()
 	cfg.Backends[0].Characteristics.Priority = -1
@@ -285,6 +299,7 @@ func TestValidateConfig_BackendNegativePriority(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_DefaultBackendNotInEnabled is part of the public API.
 func TestValidateConfig_DefaultBackendNotInEnabled(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.DefaultBackend = "nonexistent-backend"
@@ -298,6 +313,7 @@ func TestValidateConfig_DefaultBackendNotInEnabled(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ForwardingMinConfidenceTooLow is part of the public API.
 func TestValidateConfig_ForwardingMinConfidenceTooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Forwarding.Enabled = true
@@ -312,6 +328,7 @@ func TestValidateConfig_ForwardingMinConfidenceTooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ForwardingMinConfidenceTooHigh is part of the public API.
 func TestValidateConfig_ForwardingMinConfidenceTooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Forwarding.Enabled = true
@@ -326,6 +343,7 @@ func TestValidateConfig_ForwardingMinConfidenceTooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ForwardingNegativeRetries is part of the public API.
 func TestValidateConfig_ForwardingNegativeRetries(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Forwarding.Enabled = true
@@ -340,12 +358,13 @@ func TestValidateConfig_ForwardingNegativeRetries(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ForwardingValidConfig is part of the public API.
 func TestValidateConfig_ForwardingValidConfig(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Forwarding.Enabled = true
 	cfg.Routing.Forwarding.MinConfidence = 0.7
 	cfg.Routing.Forwarding.MaxRetries = 3
-	cfg.Routing.Forwarding.EscalationPath = []string{"backend-1"}
+	cfg.Routing.Forwarding.EscalationPath = []string{strBackend1}
 
 	err := ValidateConfig(cfg)
 	if err != nil {
@@ -353,10 +372,11 @@ func TestValidateConfig_ForwardingValidConfig(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EscalationPathInvalidBackend is part of the public API.
 func TestValidateConfig_EscalationPathInvalidBackend(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Forwarding.Enabled = true
-	cfg.Routing.Forwarding.EscalationPath = []string{"backend-1", "nonexistent-backend"}
+	cfg.Routing.Forwarding.EscalationPath = []string{strBackend1, "nonexistent-backend"}
 
 	err := ValidateConfig(cfg)
 	if err == nil {
@@ -367,6 +387,7 @@ func TestValidateConfig_EscalationPathInvalidBackend(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_LengthWeightOutOfRange_TooLow is part of the public API.
 func TestValidateConfig_LengthWeightOutOfRange_TooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.LengthWeight = -0.1
@@ -380,6 +401,7 @@ func TestValidateConfig_LengthWeightOutOfRange_TooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_LengthWeightOutOfRange_TooHigh is part of the public API.
 func TestValidateConfig_LengthWeightOutOfRange_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.LengthWeight = 1.5
@@ -393,6 +415,7 @@ func TestValidateConfig_LengthWeightOutOfRange_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PatternWeightOutOfRange_TooLow is part of the public API.
 func TestValidateConfig_PatternWeightOutOfRange_TooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.PatternWeight = -0.2
@@ -406,6 +429,7 @@ func TestValidateConfig_PatternWeightOutOfRange_TooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PatternWeightOutOfRange_TooHigh is part of the public API.
 func TestValidateConfig_PatternWeightOutOfRange_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.PatternWeight = 2.0
@@ -419,6 +443,7 @@ func TestValidateConfig_PatternWeightOutOfRange_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ModelWeightOutOfRange_TooLow is part of the public API.
 func TestValidateConfig_ModelWeightOutOfRange_TooLow(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.ModelWeight = -0.5
@@ -432,6 +457,7 @@ func TestValidateConfig_ModelWeightOutOfRange_TooLow(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ModelWeightOutOfRange_TooHigh is part of the public API.
 func TestValidateConfig_ModelWeightOutOfRange_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.Confidence.ModelWeight = 1.1
@@ -445,6 +471,7 @@ func TestValidateConfig_ModelWeightOutOfRange_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ThermalWarningNotLessThanCritical is part of the public API.
 func TestValidateConfig_ThermalWarningNotLessThanCritical(t *testing.T) {
 	cfg := validConfig()
 	cfg.Thermal.Enabled = true
@@ -461,6 +488,7 @@ func TestValidateConfig_ThermalWarningNotLessThanCritical(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ThermalCriticalNotLessThanShutdown is part of the public API.
 func TestValidateConfig_ThermalCriticalNotLessThanShutdown(t *testing.T) {
 	cfg := validConfig()
 	cfg.Thermal.Enabled = true
@@ -477,6 +505,7 @@ func TestValidateConfig_ThermalCriticalNotLessThanShutdown(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_ThermalValidConfig is part of the public API.
 func TestValidateConfig_ThermalValidConfig(t *testing.T) {
 	cfg := validConfig()
 	cfg.Thermal.Enabled = true
@@ -493,6 +522,7 @@ func TestValidateConfig_ThermalValidConfig(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_FanQuietGreaterThanModerate is part of the public API.
 func TestValidateConfig_FanQuietGreaterThanModerate(t *testing.T) {
 	cfg := validConfig()
 	cfg.Thermal.Enabled = true
@@ -512,6 +542,7 @@ func TestValidateConfig_FanQuietGreaterThanModerate(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_FanModerateGreaterThanLoud is part of the public API.
 func TestValidateConfig_FanModerateGreaterThanLoud(t *testing.T) {
 	cfg := validConfig()
 	cfg.Thermal.Enabled = true
@@ -531,6 +562,7 @@ func TestValidateConfig_FanModerateGreaterThanLoud(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PrometheusPortZero_Allowed is part of the public API.
 func TestValidateConfig_PrometheusPortZero_Allowed(t *testing.T) {
 	cfg := validConfig()
 	cfg.Monitoring.Enabled = true
@@ -543,6 +575,7 @@ func TestValidateConfig_PrometheusPortZero_Allowed(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PrometheusPortInvalid_TooHigh is part of the public API.
 func TestValidateConfig_PrometheusPortInvalid_TooHigh(t *testing.T) {
 	cfg := validConfig()
 	cfg.Monitoring.Enabled = true
@@ -557,6 +590,7 @@ func TestValidateConfig_PrometheusPortInvalid_TooHigh(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PrometheusPortConflictsWithGRPC is part of the public API.
 func TestValidateConfig_PrometheusPortConflictsWithGRPC(t *testing.T) {
 	cfg := validConfig()
 	cfg.Monitoring.Enabled = true
@@ -571,6 +605,7 @@ func TestValidateConfig_PrometheusPortConflictsWithGRPC(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PrometheusPortConflictsWithHTTP is part of the public API.
 func TestValidateConfig_PrometheusPortConflictsWithHTTP(t *testing.T) {
 	cfg := validConfig()
 	cfg.Monitoring.Enabled = true
@@ -585,6 +620,7 @@ func TestValidateConfig_PrometheusPortConflictsWithHTTP(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_PrometheusPortValid is part of the public API.
 func TestValidateConfig_PrometheusPortValid(t *testing.T) {
 	cfg := validConfig()
 	cfg.Monitoring.Enabled = true
@@ -596,6 +632,7 @@ func TestValidateConfig_PrometheusPortValid(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyModeInvalid is part of the public API.
 func TestValidateConfig_EfficiencyModeInvalid(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -610,6 +647,7 @@ func TestValidateConfig_EfficiencyModeInvalid(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_Performance is part of the public API.
 func TestValidateConfig_EfficiencyMode_Performance(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -621,6 +659,7 @@ func TestValidateConfig_EfficiencyMode_Performance(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_Balanced is part of the public API.
 func TestValidateConfig_EfficiencyMode_Balanced(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -632,6 +671,7 @@ func TestValidateConfig_EfficiencyMode_Balanced(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_Efficiency is part of the public API.
 func TestValidateConfig_EfficiencyMode_Efficiency(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -643,6 +683,7 @@ func TestValidateConfig_EfficiencyMode_Efficiency(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_Quiet is part of the public API.
 func TestValidateConfig_EfficiencyMode_Quiet(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -654,6 +695,7 @@ func TestValidateConfig_EfficiencyMode_Quiet(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_Auto is part of the public API.
 func TestValidateConfig_EfficiencyMode_Auto(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -665,6 +707,7 @@ func TestValidateConfig_EfficiencyMode_Auto(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EfficiencyMode_UltraEfficiency is part of the public API.
 func TestValidateConfig_EfficiencyMode_UltraEfficiency(t *testing.T) {
 	cfg := validConfig()
 	cfg.Efficiency.Enabled = true
@@ -676,6 +719,7 @@ func TestValidateConfig_EfficiencyMode_UltraEfficiency(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_MultipleBackends is part of the public API.
 func TestValidateConfig_MultipleBackends(t *testing.T) {
 	cfg := validConfig()
 
@@ -691,6 +735,7 @@ func TestValidateConfig_MultipleBackends(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_DisabledBackendNotValidated is part of the public API.
 func TestValidateConfig_DisabledBackendNotValidated(t *testing.T) {
 	cfg := validConfig()
 
@@ -706,6 +751,7 @@ func TestValidateConfig_DisabledBackendNotValidated(t *testing.T) {
 	}
 }
 
+// TestValidateConfig_EmptyDefaultBackend is part of the public API.
 func TestValidateConfig_EmptyDefaultBackend(t *testing.T) {
 	cfg := validConfig()
 	cfg.Routing.DefaultBackend = ""
