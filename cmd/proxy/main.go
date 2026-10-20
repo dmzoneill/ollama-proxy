@@ -1,3 +1,4 @@
+// Package main is the ollama-proxy command entrypoint.
 package main
 
 import (
@@ -9,7 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -119,189 +120,667 @@ func main() {
 
 	ctx := context.Background()
 
-	// Initialize thermal monitor
-	var thermalMonitor *thermal.ThermalMonitor
-	if cfg.Thermal.Enabled {
-		updateInterval := 5 * time.Second
-		if cfg.Thermal.UpdateInterval != "" {
-			var err error
-			updateInterval, err = time.ParseDuration(cfg.Thermal.UpdateInterval)
-			if err != nil {
-				logging.Logger.Warn("Invalid thermal update interval, using default",
-					zap.String("value", cfg.Thermal.UpdateInterval),
-					zap.Duration("default", 5*time.Second),
-					zap.Error(err),
-				)
-				updateInterval = 5 * time.Second
+	thermalMonitor := startThermalMonitor(cfg)
+
+	efficiencyMgr, dbusSvc := startEfficiency(cfg)
+
+	loadInitialEfficiencyMode(efficiencyMgr)
+
+	deviceManager := startDeviceManager(cfg)
+	r, _, _, forwardingRouter := buildRouter(cfg, thermalMonitor)
+	registerBackends(ctx, cfg, r)
+	pipelineExecutor, pipelineLoader, virtualDevMgr := startPipelines(cfg, r, deviceManager)
+	grpcServer, grpcRouter, computeServer := startGRPC(cfg, r, forwardingRouter, pipelineExecutor, pipelineLoader, deviceManager)
+	httpAddr := registerHTTPRoutes(cfg, grpcRouter, computeServer, thermalMonitor, efficiencyMgr)
+	startAuxiliaryServers(cfg, httpAddr, thermalMonitor, efficiencyMgr)
+	backendsDBus, routingDBus, thermalDBus, systemDBus := startExtendedDBus(cfg, grpcRouter, thermalMonitor, efficiencyMgr)
+	waitForShutdown(cfg, grpcRouter, thermalMonitor, efficiencyMgr, pipelineLoader, deviceManager, virtualDevMgr, backendsDBus, routingDBus, thermalDBus, systemDBus, dbusSvc, grpcServer)
+}
+
+func waitForShutdown(cfg *config.Config, grpcRouter *router.Router, thermalMonitor *thermal.Monitor, efficiencyMgr *efficiency.Manager, pipelineLoader *pipeline.Loader, deviceManager *device.Manager, virtualDevMgr *virtual.Manager, backendsDBus *dbusPkg.BackendsService, routingDBus *dbusPkg.RoutingService, thermalDBus *dbusPkg.ThermalService, systemDBus *dbusPkg.SystemService, dbusSvc *efficiency.DBusService, grpcServer *grpc.Server) {
+	// Start background health checker
+	go healthCheckLoop(context.Background(), grpcRouter)
+
+	// Start thermal update loop (updates efficiency manager)
+	if thermalMonitor != nil && efficiencyMgr != nil {
+		go thermalUpdateLoop(thermalMonitor, efficiencyMgr)
+	}
+
+	// Print startup summary
+	printStartupSummary(cfg, grpcRouter, thermalMonitor, efficiencyMgr, pipelineLoader, deviceManager)
+
+	// Wait for interrupt signal or SIGHUP for config reload
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
+	for {
+		sig := <-sigChan
+
+		if sig == syscall.SIGHUP {
+			if _, err := reloadConfig(); err != nil {
+				logging.Logger.Error("Failed to reload config", zap.Error(err))
+				continue
+			}
+			logging.Logger.Info("Configuration reloaded successfully")
+			continue
+		}
+
+		// SIGTERM or SIGINT - shutdown
+		break
+	}
+
+	logging.Logger.Info("Shutting down gracefully...")
+	stopServices(thermalMonitor, dbusSvc, deviceManager, virtualDevMgr, backendsDBus, routingDBus, thermalDBus, systemDBus)
+	grpcServer.GracefulStop()
+	logging.Logger.Info("Shutdown complete")
+}
+
+func reloadConfig() (*config.Config, error) {
+	newCfg, err := loadConfig(*configPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := config.ValidateConfig(newCfg); err != nil {
+		return nil, err
+	}
+	if *logLevel != "" {
+		newCfg.Monitoring.LogLevel = *logLevel
+	}
+	if *grpcPort > 0 {
+		newCfg.Server.GRPCPort = *grpcPort
+	}
+	if *httpPort > 0 {
+		newCfg.Server.HTTPPort = *httpPort
+	}
+	config.ApplyEnvOverrides(newCfg)
+	return newCfg, nil
+}
+
+func stopServices(thermalMonitor *thermal.Monitor, dbusSvc *efficiency.DBusService, deviceManager *device.Manager, virtualDevMgr *virtual.Manager, backendsDBus *dbusPkg.BackendsService, routingDBus *dbusPkg.RoutingService, thermalDBus *dbusPkg.ThermalService, systemDBus *dbusPkg.SystemService) {
+	if thermalMonitor != nil {
+		thermalMonitor.Stop()
+		logging.Logger.Info("Thermal monitor stopped")
+	}
+	if dbusSvc != nil {
+		dbusSvc.Stop()
+		logging.Logger.Info("D-Bus Efficiency service stopped")
+	}
+	if deviceManager != nil {
+		if err := deviceManager.Stop(); err != nil {
+			logging.Logger.Error("Error stopping device manager", zap.Error(err))
+		} else {
+			logging.Logger.Info("Device manager stopped")
+		}
+	}
+	if virtualDevMgr != nil {
+		if err := virtualDevMgr.Stop(); err != nil {
+			logging.Logger.Error("Error stopping virtual device manager", zap.Error(err))
+		} else {
+			logging.Logger.Info("Virtual device manager stopped")
+		}
+	}
+	stopDBus(backendsDBus, routingDBus, thermalDBus, systemDBus)
+}
+
+func stopDBus(backendsDBus *dbusPkg.BackendsService, routingDBus *dbusPkg.RoutingService, thermalDBus *dbusPkg.ThermalService, systemDBus *dbusPkg.SystemService) {
+	if backendsDBus != nil {
+		backendsDBus.Stop()
+		logging.Logger.Info("D-Bus Backends service stopped")
+	}
+	if routingDBus != nil {
+		routingDBus.Stop()
+		logging.Logger.Info("D-Bus Routing service stopped")
+	}
+	if thermalDBus != nil {
+		thermalDBus.Stop()
+		logging.Logger.Info("D-Bus Thermal service stopped")
+	}
+	if systemDBus != nil {
+		systemDBus.Stop()
+		logging.Logger.Info("D-Bus System service stopped")
+	}
+}
+
+func startExtendedDBus(cfg *config.Config, grpcRouter *router.Router, thermalMonitor *thermal.Monitor, efficiencyMgr *efficiency.Manager) (*dbusPkg.BackendsService, *dbusPkg.RoutingService, *dbusPkg.ThermalService, *dbusPkg.SystemService) {
+	var err error
+	// Start extended D-Bus services (backends, routing, thermal, system state)
+	var backendsDBus *dbusPkg.BackendsService
+	var routingDBus *dbusPkg.RoutingService
+	var thermalDBus *dbusPkg.ThermalService
+	var systemDBus *dbusPkg.SystemService
+
+	if cfg.Efficiency.DBusEnabled {
+		// Backends monitoring service
+		backendsDBus, err = dbusPkg.NewBackendsService(grpcRouter)
+		if err != nil {
+			logging.Logger.Warn("Failed to create Backends D-Bus service", zap.Error(err))
+		} else {
+			if err := backendsDBus.Start(); err != nil {
+				logging.Logger.Warn("Backends D-Bus service failed to start", zap.Error(err))
+			} else {
+				logging.Logger.Info("D-Bus Backends service started")
 			}
 		}
 
-		thermalConfig := &thermal.ThermalConfig{
-			TempWarning:  cfg.Thermal.Temperature.Warning,
-			TempCritical: cfg.Thermal.Temperature.Critical,
-			TempShutdown: cfg.Thermal.Temperature.Shutdown,
-			FanQuiet:     cfg.Thermal.Fan.Quiet,
-			FanModerate:  cfg.Thermal.Fan.Moderate,
-			FanLoud:      cfg.Thermal.Fan.Loud,
-			CooldownTime: 2 * time.Minute,
-		}
-
-		thermalMonitor = thermal.NewThermalMonitor(thermalConfig, updateInterval)
-		thermalMonitor.Start()
-		logging.Logger.Info("Thermal monitoring started",
-			zap.Duration("update_interval", updateInterval),
-			zap.Float64("warning_temp", cfg.Thermal.Temperature.Warning),
-			zap.Float64("critical_temp", cfg.Thermal.Temperature.Critical),
-		)
-	} else {
-		logging.Logger.Info("Thermal monitoring disabled")
-	}
-
-	// Initialize efficiency manager
-	var efficiencyMgr *efficiency.EfficiencyManager
-	var dbusSvc *efficiency.DBusService
-	if cfg.Efficiency.Enabled {
-		// Parse default mode
-		defaultMode := efficiency.ModeBalanced
-		switch cfg.Efficiency.DefaultMode {
-		case "Performance":
-			defaultMode = efficiency.ModePerformance
-		case "Efficiency":
-			defaultMode = efficiency.ModeEfficiency
-		case "Quiet":
-			defaultMode = efficiency.ModeQuiet
-		case "Auto":
-			defaultMode = efficiency.ModeAuto
-		case "UltraEfficiency":
-			defaultMode = efficiency.ModeUltraEfficiency
-		}
-
-		efficiencyMgr = efficiency.NewEfficiencyManager(defaultMode)
-		logging.Logger.Info("Efficiency manager initialized",
-			zap.String("mode", defaultMode.String()),
-		)
-
-		// Start D-Bus service if enabled
-		if cfg.Efficiency.DBusEnabled {
-			dbusSvc, err = efficiency.NewDBusService(efficiencyMgr)
-			if err != nil {
-				logging.Logger.Warn("D-Bus service failed to start",
-					zap.Error(err),
-					zap.String("note", "GNOME integration unavailable, CLI still works"),
-				)
+		// Routing statistics service
+		routingDBus, err = dbusPkg.NewRoutingService(grpcRouter)
+		if err != nil {
+			logging.Logger.Warn("Failed to create Routing D-Bus service", zap.Error(err))
+		} else {
+			if err := routingDBus.Start(); err != nil {
+				logging.Logger.Warn("Routing D-Bus service failed to start", zap.Error(err))
 			} else {
-				if err := dbusSvc.Start(); err != nil {
-					logging.Logger.Warn("D-Bus service error", zap.Error(err))
+				logging.Logger.Info("D-Bus Routing service started")
+			}
+		}
+
+		// Thermal monitoring service
+		if thermalMonitor != nil {
+			thermalDBus, err = dbusPkg.NewThermalService(thermalMonitor)
+			if err != nil {
+				logging.Logger.Warn("Failed to create Thermal D-Bus service", zap.Error(err))
+			} else {
+				if err := thermalDBus.Start(); err != nil {
+					logging.Logger.Warn("Thermal D-Bus service failed to start", zap.Error(err))
 				} else {
-					logging.Logger.Info("D-Bus Efficiency service started",
-						zap.String("integration", "GNOME"),
-					)
+					logging.Logger.Info("D-Bus Thermal service started")
 				}
 			}
 		}
-	} else {
-		logging.Logger.Info("Efficiency modes disabled")
-	}
 
-	// Load GSettings (if available)
-	gsettings := settings.NewSettings()
-	if gsettings.IsAvailable() {
-		logging.Logger.Info("GSettings available")
-
-		// Load initial mode from settings if efficiency manager was created
+		// System state service
 		if efficiencyMgr != nil {
-			initialMode := gsettings.LoadInitialMode()
-			efficiencyMgr.SetMode(initialMode)
-			logging.Logger.Info("Loaded mode from settings",
-				zap.String("mode", initialMode.String()),
-			)
+			systemDBus, err = dbusPkg.NewSystemService(efficiencyMgr)
+			if err != nil {
+				logging.Logger.Warn("Failed to create System D-Bus service", zap.Error(err))
+			} else {
+				if err := systemDBus.Start(); err != nil {
+					logging.Logger.Warn("System D-Bus service failed to start", zap.Error(err))
+				} else {
+					logging.Logger.Info("D-Bus System State service started")
+				}
+			}
 		}
 	}
+	return backendsDBus, routingDBus, thermalDBus, systemDBus
+}
 
-	// Initialize device manager
-	var deviceManager *device.DeviceManager
-	if cfg.Devices.Enabled {
-		dm, err := device.NewDeviceManager()
+func startAuxiliaryServers(cfg *config.Config, httpAddr string, thermalMonitor *thermal.Monitor, efficiencyMgr *efficiency.Manager) {
+	// Prometheus metrics endpoint
+	if cfg.Monitoring.Enabled && cfg.Monitoring.PrometheusPort > 0 {
+		metricsAddr := fmt.Sprintf(":%d", cfg.Monitoring.PrometheusPort)
+		go func() {
+			logging.Logger.Info("Prometheus metrics server listening",
+				zap.String("address", metricsAddr),
+				zap.String("endpoint", "/metrics"),
+			)
+
+			metricsMux := http.NewServeMux()
+			metricsMux.Handle("/metrics", promhttp.Handler())
+
+			if err := serveHTTP(metricsAddr, metricsMux); err != nil {
+				logging.Logger.Error("Metrics server failed", zap.Error(err))
+			}
+		}()
+	}
+
+	// pprof profiling endpoint
+	if cfg.Monitoring.PprofEnabled && cfg.Monitoring.PprofPort > 0 {
+		pprofAddr := fmt.Sprintf(":%d", cfg.Monitoring.PprofPort)
+		go func() {
+			logging.Logger.Info("pprof profiling server listening",
+				zap.String("address", pprofAddr),
+				zap.String("endpoints", "/debug/pprof/*"),
+			)
+
+			pprofMux := http.NewServeMux()
+			pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+			pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			if err := serveHTTP(pprofAddr, pprofMux); err != nil {
+				logging.Logger.Error("pprof server failed", zap.Error(err))
+			}
+		}()
+	}
+
+	go func() {
+		protocol := "http"
+		if cfg.Server.TLS.Enabled {
+			protocol = "https"
+		}
+
+		wsProtocol := "ws"
+		if cfg.Server.TLS.Enabled {
+			wsProtocol = "wss"
+		}
+
+		logging.Logger.Info("HTTP server listening",
+			zap.String("address", httpAddr),
+			zap.String("protocol", protocol),
+			zap.Bool("tls", cfg.Server.TLS.Enabled),
+		)
+		logging.Logger.Info("HTTP endpoints available",
+			zap.String("health", fmt.Sprintf("%s://%s/health", protocol, httpAddr)),
+			zap.String("backends", fmt.Sprintf("%s://%s/backends", protocol, httpAddr)),
+			zap.String("openai_api", fmt.Sprintf("%s://%s/v1/", protocol, httpAddr)),
+			zap.String("websocket", fmt.Sprintf("%s://%s/v1/stream/ws", wsProtocol, httpAddr)),
+			zap.Bool("thermal", thermalMonitor != nil),
+			zap.Bool("efficiency", efficiencyMgr != nil),
+		)
+
+		if cfg.Server.TLS.Enabled {
+			tlsConfig := &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}
+
+			httpServer := &http.Server{
+				Addr:              httpAddr,
+				TLSConfig:         tlsConfig,
+				ReadHeaderTimeout: 5 * time.Second,
+				ReadTimeout:       30 * time.Second,
+				WriteTimeout:      60 * time.Second,
+				IdleTimeout:       120 * time.Second,
+			}
+
+			if err := httpServer.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile); err != nil {
+				logging.Logger.Fatal("Failed to serve HTTPS", zap.Error(err))
+			}
+		} else {
+			if err := serveHTTP(httpAddr, nil); err != nil {
+				logging.Logger.Fatal("Failed to serve HTTP", zap.Error(err))
+			}
+		}
+	}()
+
+}
+
+func registerHTTPRoutes(cfg *config.Config, grpcRouter *router.Router, computeServer *server.ComputeServer, thermalMonitor *thermal.Monitor, efficiencyMgr *efficiency.Manager) string {
+	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HTTPPort)
+
+	// Liveness probe - Kubernetes style (is server alive?)
+	http.HandleFunc("/healthz", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writePlain(w, http.StatusOK, "ok\n")
+	}))
+
+	// Readiness probe - Kubernetes style (ready to serve traffic?)
+	http.HandleFunc("/readyz", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		backends := grpcRouter.ListBackends()
+		healthyCount := 0
+		for _, backend := range backends {
+			if backend.IsHealthy() {
+				healthyCount++
+			}
+		}
+
+		if healthyCount > 0 {
+			writePlain(w, http.StatusOK, "ready: %d/%d backends healthy\n", healthyCount, len(backends))
+		} else {
+			writePlain(w, http.StatusServiceUnavailable, "not ready: 0/%d backends healthy\n", len(backends))
+		}
+	}))
+
+	// Detailed health endpoint (legacy)
+	http.HandleFunc("/health", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		healthResp, err := computeServer.HealthCheck(r.Context(), &pb.HealthCheckRequest{})
 		if err != nil {
-			logging.Logger.Warn("Failed to initialize device manager",
-				zap.Error(err),
-				zap.String("note", "Device hotplug detection unavailable"),
+			writePlain(w, http.StatusInternalServerError, "health check failed: %v\n", err)
+			return
+		}
+		writePlain(w, http.StatusOK, "Status: %s\n", healthResp.Status)
+		for backend, status := range healthResp.BackendHealth {
+			if _, err := fmt.Fprintf(w, "  %s: %s\n", backend, status); err != nil {
+				logging.Warn("write health line", zap.Error(err))
+				return
+			}
+		}
+	}))
+
+	// Backends endpoint
+	http.HandleFunc("/backends", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		backendsResp, err := computeServer.ListBackends(r.Context(), &pb.ListBackendsRequest{})
+		if err != nil {
+			writePlain(w, http.StatusInternalServerError, "list backends failed: %v\n", err)
+			return
+		}
+		writePlain(w, http.StatusOK, "Available Backends:\n\n")
+		for _, b := range backendsResp.Backends {
+			if _, err := fmt.Fprintf(w, "ID: %s\n  Name: %s\n  Hardware: %s\n  Status: %s\n  Power: %.1fW\n  Avg Latency: %dms\n\n",
+				b.Id, b.Name, b.Hardware, b.Status.State, b.Metrics.PowerWatts, b.Metrics.AvgLatencyMs); err != nil {
+				logging.Warn("write backend line", zap.Error(err))
+				return
+			}
+		}
+	}))
+
+	// Thermal status endpoint
+	if thermalMonitor != nil {
+		http.HandleFunc("/thermal", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, thermalMonitor.GetAllStates())
+		}))
+	}
+
+	// Efficiency mode endpoint
+	if efficiencyMgr != nil {
+		http.HandleFunc("/efficiency", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			currentMode := efficiencyMgr.GetMode()
+			effectiveMode := efficiencyMgr.GetEffectiveMode()
+
+			response := map[string]interface{}{
+				"current_mode":   currentMode.String(),
+				"effective_mode": effectiveMode.String(),
+				"description":    efficiencyMgr.GetModeDescription(),
+			}
+
+			writeJSON(w, response)
+		}))
+	}
+
+	// Initialize authentication middleware
+	var authMiddleware func(http.Handler) http.Handler
+	if cfg.Server.Auth.Enabled {
+		authConfig := auth.Config{
+			Enabled: true,
+			APIKeys: make(map[string]auth.APIKeyInfo),
+		}
+
+		// Convert config API keys to auth.APIKeyInfo
+		for key, keyInfo := range cfg.Server.Auth.APIKeys {
+			authConfig.APIKeys[key] = auth.APIKeyInfo{
+				Name:        keyInfo.Name,
+				Permissions: keyInfo.Permissions,
+				Enabled:     keyInfo.Enabled,
+			}
+		}
+
+		authMiddleware = auth.APIKeyMiddleware(authConfig)
+		logging.Logger.Info("API authentication enabled",
+			zap.Int("api_keys_count", len(authConfig.APIKeys)),
+		)
+	} else {
+		// No-op middleware when auth is disabled
+		authMiddleware = func(next http.Handler) http.Handler {
+			return next
+		}
+		logging.Logger.Info("API authentication disabled",
+			zap.String("warning", "all requests will be accepted"),
+		)
+	}
+
+	// Initialize rate limiting middleware
+	var rateLimitMiddleware func(http.Handler) http.Handler
+	if cfg.Server.RateLimit.Enabled {
+		rateLimiter := ratelimit.NewIPRateLimiter(
+			rate.Limit(cfg.Server.RateLimit.Rate),
+			cfg.Server.RateLimit.Burst,
+		)
+		rateLimitMiddleware = rateLimiter.Middleware
+		logging.Logger.Info("Rate limiting enabled",
+			zap.Float64("rate_per_second", cfg.Server.RateLimit.Rate),
+			zap.Int("burst", cfg.Server.RateLimit.Burst),
+		)
+	} else {
+		// No-op middleware when rate limiting is disabled
+		rateLimitMiddleware = func(next http.Handler) http.Handler {
+			return next
+		}
+		logging.Logger.Info("Rate limiting disabled")
+	}
+
+	// Chain middleware: recovery first, then auth, then rate limiting
+	applyMiddleware := func(handler http.HandlerFunc) http.Handler {
+		return middleware.HTTPRecovery(authMiddleware(rateLimitMiddleware(handler)))
+	}
+
+	// OpenAI-compatible endpoints with middleware
+	http.Handle("/v1/chat/completions", applyMiddleware(openaihttp.HandleChatCompletion(grpcRouter)))
+	http.Handle("/v1/completions", applyMiddleware(openaihttp.HandleCompletion(grpcRouter)))
+	http.Handle("/v1/embeddings", applyMiddleware(openaihttp.HandleEmbedding(grpcRouter)))
+	http.Handle("/v1/models", applyMiddleware(openaihttp.HandleModels(grpcRouter)))
+
+	// WebSocket endpoint for ultra-low latency streaming (with middleware)
+	http.Handle("/v1/stream/ws", applyMiddleware(websockethttp.HandleWebSocketStream(grpcRouter)))
+
+	// Version endpoint
+	http.HandleFunc("/version", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		versionInfo := map[string]string{
+			"version":    Version,
+			"git_commit": GitCommit,
+			"build_time": BuildTime,
+		}
+		writeJSON(w, versionInfo)
+	}))
+
+	return httpAddr
+}
+
+func startGRPC(cfg *config.Config, r interface{}, forwardingRouter *router.ForwardingRouter, pipelineExecutor *pipeline.Executor, pipelineLoader *pipeline.Loader, deviceManager *device.Manager) (*grpc.Server, *router.Router, *server.ComputeServer) {
+	// Create gRPC server (adapt router interface)
+	var grpcRouter *router.Router
+	if tr, ok := r.(*router.ThermalRouter); ok {
+		grpcRouter = tr.Router
+	} else if base, ok := r.(*router.Router); ok {
+		grpcRouter = base
+	} else {
+		logging.Logger.Fatal("router does not implement the expected concrete type")
+	}
+
+	// Create gRPC server with optional TLS
+	var grpcServer *grpc.Server
+	if cfg.Server.TLS.Enabled {
+		cert, err := tls.LoadX509KeyPair(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
+		if err != nil {
+			logging.Logger.Fatal("Failed to load TLS certificate", zap.Error(err))
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Optional mTLS if client CA provided
+		if cfg.Server.TLS.ClientCAFile != "" {
+			caCert, err := os.ReadFile(cfg.Server.TLS.ClientCAFile)
+			if err != nil {
+				logging.Logger.Fatal("Failed to load client CA", zap.Error(err))
+			}
+
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM(caCert) {
+				logging.Logger.Fatal("Failed to parse client CA certificate")
+			}
+
+			tlsConfig.ClientCAs = caCertPool
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+			logging.Logger.Info("gRPC mTLS enabled",
+				zap.String("security_level", "mutual_tls"),
+				zap.Bool("client_cert_required", true),
 			)
 		} else {
-			deviceManager = dm
+			logging.Logger.Info("gRPC TLS enabled",
+				zap.String("security_level", "tls"),
+			)
+		}
 
-			// Start auto-discovery if enabled
-			if cfg.Devices.AutoDiscover {
-				deviceManager.StartAutoDiscovery()
-				logging.Logger.Info("Device auto-discovery started",
-					zap.Bool("hotplug_detection", true),
+		creds := credentials.NewTLS(tlsConfig)
+		grpcServer = grpc.NewServer(grpc.Creds(creds))
+	} else {
+		grpcServer = grpc.NewServer()
+		logging.Logger.Warn("gRPC TLS disabled",
+			zap.String("warning", "not recommended for production"),
+		)
+	}
+
+	// Pass forwarding router to server if enabled
+	computeServer := server.NewComputeServer(grpcRouter)
+	if forwardingRouter != nil {
+		computeServer.SetForwardingRouter(forwardingRouter)
+	}
+
+	// Pass pipeline executor to server if enabled
+	if pipelineExecutor != nil && pipelineLoader != nil {
+		computeServer.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
+		logging.Logger.Info("Pipeline executor attached to gRPC server")
+	}
+
+	pb.RegisterComputeServiceServer(grpcServer, computeServer)
+
+	// Register device service if device manager is enabled
+	if deviceManager != nil {
+		deviceGRPCService := device.NewGRPCService(deviceManager)
+		devicev1.RegisterDeviceServiceServer(grpcServer, deviceGRPCService)
+		logging.Logger.Info("Device gRPC service registered")
+	}
+
+	// Enable gRPC reflection for grpcurl
+	reflection.Register(grpcServer)
+
+	// Start gRPC server
+	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.GRPCPort)
+	lis, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		logging.Logger.Fatal("Failed to listen on gRPC port",
+			zap.String("address", grpcAddr),
+			zap.Error(err),
+		)
+	}
+
+	go func() {
+		logging.Logger.Info("gRPC server listening",
+			zap.String("address", grpcAddr),
+			zap.Bool("tls", cfg.Server.TLS.Enabled),
+			zap.Bool("reflection", true),
+		)
+		if err := grpcServer.Serve(lis); err != nil {
+			logging.Logger.Fatal("Failed to serve gRPC", zap.Error(err))
+		}
+	}()
+	return grpcServer, grpcRouter, computeServer
+}
+
+func startPipelines(cfg *config.Config, r interface{ ListBackends() []backends.Backend }, deviceManager *device.Manager) (*pipeline.Executor, *pipeline.Loader, *virtual.Manager) {
+	// Initialize pipeline system
+	// Note: Pipeline executor is always created for virtual device support
+	var pipelineExecutor *pipeline.Executor
+	var pipelineLoader *pipeline.Loader
+
+	// Create executor with all backends (required for virtual devices)
+	allBackends := r.ListBackends()
+	pipelineExecutor = pipeline.NewPipelineExecutor(allBackends)
+	logging.Logger.Info("Pipeline executor initialized",
+		zap.Int("backends", len(allBackends)),
+	)
+
+	if cfg.Pipelines.Enabled {
+		logging.Logger.Info("Loading pipeline configurations",
+			zap.String("config_file", cfg.Pipelines.ConfigFile),
+		)
+
+		// Load pipelines from config
+		pipelineLoader = pipeline.NewPipelineLoader()
+		if err := pipelineLoader.LoadFromFile(cfg.Pipelines.ConfigFile); err != nil {
+			logging.Logger.Warn("Failed to load pipelines", zap.Error(err))
+		} else {
+			pipelineIDs := pipelineLoader.ListPipelines()
+			logging.Logger.Info("Loaded pipelines",
+				zap.Int("count", len(pipelineIDs)),
+				zap.Strings("pipeline_ids", pipelineIDs),
+			)
+		}
+	} else {
+		logging.Logger.Info("Pipeline config loading disabled (executor still available)")
+	}
+
+	// Initialize virtual device manager
+	var virtualDevMgr *virtual.Manager
+	if cfg.VirtualDevices.Enabled {
+		vdm, err := virtual.NewVirtualDeviceManager(
+			deviceManager,
+			pipelineExecutor,
+			&cfg.VirtualDevices,
+			logging.Logger,
+		)
+		if err != nil {
+			logging.Logger.Warn("Failed to initialize virtual device manager",
+				zap.Error(err),
+				zap.String("note", "Virtual audio/video devices unavailable"),
+			)
+		} else {
+			virtualDevMgr = vdm
+
+			// Collect backend information
+			backendInfos := make([]virtual.BackendInfo, 0)
+			for _, backendCfg := range cfg.Backends {
+				if !backendCfg.Enabled {
+					continue
+				}
+				backendInfos = append(backendInfos, virtual.BackendInfo{
+					ID:       backendCfg.ID,
+					Name:     backendCfg.Name,
+					Hardware: backendCfg.Hardware,
+				})
+			}
+
+			// Create audio devices for each backend
+			for _, backendInfo := range backendInfos {
+				if err := virtualDevMgr.CreateDevicesForBackend(
+					backendInfo.ID,
+					backendInfo.Name,
+					backendInfo.Hardware,
+				); err != nil {
+					logging.Logger.Error("Failed to create virtual devices for backend",
+						zap.String("backend", backendInfo.ID),
+						zap.Error(err),
+					)
+				}
+			}
+
+			// Create virtual cameras (must be done together due to module loading)
+			if cfg.VirtualDevices.Video.Enabled && cfg.VirtualDevices.Video.Camera.Enabled {
+				if err := virtualDevMgr.CreateVirtualCameras(backendInfos); err != nil {
+					logging.Logger.Error("Failed to create virtual cameras",
+						zap.Error(err),
+					)
+				}
+			}
+
+			logging.Logger.Info("Virtual devices created",
+				zap.Int("microphones", virtualDevMgr.GetSourceCount()),
+				zap.Int("speakers", virtualDevMgr.GetSinkCount()),
+				zap.Int("cameras", virtualDevMgr.GetCameraCount()),
+			)
+
+			// Register backends with virtual device manager for meeting bridge
+			registeredBackends := r.ListBackends()
+			for _, backend := range registeredBackends {
+				// Register with virtual device manager
+				virtualDevMgr.RegisterBackend(backend.ID(), backend)
+				logging.Logger.Debug("Registered backend with virtual device manager",
+					zap.String("backend_id", backend.ID()),
 				)
 			}
 
-			logging.Logger.Info("Device manager initialized",
-				zap.String("dbus_service", "ie.fio.OllamaProxy.DeviceManager"),
-				zap.Bool("auto_discover", cfg.Devices.AutoDiscover),
-			)
+			// Auto-start meeting bridge for NPU backend
+			if err := virtualDevMgr.StartMeetingBridge("ollama-npu"); err != nil {
+				logging.Logger.Warn("Failed to auto-start meeting bridge",
+					zap.String("backend", "ollama-npu"),
+					zap.Error(err),
+				)
+			} else {
+				logging.Logger.Info("Meeting audio bridge started successfully",
+					zap.String("backend", "ollama-npu"),
+					zap.String("description", "Google Meet AI Assistant active"),
+				)
+			}
 		}
 	} else {
-		logging.Logger.Info("Device management disabled")
+		logging.Logger.Info("Virtual device management disabled")
 	}
+	return pipelineExecutor, pipelineLoader, virtualDevMgr
+}
 
-	// Initialize router (thermal-aware if enabled, with optional forwarding)
-	var r interface {
-		RegisterBackend(backends.Backend) error
-		ListBackends() []backends.Backend
-		RouteRequest(context.Context, *backends.Annotations) (*router.RoutingDecision, error)
-		HealthCheckAll(context.Context) map[string]bool
-	}
-
-	routerCfg := &router.Config{
-		DefaultBackendID: cfg.Routing.DefaultBackend,
-		PowerAware:       cfg.Routing.PowerAware,
-		AutoOptimize:     cfg.Routing.AutoOptimizeLatency,
-	}
-
-	// Create base router
-	var baseRouter *router.Router
-	var thermalRouter *router.ThermalRouter
-
-	if thermalMonitor != nil {
-		// Use thermal-aware router
-		thermalRouter = router.NewThermalRouter(*routerCfg, thermalMonitor)
-		baseRouter = thermalRouter.Router
-		r = thermalRouter
-		logging.Logger.Info("Using thermal-aware routing",
-			zap.Bool("power_aware", routerCfg.PowerAware),
-			zap.Bool("auto_optimize", routerCfg.AutoOptimize),
-		)
-	} else {
-		// Use basic router
-		baseRouter = router.NewRouter(*routerCfg)
-		r = baseRouter
-		logging.Logger.Info("Using basic routing",
-			zap.Bool("power_aware", routerCfg.PowerAware),
-		)
-	}
-
-	// Optionally wrap with forwarding router
-	var forwardingRouter *router.ForwardingRouter
-	if cfg.Routing.Forwarding.Enabled {
-		forwardingCfg := &router.ForwardingConfig{
-			Enabled:              cfg.Routing.Forwarding.Enabled,
-			MinConfidence:        cfg.Routing.Forwarding.MinConfidence,
-			MaxRetries:           cfg.Routing.Forwarding.MaxRetries,
-			EscalationPath:       cfg.Routing.Forwarding.EscalationPath,
-			RespectThermalLimits: cfg.Routing.Forwarding.RespectThermalLimits,
-			ReturnBestAttempt:    cfg.Routing.Forwarding.ReturnBestAttempt,
-		}
-
-		forwardingRouter = router.NewForwardingRouter(baseRouter, thermalRouter, forwardingCfg)
-		logging.Logger.Info("Confidence-based forwarding enabled",
-			zap.Float64("threshold", forwardingCfg.MinConfidence),
-			zap.Int("max_retries", forwardingCfg.MaxRetries),
-		)
-	}
-
+func registerBackends(ctx context.Context, cfg *config.Config, r interface{ RegisterBackend(backends.Backend) error }) {
 	// Register backends
 	for _, backendCfg := range cfg.Backends {
 		if !backendCfg.Enabled {
@@ -438,630 +917,239 @@ func main() {
 		}
 	}
 
-	// Initialize pipeline system
-	// Note: Pipeline executor is always created for virtual device support
-	var pipelineExecutor *pipeline.PipelineExecutor
-	var pipelineLoader *pipeline.PipelineLoader
+}
 
-	// Create executor with all backends (required for virtual devices)
-	allBackends := r.ListBackends()
-	pipelineExecutor = pipeline.NewPipelineExecutor(allBackends)
-	logging.Logger.Info("Pipeline executor initialized",
-		zap.Int("backends", len(allBackends)),
-	)
-
-	if cfg.Pipelines.Enabled {
-		logging.Logger.Info("Loading pipeline configurations",
-			zap.String("config_file", cfg.Pipelines.ConfigFile),
-		)
-
-		// Load pipelines from config
-		pipelineLoader = pipeline.NewPipelineLoader()
-		if err := pipelineLoader.LoadFromFile(cfg.Pipelines.ConfigFile); err != nil {
-			logging.Logger.Warn("Failed to load pipelines", zap.Error(err))
-		} else {
-			pipelineIDs := pipelineLoader.ListPipelines()
-			logging.Logger.Info("Loaded pipelines",
-				zap.Int("count", len(pipelineIDs)),
-				zap.Strings("pipeline_ids", pipelineIDs),
-			)
-		}
-	} else {
-		logging.Logger.Info("Pipeline config loading disabled (executor still available)")
+func buildRouter(cfg *config.Config, thermalMonitor *thermal.Monitor) (interface {
+	RegisterBackend(backends.Backend) error
+	ListBackends() []backends.Backend
+	RouteRequest(context.Context, *backends.Annotations) (*router.RoutingDecision, error)
+	HealthCheckAll(context.Context) map[string]bool
+}, *router.Router, *router.ThermalRouter, *router.ForwardingRouter) {
+	// Initialize router (thermal-aware if enabled, with optional forwarding)
+	var r interface {
+		RegisterBackend(backends.Backend) error
+		ListBackends() []backends.Backend
+		RouteRequest(context.Context, *backends.Annotations) (*router.RoutingDecision, error)
+		HealthCheckAll(context.Context) map[string]bool
 	}
 
-	// Initialize virtual device manager
-	var virtualDevMgr *virtual.VirtualDeviceManager
-	if cfg.VirtualDevices.Enabled {
-		vdm, err := virtual.NewVirtualDeviceManager(
-			deviceManager,
-			pipelineExecutor,
-			&cfg.VirtualDevices,
-			logging.Logger,
-		)
-		if err != nil {
-			logging.Logger.Warn("Failed to initialize virtual device manager",
-				zap.Error(err),
-				zap.String("note", "Virtual audio/video devices unavailable"),
-			)
-		} else {
-			virtualDevMgr = vdm
-
-			// Collect backend information
-			backendInfos := make([]virtual.BackendInfo, 0)
-			for _, backendCfg := range cfg.Backends {
-				if !backendCfg.Enabled {
-					continue
-				}
-				backendInfos = append(backendInfos, virtual.BackendInfo{
-					ID:       backendCfg.ID,
-					Name:     backendCfg.Name,
-					Hardware: backendCfg.Hardware,
-				})
-			}
-
-			// Create audio devices for each backend
-			for _, backendInfo := range backendInfos {
-				if err := virtualDevMgr.CreateDevicesForBackend(
-					backendInfo.ID,
-					backendInfo.Name,
-					backendInfo.Hardware,
-				); err != nil {
-					logging.Logger.Error("Failed to create virtual devices for backend",
-						zap.String("backend", backendInfo.ID),
-						zap.Error(err),
-					)
-				}
-			}
-
-			// Create virtual cameras (must be done together due to module loading)
-			if cfg.VirtualDevices.Video.Enabled && cfg.VirtualDevices.Video.Camera.Enabled {
-				if err := virtualDevMgr.CreateVirtualCameras(backendInfos); err != nil {
-					logging.Logger.Error("Failed to create virtual cameras",
-						zap.Error(err),
-					)
-				}
-			}
-
-			logging.Logger.Info("Virtual devices created",
-				zap.Int("microphones", virtualDevMgr.GetSourceCount()),
-				zap.Int("speakers", virtualDevMgr.GetSinkCount()),
-				zap.Int("cameras", virtualDevMgr.GetCameraCount()),
-			)
-
-		// Register backends with virtual device manager for meeting bridge
-		registeredBackends := r.ListBackends()
-		for _, backend := range registeredBackends {
-			// Register with virtual device manager
-			virtualDevMgr.RegisterBackend(backend.ID(), backend)
-			logging.Logger.Debug("Registered backend with virtual device manager",
-				zap.String("backend_id", backend.ID()),
-			)
-		}
-
-		// Auto-start meeting bridge for NPU backend
-		if err := virtualDevMgr.StartMeetingBridge("ollama-npu"); err != nil {
-			logging.Logger.Warn("Failed to auto-start meeting bridge",
-				zap.String("backend", "ollama-npu"),
-				zap.Error(err),
-			)
-		} else {
-			logging.Logger.Info("Meeting audio bridge started successfully",
-				zap.String("backend", "ollama-npu"),
-				zap.String("description", "Google Meet AI Assistant active"),
-			)
-		}
-		}
-	} else {
-		logging.Logger.Info("Virtual device management disabled")
+	routerCfg := &router.Config{
+		DefaultBackendID: cfg.Routing.DefaultBackend,
+		PowerAware:       cfg.Routing.PowerAware,
+		AutoOptimize:     cfg.Routing.AutoOptimizeLatency,
 	}
 
-	// Create gRPC server (adapt router interface)
-	var grpcRouter *router.Router
-	if tr, ok := r.(*router.ThermalRouter); ok {
-		grpcRouter = tr.Router
-	} else {
-		grpcRouter = r.(*router.Router)
-	}
+	// Create base router
+	var baseRouter *router.Router
+	var thermalRouter *router.ThermalRouter
 
-	// Create gRPC server with optional TLS
-	var grpcServer *grpc.Server
-	if cfg.Server.TLS.Enabled {
-		cert, err := tls.LoadX509KeyPair(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
-		if err != nil {
-			logging.Logger.Fatal("Failed to load TLS certificate", zap.Error(err))
-		}
-
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		}
-
-		// Optional mTLS if client CA provided
-		if cfg.Server.TLS.ClientCAFile != "" {
-			caCert, err := os.ReadFile(cfg.Server.TLS.ClientCAFile)
-			if err != nil {
-				logging.Logger.Fatal("Failed to load client CA", zap.Error(err))
-			}
-
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM(caCert) {
-				logging.Logger.Fatal("Failed to parse client CA certificate")
-			}
-
-			tlsConfig.ClientCAs = caCertPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			logging.Logger.Info("gRPC mTLS enabled",
-				zap.String("security_level", "mutual_tls"),
-				zap.Bool("client_cert_required", true),
-			)
-		} else {
-			logging.Logger.Info("gRPC TLS enabled",
-				zap.String("security_level", "tls"),
-			)
-		}
-
-		creds := credentials.NewTLS(tlsConfig)
-		grpcServer = grpc.NewServer(grpc.Creds(creds))
-	} else {
-		grpcServer = grpc.NewServer()
-		logging.Logger.Warn("gRPC TLS disabled",
-			zap.String("warning", "not recommended for production"),
-		)
-	}
-
-	// Pass forwarding router to server if enabled
-	computeServer := server.NewComputeServer(grpcRouter)
-	if forwardingRouter != nil {
-		computeServer.SetForwardingRouter(forwardingRouter)
-	}
-
-	// Pass pipeline executor to server if enabled
-	if pipelineExecutor != nil && pipelineLoader != nil {
-		computeServer.SetPipelineExecutor(pipelineExecutor, pipelineLoader)
-		logging.Logger.Info("Pipeline executor attached to gRPC server")
-	}
-
-	pb.RegisterComputeServiceServer(grpcServer, computeServer)
-
-	// Register device service if device manager is enabled
-	if deviceManager != nil {
-		deviceGRPCService := device.NewGRPCService(deviceManager)
-		devicev1.RegisterDeviceServiceServer(grpcServer, deviceGRPCService)
-		logging.Logger.Info("Device gRPC service registered")
-	}
-
-	// Enable gRPC reflection for grpcurl
-	reflection.Register(grpcServer)
-
-	// Start gRPC server
-	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.GRPCPort)
-	lis, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		logging.Logger.Fatal("Failed to listen on gRPC port",
-			zap.String("address", grpcAddr),
-			zap.Error(err),
-		)
-	}
-
-	go func() {
-		logging.Logger.Info("gRPC server listening",
-			zap.String("address", grpcAddr),
-			zap.Bool("tls", cfg.Server.TLS.Enabled),
-			zap.Bool("reflection", true),
-		)
-		if err := grpcServer.Serve(lis); err != nil {
-			logging.Logger.Fatal("Failed to serve gRPC", zap.Error(err))
-		}
-	}()
-
-	// HTTP endpoints
-	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HTTPPort)
-
-	// Liveness probe - Kubernetes style (is server alive?)
-	http.HandleFunc("/healthz", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "ok\n")
-	}))
-
-	// Readiness probe - Kubernetes style (ready to serve traffic?)
-	http.HandleFunc("/readyz", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		backends := grpcRouter.ListBackends()
-		healthyCount := 0
-		for _, backend := range backends {
-			if backend.IsHealthy() {
-				healthyCount++
-			}
-		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		if healthyCount > 0 {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "ready: %d/%d backends healthy\n", healthyCount, len(backends))
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "not ready: 0/%d backends healthy\n", len(backends))
-		}
-	}))
-
-	// Detailed health endpoint (legacy)
-	http.HandleFunc("/health", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		healthResp, _ := computeServer.HealthCheck(r.Context(), &pb.HealthCheckRequest{})
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "Status: %s\n", healthResp.Status)
-		for backend, status := range healthResp.BackendHealth {
-			fmt.Fprintf(w, "  %s: %s\n", backend, status)
-		}
-	}))
-
-	// Backends endpoint
-	http.HandleFunc("/backends", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		backendsResp, _ := computeServer.ListBackends(r.Context(), &pb.ListBackendsRequest{})
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "Available Backends:\n\n")
-		for _, b := range backendsResp.Backends {
-			fmt.Fprintf(w, "ID: %s\n", b.Id)
-			fmt.Fprintf(w, "  Name: %s\n", b.Name)
-			fmt.Fprintf(w, "  Hardware: %s\n", b.Hardware)
-			fmt.Fprintf(w, "  Status: %s\n", b.Status.State)
-			fmt.Fprintf(w, "  Power: %.1fW\n", b.Metrics.PowerWatts)
-			fmt.Fprintf(w, "  Avg Latency: %dms\n\n", b.Metrics.AvgLatencyMs)
-		}
-	}))
-
-	// Thermal status endpoint
 	if thermalMonitor != nil {
-		http.HandleFunc("/thermal", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			states := thermalMonitor.GetAllStates()
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(states)
-		}))
-	}
-
-	// Efficiency mode endpoint
-	if efficiencyMgr != nil {
-		http.HandleFunc("/efficiency", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			currentMode := efficiencyMgr.GetMode()
-			effectiveMode := efficiencyMgr.GetEffectiveMode()
-
-			response := map[string]interface{}{
-				"current_mode":   currentMode.String(),
-				"effective_mode": effectiveMode.String(),
-				"description":    efficiencyMgr.GetModeDescription(),
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
-		}))
-	}
-
-	// Initialize authentication middleware
-	var authMiddleware func(http.Handler) http.Handler
-	if cfg.Server.Auth.Enabled {
-		authConfig := auth.Config{
-			Enabled: true,
-			APIKeys: make(map[string]auth.APIKeyInfo),
-		}
-
-		// Convert config API keys to auth.APIKeyInfo
-		for key, keyInfo := range cfg.Server.Auth.APIKeys {
-			authConfig.APIKeys[key] = auth.APIKeyInfo{
-				Name:        keyInfo.Name,
-				Permissions: keyInfo.Permissions,
-				Enabled:     keyInfo.Enabled,
-			}
-		}
-
-		authMiddleware = auth.APIKeyMiddleware(authConfig)
-		logging.Logger.Info("API authentication enabled",
-			zap.Int("api_keys_count", len(authConfig.APIKeys)),
+		// Use thermal-aware router
+		thermalRouter = router.NewThermalRouter(*routerCfg, thermalMonitor)
+		baseRouter = thermalRouter.Router
+		r = thermalRouter
+		logging.Logger.Info("Using thermal-aware routing",
+			zap.Bool("power_aware", routerCfg.PowerAware),
+			zap.Bool("auto_optimize", routerCfg.AutoOptimize),
 		)
 	} else {
-		// No-op middleware when auth is disabled
-		authMiddleware = func(next http.Handler) http.Handler {
-			return next
-		}
-		logging.Logger.Info("API authentication disabled",
-			zap.String("warning", "all requests will be accepted"),
+		// Use basic router
+		baseRouter = router.NewRouter(*routerCfg)
+		r = baseRouter
+		logging.Logger.Info("Using basic routing",
+			zap.Bool("power_aware", routerCfg.PowerAware),
 		)
 	}
 
-	// Initialize rate limiting middleware
-	var rateLimitMiddleware func(http.Handler) http.Handler
-	if cfg.Server.RateLimit.Enabled {
-		rateLimiter := ratelimit.NewIPRateLimiter(
-			rate.Limit(cfg.Server.RateLimit.Rate),
-			cfg.Server.RateLimit.Burst,
+	// Optionally wrap with forwarding router
+	var forwardingRouter *router.ForwardingRouter
+	if cfg.Routing.Forwarding.Enabled {
+		forwardingCfg := &router.ForwardingConfig{
+			Enabled:              cfg.Routing.Forwarding.Enabled,
+			MinConfidence:        cfg.Routing.Forwarding.MinConfidence,
+			MaxRetries:           cfg.Routing.Forwarding.MaxRetries,
+			EscalationPath:       cfg.Routing.Forwarding.EscalationPath,
+			RespectThermalLimits: cfg.Routing.Forwarding.RespectThermalLimits,
+			ReturnBestAttempt:    cfg.Routing.Forwarding.ReturnBestAttempt,
+		}
+
+		forwardingRouter = router.NewForwardingRouter(baseRouter, thermalRouter, forwardingCfg)
+		logging.Logger.Info("Confidence-based forwarding enabled",
+			zap.Float64("threshold", forwardingCfg.MinConfidence),
+			zap.Int("max_retries", forwardingCfg.MaxRetries),
 		)
-		rateLimitMiddleware = rateLimiter.Middleware
-		logging.Logger.Info("Rate limiting enabled",
-			zap.Float64("rate_per_second", cfg.Server.RateLimit.Rate),
-			zap.Int("burst", cfg.Server.RateLimit.Burst),
-		)
-	} else {
-		// No-op middleware when rate limiting is disabled
-		rateLimitMiddleware = func(next http.Handler) http.Handler {
-			return next
-		}
-		logging.Logger.Info("Rate limiting disabled")
 	}
+	return r, baseRouter, thermalRouter, forwardingRouter
+}
 
-	// Chain middleware: recovery first, then auth, then rate limiting
-	applyMiddleware := func(handler http.HandlerFunc) http.Handler {
-		return middleware.HTTPRecovery(authMiddleware(rateLimitMiddleware(handler)))
-	}
-
-	// OpenAI-compatible endpoints with middleware
-	http.Handle("/v1/chat/completions", applyMiddleware(openaihttp.HandleChatCompletion(grpcRouter)))
-	http.Handle("/v1/completions", applyMiddleware(openaihttp.HandleCompletion(grpcRouter)))
-	http.Handle("/v1/embeddings", applyMiddleware(openaihttp.HandleEmbedding(grpcRouter)))
-	http.Handle("/v1/models", applyMiddleware(openaihttp.HandleModels(grpcRouter)))
-
-	// WebSocket endpoint for ultra-low latency streaming (with middleware)
-	http.Handle("/v1/stream/ws", applyMiddleware(websockethttp.HandleWebSocketStream(grpcRouter)))
-
-	// Version endpoint
-	http.HandleFunc("/version", middleware.RecoveryHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		versionInfo := map[string]string{
-			"version":    Version,
-			"git_commit": GitCommit,
-			"build_time": BuildTime,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(versionInfo)
-	}))
-
-	// Prometheus metrics endpoint
-	if cfg.Monitoring.Enabled && cfg.Monitoring.PrometheusPort > 0 {
-		metricsAddr := fmt.Sprintf(":%d", cfg.Monitoring.PrometheusPort)
-		go func() {
-			logging.Logger.Info("Prometheus metrics server listening",
-				zap.String("address", metricsAddr),
-				zap.String("endpoint", "/metrics"),
-			)
-
-			metricsMux := http.NewServeMux()
-			metricsMux.Handle("/metrics", promhttp.Handler())
-
-			if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
-				logging.Logger.Error("Metrics server failed", zap.Error(err))
-			}
-		}()
-	}
-
-	// pprof profiling endpoint
-	if cfg.Monitoring.PprofEnabled && cfg.Monitoring.PprofPort > 0 {
-		pprofAddr := fmt.Sprintf(":%d", cfg.Monitoring.PprofPort)
-		go func() {
-			logging.Logger.Info("pprof profiling server listening",
-				zap.String("address", pprofAddr),
-				zap.String("endpoints", "/debug/pprof/*"),
-			)
-
-			// pprof handlers are automatically registered via import _ "net/http/pprof"
-			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-				logging.Logger.Error("pprof server failed", zap.Error(err))
-			}
-		}()
-	}
-
-	go func() {
-		protocol := "http"
-		if cfg.Server.TLS.Enabled {
-			protocol = "https"
-		}
-
-		wsProtocol := "ws"
-		if cfg.Server.TLS.Enabled {
-			wsProtocol = "wss"
-		}
-
-		logging.Logger.Info("HTTP server listening",
-			zap.String("address", httpAddr),
-			zap.String("protocol", protocol),
-			zap.Bool("tls", cfg.Server.TLS.Enabled),
-		)
-		logging.Logger.Info("HTTP endpoints available",
-			zap.String("health", fmt.Sprintf("%s://%s/health", protocol, httpAddr)),
-			zap.String("backends", fmt.Sprintf("%s://%s/backends", protocol, httpAddr)),
-			zap.String("openai_api", fmt.Sprintf("%s://%s/v1/", protocol, httpAddr)),
-			zap.String("websocket", fmt.Sprintf("%s://%s/v1/stream/ws", wsProtocol, httpAddr)),
-			zap.Bool("thermal", thermalMonitor != nil),
-			zap.Bool("efficiency", efficiencyMgr != nil),
-		)
-
-		if cfg.Server.TLS.Enabled {
-			tlsConfig := &tls.Config{
-				MinVersion: tls.VersionTLS12,
-			}
-
-			httpServer := &http.Server{
-				Addr:      httpAddr,
-				TLSConfig: tlsConfig,
-			}
-
-			if err := httpServer.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile); err != nil {
-				logging.Logger.Fatal("Failed to serve HTTPS", zap.Error(err))
-			}
-		} else {
-			if err := http.ListenAndServe(httpAddr, nil); err != nil {
-				logging.Logger.Fatal("Failed to serve HTTP", zap.Error(err))
-			}
-		}
-	}()
-
-	// Start extended D-Bus services (backends, routing, thermal, system state)
-	var backendsDBus *dbusPkg.BackendsService
-	var routingDBus *dbusPkg.RoutingService
-	var thermalDBus *dbusPkg.ThermalService
-	var systemDBus *dbusPkg.SystemService
-
-	if cfg.Efficiency.DBusEnabled {
-		// Backends monitoring service
-		backendsDBus, err = dbusPkg.NewBackendsService(grpcRouter)
+func startDeviceManager(cfg *config.Config) *device.Manager {
+	// Initialize device manager
+	var deviceManager *device.Manager
+	if cfg.Devices.Enabled {
+		dm, err := device.NewDeviceManager()
 		if err != nil {
-			logging.Logger.Warn("Failed to create Backends D-Bus service", zap.Error(err))
+			logging.Logger.Warn("Failed to initialize device manager",
+				zap.Error(err),
+				zap.String("note", "Device hotplug detection unavailable"),
+			)
 		} else {
-			if err := backendsDBus.Start(); err != nil {
-				logging.Logger.Warn("Backends D-Bus service failed to start", zap.Error(err))
-			} else {
-				logging.Logger.Info("D-Bus Backends service started")
-			}
-		}
+			deviceManager = dm
 
-		// Routing statistics service
-		routingDBus, err = dbusPkg.NewRoutingService(grpcRouter)
-		if err != nil {
-			logging.Logger.Warn("Failed to create Routing D-Bus service", zap.Error(err))
-		} else {
-			if err := routingDBus.Start(); err != nil {
-				logging.Logger.Warn("Routing D-Bus service failed to start", zap.Error(err))
-			} else {
-				logging.Logger.Info("D-Bus Routing service started")
-			}
-		}
-
-		// Thermal monitoring service
-		if thermalMonitor != nil {
-			thermalDBus, err = dbusPkg.NewThermalService(thermalMonitor)
-			if err != nil {
-				logging.Logger.Warn("Failed to create Thermal D-Bus service", zap.Error(err))
-			} else {
-				if err := thermalDBus.Start(); err != nil {
-					logging.Logger.Warn("Thermal D-Bus service failed to start", zap.Error(err))
-				} else {
-					logging.Logger.Info("D-Bus Thermal service started")
+			// Start auto-discovery if enabled
+			if cfg.Devices.AutoDiscover {
+				if err := deviceManager.StartAutoDiscovery(); err != nil {
+					logging.Logger.Warn("Device auto-discovery failed", zap.Error(err))
 				}
+				logging.Logger.Info("Device auto-discovery started",
+					zap.Bool("hotplug_detection", true),
+				)
 			}
-		}
 
-		// System state service
+			logging.Logger.Info("Device manager initialized",
+				zap.String("dbus_service", "ie.fio.OllamaProxy.Manager"),
+				zap.Bool("auto_discover", cfg.Devices.AutoDiscover),
+			)
+		}
+	} else {
+		logging.Logger.Info("Device management disabled")
+	}
+	return deviceManager
+}
+
+func loadInitialEfficiencyMode(efficiencyMgr *efficiency.Manager) {
+	// Load GSettings (if available)
+	gsettings := settings.NewSettings()
+	if gsettings.IsAvailable() {
+		logging.Logger.Info("GSettings available")
+
+		// Load initial mode from settings if efficiency manager was created
 		if efficiencyMgr != nil {
-			systemDBus, err = dbusPkg.NewSystemService(efficiencyMgr)
+			initialMode := gsettings.LoadInitialMode()
+			efficiencyMgr.SetMode(initialMode)
+			logging.Logger.Info("Loaded mode from settings",
+				zap.String("mode", initialMode.String()),
+			)
+		}
+	}
+
+}
+
+func startEfficiency(cfg *config.Config) (*efficiency.Manager, *efficiency.DBusService) {
+	var err error
+	// Initialize efficiency manager
+	var efficiencyMgr *efficiency.Manager
+	var dbusSvc *efficiency.DBusService
+	if cfg.Efficiency.Enabled {
+		// Parse default mode
+		defaultMode := efficiency.ModeBalanced
+		switch cfg.Efficiency.DefaultMode {
+		case "Performance":
+			defaultMode = efficiency.ModePerformance
+		case "Efficiency":
+			defaultMode = efficiency.ModeEfficiency
+		case "Quiet":
+			defaultMode = efficiency.ModeQuiet
+		case "Auto":
+			defaultMode = efficiency.ModeAuto
+		case "UltraEfficiency":
+			defaultMode = efficiency.ModeUltraEfficiency
+		}
+
+		efficiencyMgr = efficiency.NewEfficiencyManager(defaultMode)
+		logging.Logger.Info("Efficiency manager initialized",
+			zap.String("mode", defaultMode.String()),
+		)
+
+		// Start D-Bus service if enabled
+		if cfg.Efficiency.DBusEnabled {
+			dbusSvc, err = efficiency.NewDBusService(efficiencyMgr)
 			if err != nil {
-				logging.Logger.Warn("Failed to create System D-Bus service", zap.Error(err))
+				logging.Logger.Warn("D-Bus service failed to start",
+					zap.Error(err),
+					zap.String("note", "GNOME integration unavailable, CLI still works"),
+				)
 			} else {
-				if err := systemDBus.Start(); err != nil {
-					logging.Logger.Warn("System D-Bus service failed to start", zap.Error(err))
+				if err := dbusSvc.Start(); err != nil {
+					logging.Logger.Warn("D-Bus service error", zap.Error(err))
 				} else {
-					logging.Logger.Info("D-Bus System State service started")
+					logging.Logger.Info("D-Bus Efficiency service started",
+						zap.String("integration", "GNOME"),
+					)
 				}
 			}
 		}
+	} else {
+		logging.Logger.Info("Efficiency modes disabled")
 	}
+	return efficiencyMgr, dbusSvc
+}
 
-	// Start background health checker
-	go healthCheckLoop(ctx, grpcRouter)
-
-	// Start thermal update loop (updates efficiency manager)
-	if thermalMonitor != nil && efficiencyMgr != nil {
-		go thermalUpdateLoop(thermalMonitor, efficiencyMgr)
-	}
-
-	// Print startup summary
-	printStartupSummary(cfg, grpcRouter, thermalMonitor, efficiencyMgr, pipelineLoader, deviceManager)
-
-	// Wait for interrupt signal or SIGHUP for config reload
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
-	for {
-		sig := <-sigChan
-
-		if sig == syscall.SIGHUP {
-			logging.Logger.Info("Received SIGHUP, reloading configuration")
-
-			newCfg, err := loadConfig(*configPath)
+func startThermalMonitor(cfg *config.Config) *thermal.Monitor {
+	// Initialize thermal monitor
+	var thermalMonitor *thermal.Monitor
+	if cfg.Thermal.Enabled {
+		updateInterval := 5 * time.Second
+		if cfg.Thermal.UpdateInterval != "" {
+			var err error
+			updateInterval, err = time.ParseDuration(cfg.Thermal.UpdateInterval)
 			if err != nil {
-				logging.Logger.Error("Failed to reload config", zap.Error(err))
-				continue
+				logging.Logger.Warn("Invalid thermal update interval, using default",
+					zap.String("value", cfg.Thermal.UpdateInterval),
+					zap.Duration("default", 5*time.Second),
+					zap.Error(err),
+				)
+				updateInterval = 5 * time.Second
 			}
-
-			configValidator := newCfg
-			if err := config.ValidateConfig(configValidator); err != nil {
-				logging.Logger.Error("Invalid configuration on reload", zap.Error(err))
-				continue
-			}
-
-			// Apply CLI overrides
-			if *logLevel != "" {
-				newCfg.Monitoring.LogLevel = *logLevel
-			}
-			if *grpcPort > 0 {
-				newCfg.Server.GRPCPort = *grpcPort
-			}
-			if *httpPort > 0 {
-				newCfg.Server.HTTPPort = *httpPort
-			}
-
-			// Apply environment variable overrides
-			configForEnv := newCfg
-			config.ApplyEnvOverrides(configForEnv)
-
-			// Update configuration
-			cfg = newCfg
-			logging.Logger.Info("Configuration reloaded successfully")
-
-			// Note: Some configuration changes may require restart
-			// This reload only updates runtime-changeable settings
-			continue
 		}
 
-		// SIGTERM or SIGINT - shutdown
-		break
-	}
-
-	logging.Logger.Info("Shutting down gracefully...")
-
-	// Stop services
-	if thermalMonitor != nil {
-		thermalMonitor.Stop()
-		logging.Logger.Info("Thermal monitor stopped")
-	}
-	if dbusSvc != nil {
-		dbusSvc.Stop()
-		logging.Logger.Info("D-Bus Efficiency service stopped")
-	}
-
-	// Stop device manager
-	if deviceManager != nil {
-		if err := deviceManager.Stop(); err != nil {
-			logging.Logger.Error("Error stopping device manager", zap.Error(err))
-		} else {
-			logging.Logger.Info("Device manager stopped")
+		thermalConfig := &thermal.Config{
+			TempWarning:  cfg.Thermal.Temperature.Warning,
+			TempCritical: cfg.Thermal.Temperature.Critical,
+			TempShutdown: cfg.Thermal.Temperature.Shutdown,
+			FanQuiet:     cfg.Thermal.Fan.Quiet,
+			FanModerate:  cfg.Thermal.Fan.Moderate,
+			FanLoud:      cfg.Thermal.Fan.Loud,
+			CooldownTime: 2 * time.Minute,
 		}
-	}
 
-	// Stop virtual device manager
-	if virtualDevMgr != nil {
-		if err := virtualDevMgr.Stop(); err != nil {
-			logging.Logger.Error("Error stopping virtual device manager", zap.Error(err))
-		} else {
-			logging.Logger.Info("Virtual device manager stopped")
-		}
+		thermalMonitor = thermal.NewThermalMonitor(thermalConfig, updateInterval)
+		thermalMonitor.Start()
+		logging.Logger.Info("Thermal monitoring started",
+			zap.Duration("update_interval", updateInterval),
+			zap.Float64("warning_temp", cfg.Thermal.Temperature.Warning),
+			zap.Float64("critical_temp", cfg.Thermal.Temperature.Critical),
+		)
+	} else {
+		logging.Logger.Info("Thermal monitoring disabled")
 	}
+	return thermalMonitor
+}
 
-	// Stop extended D-Bus services
-	if backendsDBus != nil {
-		backendsDBus.Stop()
-		logging.Logger.Info("D-Bus Backends service stopped")
+func writePlain(w http.ResponseWriter, status int, format string, args ...any) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(status)
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		logging.Warn("write http response", zap.Error(err))
 	}
-	if routingDBus != nil {
-		routingDBus.Stop()
-		logging.Logger.Info("D-Bus Routing service stopped")
-	}
-	if thermalDBus != nil {
-		thermalDBus.Stop()
-		logging.Logger.Info("D-Bus Thermal service stopped")
-	}
-	if systemDBus != nil {
-		systemDBus.Stop()
-		logging.Logger.Info("D-Bus System service stopped")
-	}
+}
 
-	grpcServer.GracefulStop()
-	logging.Logger.Info("Shutdown complete")
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		logging.Warn("encode http json", zap.Error(err))
+	}
+}
+
+func serveHTTP(addr string, handler http.Handler) error {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func loadConfig(path string) (*config.Config, error) {
@@ -1102,7 +1190,7 @@ func healthCheckLoop(ctx context.Context, r *router.Router) {
 }
 
 // thermalUpdateLoop updates efficiency manager with thermal state
-func thermalUpdateLoop(tm *thermal.ThermalMonitor, em *efficiency.EfficiencyManager) {
+func thermalUpdateLoop(tm *thermal.Monitor, em *efficiency.Manager) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -1136,17 +1224,17 @@ func thermalUpdateLoop(tm *thermal.ThermalMonitor, em *efficiency.EfficiencyMana
 			// Update efficiency manager state
 			// Note: Battery info would come from system monitoring
 			em.UpdateSystemState(
-				100,         // batteryPercent - TODO: read from system
-				false,       // onBattery - TODO: read from system
-				avgTemp,     // avgTemp
-				avgFan,      // avgFanSpeed
-				quietHours,  // quietHours
+				100,        // batteryPercent - TODO: read from system
+				false,      // onBattery - TODO: read from system
+				avgTemp,    // avgTemp
+				avgFan,     // avgFanSpeed
+				quietHours, // quietHours
 			)
 		}
 	}
 }
 
-func printStartupSummary(cfg *config.Config, r *router.Router, tm *thermal.ThermalMonitor, em *efficiency.EfficiencyManager, pl *pipeline.PipelineLoader, dm *device.DeviceManager) {
+func printStartupSummary(cfg *config.Config, r *router.Router, tm *thermal.Monitor, em *efficiency.Manager, pl *pipeline.Loader, dm *device.Manager) {
 	logging.Logger.Info("==================================================")
 	logging.Logger.Info("OLLAMA COMPUTE PROXY - READY")
 	logging.Logger.Info("==================================================")
@@ -1220,9 +1308,12 @@ func printStartupSummary(cfg *config.Config, r *router.Router, tm *thermal.Therm
 
 	// Device management
 	if dm != nil {
-		devices, _ := dm.ListDevices("")
+		devices, err := dm.ListDevices("")
+		if err != nil {
+			logging.Logger.Warn("Failed to list devices", zap.Error(err))
+		}
 		logging.Logger.Info("Device manager",
-			zap.String("dbus_service", "ie.fio.OllamaProxy.DeviceManager"),
+			zap.String("dbus_service", "ie.fio.OllamaProxy.Manager"),
 			zap.Int("registered_devices", len(devices)),
 			zap.Bool("auto_discovery", cfg.Devices.AutoDiscover),
 		)

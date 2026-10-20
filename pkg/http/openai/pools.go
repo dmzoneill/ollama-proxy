@@ -16,10 +16,13 @@ var chatChunkPool = sync.Pool{
 
 // getChatChunk gets a chunk from pool
 func getChatChunk() *ChatCompletionChunk {
-	chunk := chatChunkPool.Get().(*ChatCompletionChunk)
+	chunk, ok := chatChunkPool.Get().(*ChatCompletionChunk)
+	if !ok || chunk == nil {
+		chunk = &ChatCompletionChunk{Choices: make([]ChatCompletionChunkChoice, 1)}
+	}
 	// Reset fields to default state
 	chunk.ID = ""
-	chunk.Object = "chat.completion.chunk"
+	chunk.Object = strChatCompletionChunk
 	chunk.Created = 0
 	chunk.Model = ""
 	if len(chunk.Choices) > 0 {
@@ -52,10 +55,13 @@ var completionChunkPool = sync.Pool{
 
 // getCompletionChunk gets a chunk from pool
 func getCompletionChunk() *CompletionChunk {
-	chunk := completionChunkPool.Get().(*CompletionChunk)
+	chunk, ok := completionChunkPool.Get().(*CompletionChunk)
+	if !ok || chunk == nil {
+		chunk = &CompletionChunk{Choices: make([]CompletionChunkChoice, 1)}
+	}
 	// Reset fields to default state
 	chunk.ID = ""
-	chunk.Object = "text_completion.chunk"
+	chunk.Object = strTextCompletionChunk
 	chunk.Created = 0
 	chunk.Model = ""
 	if len(chunk.Choices) > 0 {
@@ -87,7 +93,11 @@ var sseBufferPool = sync.Pool{
 
 // getSSEBuffer gets a buffer from pool
 func getSSEBuffer() *bytes.Buffer {
-	return sseBufferPool.Get().(*bytes.Buffer)
+	buf, ok := sseBufferPool.Get().(*bytes.Buffer)
+	if !ok || buf == nil {
+		return bytes.NewBuffer(make([]byte, 0, 2048))
+	}
+	return buf
 }
 
 // putSSEBuffer returns buffer to pool
@@ -110,7 +120,12 @@ var jsonBytesPool = sync.Pool{
 
 // getJSONBytes gets a byte slice from pool
 func getJSONBytes() *[]byte {
-	return jsonBytesPool.Get().(*[]byte)
+	b, ok := jsonBytesPool.Get().(*[]byte)
+	if !ok || b == nil {
+		empty := make([]byte, 0, 1024)
+		return &empty
+	}
+	return b
 }
 
 // putJSONBytes returns byte slice to pool

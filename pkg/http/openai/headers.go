@@ -8,6 +8,7 @@ import (
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/router"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // ParseRoutingHeaders extracts routing annotations from HTTP request headers
@@ -34,14 +35,14 @@ func ParseRoutingHeaders(r *http.Request) *backends.Annotations {
 	// X-Max-Latency-Ms: Maximum acceptable latency constraint (integer)
 	if maxLatency := r.Header.Get("X-Max-Latency-Ms"); maxLatency != "" {
 		if val, err := strconv.Atoi(maxLatency); err == nil {
-			annotations.MaxLatencyMs = int32(val)
+			annotations.MaxLatencyMs = safeconv.Int32FromInt(val)
 		}
 	}
 
 	// X-Max-Power-Watts: Maximum power budget constraint (integer)
 	if maxPower := r.Header.Get("X-Max-Power-Watts"); maxPower != "" {
 		if val, err := strconv.Atoi(maxPower); err == nil {
-			annotations.MaxPowerWatts = int32(val)
+			annotations.MaxPowerWatts = safeconv.Int32FromInt(val)
 		}
 	}
 
@@ -52,67 +53,28 @@ func ParseRoutingHeaders(r *http.Request) *backends.Annotations {
 
 	// X-Media-Type: Media type hint for routing (text, code, image, audio, realtime, auto)
 	if mediaType := r.Header.Get("X-Media-Type"); mediaType != "" {
-		// Map string to backends.MediaType enum
-		switch strings.ToLower(mediaType) {
-		case "text":
-			annotations.MediaType = backends.MediaTypeText
-		case "code":
-			annotations.MediaType = backends.MediaTypeCode
-		case "image":
-			annotations.MediaType = backends.MediaTypeImage
-		case "audio":
-			annotations.MediaType = backends.MediaTypeAudio
-		case "realtime":
-			annotations.MediaType = backends.MediaTypeRealtime
-		case "auto":
-			annotations.MediaType = backends.MediaTypeAuto
-		}
+		annotations.MediaType = mediaTypeFromHeader(mediaType)
 	}
+	annotations.Priority = priorityFromHeaders(r.Header.Get("X-Priority"), annotations)
 
-	// X-Priority: Explicit priority level (best-effort, normal, high, critical)
-	if priority := r.Header.Get("X-Priority"); priority != "" {
-		switch strings.ToLower(priority) {
-		case "best-effort", "low":
-			annotations.Priority = backends.PriorityBestEffort
-		case "normal":
-			annotations.Priority = backends.PriorityNormal
-		case "high":
-			annotations.Priority = backends.PriorityHigh
-		case "critical", "realtime":
-			annotations.Priority = backends.PriorityCritical
-		}
-	} else {
-		// Auto-set priority based on other headers
-		if annotations.LatencyCritical || annotations.MediaType == backends.MediaTypeRealtime {
-			annotations.Priority = backends.PriorityCritical
-		} else if annotations.MediaType == backends.MediaTypeAudio {
-			annotations.Priority = backends.PriorityHigh
-		} else {
-			annotations.Priority = backends.PriorityNormal
-		}
-	}
+	applyTrackingHeaders(r, annotations)
+	return annotations
+}
 
-	// X-Request-ID: Request tracking ID
+func applyTrackingHeaders(r *http.Request, annotations *backends.Annotations) {
 	if requestID := r.Header.Get("X-Request-ID"); requestID != "" {
 		annotations.RequestID = requestID
 	}
-
-	// X-Deadline-Ms: Absolute deadline in Unix milliseconds
 	if deadline := r.Header.Get("X-Deadline-Ms"); deadline != "" {
 		if val, err := strconv.ParseInt(deadline, 10, 64); err == nil {
 			annotations.DeadlineMs = val
 		}
 	}
-
-	// X-Custom-*: Custom annotations (e.g., X-Custom-Priority: high)
 	for key, values := range r.Header {
 		if strings.HasPrefix(key, "X-Custom-") && len(values) > 0 {
-			customKey := strings.TrimPrefix(key, "X-Custom-")
-			annotations.Custom[customKey] = values[0]
+			annotations.Custom[strings.TrimPrefix(key, "X-Custom-")] = values[0]
 		}
 	}
-
-	return annotations
 }
 
 // WriteRoutingHeaders writes routing metadata to HTTP response headers
@@ -147,8 +109,50 @@ func WriteRoutingHeaders(w http.ResponseWriter, decision *router.RoutingDecision
 	}
 }
 
+func mediaTypeFromHeader(mediaType string) backends.MediaType {
+	switch strings.ToLower(mediaType) {
+	case strText:
+		return backends.MediaTypeText
+	case strCode:
+		return backends.MediaTypeCode
+	case strImage:
+		return backends.MediaTypeImage
+	case strAudio:
+		return backends.MediaTypeAudio
+	case strRealtime:
+		return backends.MediaTypeRealtime
+	case strAuto:
+		return backends.MediaTypeAuto
+	default:
+		return ""
+	}
+}
+
+func priorityFromHeaders(priority string, annotations *backends.Annotations) backends.Priority {
+	switch strings.ToLower(priority) {
+	case "":
+		if annotations.LatencyCritical || annotations.MediaType == backends.MediaTypeRealtime {
+			return backends.PriorityCritical
+		}
+		if annotations.MediaType == backends.MediaTypeAudio {
+			return backends.PriorityHigh
+		}
+		return backends.PriorityNormal
+	case strBestEffort, strLow:
+		return backends.PriorityBestEffort
+	case strNormal:
+		return backends.PriorityNormal
+	case strHigh:
+		return backends.PriorityHigh
+	case strCritical, strRealtime:
+		return backends.PriorityCritical
+	default:
+		return 0
+	}
+}
+
 // parseBool converts string to bool, accepting various formats
 func parseBool(s string) bool {
 	s = strings.ToLower(strings.TrimSpace(s))
-	return s == "true" || s == "1" || s == "yes" || s == "on"
+	return s == strTrue || s == "1" || s == strYes || s == "on"
 }

@@ -5,12 +5,13 @@ import (
 	"testing"
 )
 
+// TestNoBackendsError is part of the public API.
 func TestNoBackendsError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *NoBackendsError
-		wantCode    int
+		err          *NoBackendsError
+		name         string
 		wantContains []string
+		wantCode     int
 	}{
 		{
 			name: "no constraints",
@@ -18,7 +19,7 @@ func TestNoBackendsError(t *testing.T) {
 				TotalBackends:   3,
 				HealthyBackends: 0,
 			},
-			wantCode:    CodeNoBackendsAvailable,
+			wantCode:     CodeNoBackendsAvailable,
 			wantContains: []string{"no backends available", "3 total", "0 healthy"},
 		},
 		{
@@ -26,10 +27,10 @@ func TestNoBackendsError(t *testing.T) {
 			err: &NoBackendsError{
 				TotalBackends:   3,
 				HealthyBackends: 1,
-				Constraints:     []string{"latency < 100ms", "power < 50W"},
+				Constraints:     []string{strLatency100ms, "power < 50W"},
 			},
-			wantCode:    CodeNoBackendsAvailable,
-			wantContains: []string{"no backends available", "3 total", "1 healthy", "constraints", "latency < 100ms"},
+			wantCode:     CodeNoBackendsAvailable,
+			wantContains: []string{"no backends available", "3 total", "1 healthy", "constraints", strLatency100ms},
 		},
 	}
 
@@ -49,9 +50,10 @@ func TestNoBackendsError(t *testing.T) {
 	}
 }
 
+// TestBackendUnhealthyError is part of the public API.
 func TestBackendUnhealthyError(t *testing.T) {
 	err := &BackendUnhealthyError{
-		BackendID: "ollama-gpu",
+		BackendID: strOllamaGpu,
 		Reason:    "connection refused",
 	}
 
@@ -60,7 +62,7 @@ func TestBackendUnhealthyError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	wantContains := []string{"ollama-gpu", "unhealthy", "connection refused"}
+	wantContains := []string{strOllamaGpu, "unhealthy", "connection refused"}
 	for _, want := range wantContains {
 		if !strings.Contains(errMsg, want) {
 			t.Errorf("Error() = %q, want to contain %q", errMsg, want)
@@ -68,11 +70,12 @@ func TestBackendUnhealthyError(t *testing.T) {
 	}
 }
 
+// TestBackendTimeoutError is part of the public API.
 func TestBackendTimeoutError(t *testing.T) {
 	err := &BackendTimeoutError{
-		BackendID: "ollama-npu",
-		Operation: "generate",
-		Duration:  "30s",
+		BackendID: strOllamaNpu,
+		Operation: strGenerate,
+		Duration:  str30s,
 	}
 
 	if got := err.Code(); got != CodeBackendTimeout {
@@ -80,7 +83,7 @@ func TestBackendTimeoutError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	wantContains := []string{"ollama-npu", "timeout", "generate", "30s"}
+	wantContains := []string{strOllamaNpu, "timeout", strGenerate, str30s}
 	for _, want := range wantContains {
 		if !strings.Contains(errMsg, want) {
 			t.Errorf("Error() = %q, want to contain %q", errMsg, want)
@@ -88,6 +91,7 @@ func TestBackendTimeoutError(t *testing.T) {
 	}
 }
 
+// TestBackendCapacityError is part of the public API.
 func TestBackendCapacityError(t *testing.T) {
 	err := &BackendCapacityError{
 		BackendID:  "ollama-cpu",
@@ -108,10 +112,11 @@ func TestBackendCapacityError(t *testing.T) {
 	}
 }
 
+// TestBackendUnsupportedError is part of the public API.
 func TestBackendUnsupportedError(t *testing.T) {
 	err := &BackendUnsupportedError{
-		BackendID: "ollama-npu",
-		Model:     "gpt-4",
+		BackendID: strOllamaNpu,
+		Model:     strGpt4,
 		Reason:    "model too large for NPU",
 	}
 
@@ -120,7 +125,7 @@ func TestBackendUnsupportedError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	wantContains := []string{"ollama-npu", "gpt-4", "does not support", "model too large"}
+	wantContains := []string{strOllamaNpu, strGpt4, "does not support", "model too large"}
 	for _, want := range wantContains {
 		if !strings.Contains(errMsg, want) {
 			t.Errorf("Error() = %q, want to contain %q", errMsg, want)
@@ -128,9 +133,10 @@ func TestBackendUnsupportedError(t *testing.T) {
 	}
 }
 
+// TestCircuitBreakerOpenError is part of the public API.
 func TestCircuitBreakerOpenError(t *testing.T) {
 	err := &CircuitBreakerOpenError{
-		BackendID: "ollama-gpu",
+		BackendID: strOllamaGpu,
 		Failures:  5,
 	}
 
@@ -139,7 +145,7 @@ func TestCircuitBreakerOpenError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	wantContains := []string{"ollama-gpu", "circuit breaker", "5 failures"}
+	wantContains := []string{strOllamaGpu, "circuit breaker", "5 failures"}
 	for _, want := range wantContains {
 		if !strings.Contains(errMsg, want) {
 			t.Errorf("Error() = %q, want to contain %q", errMsg, want)
@@ -147,36 +153,37 @@ func TestCircuitBreakerOpenError(t *testing.T) {
 	}
 }
 
+// TestRoutingError is part of the public API.
 func TestRoutingError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *RoutingError
-		wantCode    int
+		err          *RoutingError
+		name         string
 		wantContains []string
+		wantCode     int
 	}{
 		{
 			name: "no constraints",
 			err: &RoutingError{
 				Reason:        "all backends unhealthy",
-				Model:         "llama2",
+				Model:         strLlama2,
 				BackendsTried: 3,
 			},
-			wantCode:    CodeRoutingFailed,
-			wantContains: []string{"routing failed", "llama2", "all backends unhealthy", "tried 3 backends"},
+			wantCode:     CodeRoutingFailed,
+			wantContains: []string{strRoutingFailed, strLlama2, "all backends unhealthy", "tried 3 backends"},
 		},
 		{
 			name: "with constraints",
 			err: &RoutingError{
 				Reason:        "no match",
-				Model:         "llama2",
+				Model:         strLlama2,
 				BackendsTried: 3,
 				Constraints: map[string]interface{}{
 					"max_latency": 100,
 					"max_power":   50,
 				},
 			},
-			wantCode:    CodeRoutingFailed,
-			wantContains: []string{"routing failed", "llama2", "no match", "tried 3 backends", "constraints"},
+			wantCode:     CodeRoutingFailed,
+			wantContains: []string{strRoutingFailed, strLlama2, "no match", "tried 3 backends", "constraints"},
 		},
 	}
 
@@ -196,6 +203,7 @@ func TestRoutingError(t *testing.T) {
 	}
 }
 
+// TestThermalLimitError is part of the public API.
 func TestThermalLimitError(t *testing.T) {
 	err := &ThermalLimitError{
 		Hardware:    "GPU",
@@ -216,9 +224,10 @@ func TestThermalLimitError(t *testing.T) {
 	}
 }
 
+// TestValidationError is part of the public API.
 func TestValidationError(t *testing.T) {
 	err := &ValidationError{
-		Field:  "temperature",
+		Field:  strTemperature,
 		Value:  2.5,
 		Reason: "must be between 0.0 and 2.0",
 	}
@@ -228,7 +237,7 @@ func TestValidationError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	wantContains := []string{"validation failed", "temperature", "2.5", "must be between"}
+	wantContains := []string{"validation failed", strTemperature, "2.5", "must be between"}
 	for _, want := range wantContains {
 		if !strings.Contains(errMsg, want) {
 			t.Errorf("Error() = %q, want to contain %q", errMsg, want)
@@ -236,6 +245,7 @@ func TestValidationError(t *testing.T) {
 	}
 }
 
+// TestInvalidModelError is part of the public API.
 func TestInvalidModelError(t *testing.T) {
 	err := &InvalidModelError{
 		Model:  "invalid-model!",
@@ -255,12 +265,13 @@ func TestInvalidModelError(t *testing.T) {
 	}
 }
 
+// TestInvalidPromptError is part of the public API.
 func TestInvalidPromptError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *InvalidPromptError
-		wantCode    int
+		err          *InvalidPromptError
+		name         string
 		wantContains []string
+		wantCode     int
 	}{
 		{
 			name: "with max length",
@@ -269,7 +280,7 @@ func TestInvalidPromptError(t *testing.T) {
 				MaxLength: 100000,
 				Reason:    "too long",
 			},
-			wantCode:    CodeInvalidPrompt,
+			wantCode:     CodeInvalidPrompt,
 			wantContains: []string{"invalid prompt", "too long", "150000", "100000"},
 		},
 		{
@@ -277,7 +288,7 @@ func TestInvalidPromptError(t *testing.T) {
 			err: &InvalidPromptError{
 				Reason: "empty prompt",
 			},
-			wantCode:    CodeInvalidPrompt,
+			wantCode:     CodeInvalidPrompt,
 			wantContains: []string{"invalid prompt", "empty prompt"},
 		},
 	}
@@ -298,31 +309,32 @@ func TestInvalidPromptError(t *testing.T) {
 	}
 }
 
+// TestConfigError is part of the public API.
 func TestConfigError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *ConfigError
-		wantCode    int
+		err          *ConfigError
+		name         string
 		wantContains []string
+		wantCode     int
 	}{
 		{
 			name: "with field",
 			err: &ConfigError{
-				Path:   "config/config.yaml",
+				Path:   strConfigConfigYaml,
 				Field:  "grpc_port",
 				Reason: "must be between 1 and 65535",
 			},
-			wantCode:    CodeConfigInvalid,
-			wantContains: []string{"config error", "config/config.yaml", "grpc_port", "must be between"},
+			wantCode:     CodeConfigInvalid,
+			wantContains: []string{"config error", strConfigConfigYaml, "grpc_port", "must be between"},
 		},
 		{
 			name: "without field",
 			err: &ConfigError{
-				Path:   "config/config.yaml",
+				Path:   strConfigConfigYaml,
 				Reason: "file not found",
 			},
-			wantCode:    CodeConfigInvalid,
-			wantContains: []string{"config error", "config/config.yaml", "file not found"},
+			wantCode:     CodeConfigInvalid,
+			wantContains: []string{"config error", strConfigConfigYaml, "file not found"},
 		},
 	}
 
@@ -342,12 +354,13 @@ func TestConfigError(t *testing.T) {
 	}
 }
 
+// TestPipelineError is part of the public API.
 func TestPipelineError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *PipelineError
-		wantCode    int
+		err          *PipelineError
+		name         string
 		wantContains []string
+		wantCode     int
 	}{
 		{
 			name: "with stage",
@@ -356,7 +369,7 @@ func TestPipelineError(t *testing.T) {
 				Stage:      "tokenization",
 				Reason:     "model not loaded",
 			},
-			wantCode:    CodePipelineExecutionFailed,
+			wantCode:     CodePipelineExecutionFailed,
 			wantContains: []string{"pipeline text-processing", "stage 'tokenization'", "model not loaded"},
 		},
 		{
@@ -365,7 +378,7 @@ func TestPipelineError(t *testing.T) {
 				PipelineID: "text-processing",
 				Reason:     "pipeline not found",
 			},
-			wantCode:    CodePipelineExecutionFailed,
+			wantCode:     CodePipelineExecutionFailed,
 			wantContains: []string{"pipeline text-processing", "failed", "pipeline not found"},
 		},
 	}
@@ -386,10 +399,11 @@ func TestPipelineError(t *testing.T) {
 	}
 }
 
+// TestProxyError is part of the public API.
 func TestProxyError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         *ProxyError
+		name         string
+		err          *ProxyError
 		wantContains []string
 	}{
 		{
@@ -404,13 +418,13 @@ func TestProxyError(t *testing.T) {
 			name: "with context",
 			err: &ProxyError{
 				Code:    2000,
-				Message: "routing failed",
+				Message: strRoutingFailed,
 				Context: map[string]interface{}{
-					"model":    "llama2",
+					"model":    strLlama2,
 					"backends": 3,
 				},
 			},
-			wantContains: []string{"[2000]", "routing failed", "context"},
+			wantContains: []string{"[2000]", strRoutingFailed, "context"},
 		},
 	}
 
@@ -428,7 +442,7 @@ func TestProxyError(t *testing.T) {
 
 // Test helper functions
 func TestNewNoBackendsError(t *testing.T) {
-	err := NewNoBackendsError(3, 1, []string{"latency < 100ms"})
+	err := NewNoBackendsError(3, 1, []string{strLatency100ms})
 	if err.TotalBackends != 3 {
 		t.Errorf("TotalBackends = %v, want 3", err.TotalBackends)
 	}
@@ -440,9 +454,10 @@ func TestNewNoBackendsError(t *testing.T) {
 	}
 }
 
+// TestNewBackendUnhealthyError is part of the public API.
 func TestNewBackendUnhealthyError(t *testing.T) {
-	err := NewBackendUnhealthyError("test-backend", "connection failed")
-	if err.BackendID != "test-backend" {
+	err := NewBackendUnhealthyError(strTestBackend, "connection failed")
+	if err.BackendID != strTestBackend {
 		t.Errorf("BackendID = %v, want test-backend", err.BackendID)
 	}
 	if err.Reason != "connection failed" {
@@ -450,25 +465,27 @@ func TestNewBackendUnhealthyError(t *testing.T) {
 	}
 }
 
+// TestNewBackendTimeoutError is part of the public API.
 func TestNewBackendTimeoutError(t *testing.T) {
-	err := NewBackendTimeoutError("test-backend", "generate", "30s")
-	if err.BackendID != "test-backend" {
+	err := NewBackendTimeoutError(strTestBackend, strGenerate, str30s)
+	if err.BackendID != strTestBackend {
 		t.Errorf("BackendID = %v, want test-backend", err.BackendID)
 	}
-	if err.Operation != "generate" {
+	if err.Operation != strGenerate {
 		t.Errorf("Operation = %v, want generate", err.Operation)
 	}
-	if err.Duration != "30s" {
+	if err.Duration != str30s {
 		t.Errorf("Duration = %v, want 30s", err.Duration)
 	}
 }
 
+// TestNewBackendUnsupportedError is part of the public API.
 func TestNewBackendUnsupportedError(t *testing.T) {
-	err := NewBackendUnsupportedError("test-backend", "gpt-4", "model too large")
-	if err.BackendID != "test-backend" {
+	err := NewBackendUnsupportedError(strTestBackend, strGpt4, "model too large")
+	if err.BackendID != strTestBackend {
 		t.Errorf("BackendID = %v, want test-backend", err.BackendID)
 	}
-	if err.Model != "gpt-4" {
+	if err.Model != strGpt4 {
 		t.Errorf("Model = %v, want gpt-4", err.Model)
 	}
 	if err.Reason != "model too large" {
@@ -476,9 +493,10 @@ func TestNewBackendUnsupportedError(t *testing.T) {
 	}
 }
 
+// TestNewValidationError is part of the public API.
 func TestNewValidationError(t *testing.T) {
-	err := NewValidationError("temperature", 2.5, "out of range")
-	if err.Field != "temperature" {
+	err := NewValidationError(strTemperature, 2.5, "out of range")
+	if err.Field != strTemperature {
 		t.Errorf("Field = %v, want temperature", err.Field)
 	}
 	if err.Value != 2.5 {
@@ -489,6 +507,7 @@ func TestNewValidationError(t *testing.T) {
 	}
 }
 
+// TestNewInvalidModelError is part of the public API.
 func TestNewInvalidModelError(t *testing.T) {
 	err := NewInvalidModelError("test-model", "invalid format")
 	if err.Model != "test-model" {
@@ -499,6 +518,7 @@ func TestNewInvalidModelError(t *testing.T) {
 	}
 }
 
+// TestNewConfigError is part of the public API.
 func TestNewConfigError(t *testing.T) {
 	err := NewConfigError("config.yaml", "port", "invalid port")
 	if err.Path != "config.yaml" {
@@ -512,6 +532,7 @@ func TestNewConfigError(t *testing.T) {
 	}
 }
 
+// TestNewPipelineError is part of the public API.
 func TestNewPipelineError(t *testing.T) {
 	err := NewPipelineError("test-pipeline", "stage1", "execution failed")
 	if err.PipelineID != "test-pipeline" {

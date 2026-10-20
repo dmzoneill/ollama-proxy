@@ -9,25 +9,27 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 )
 
 // V4L2Loopback manages v4l2loopback kernel module and virtual cameras
 type V4L2Loopback struct {
-	devices      map[string]*V4L2VirtualCamera // device path -> camera
-	deviceLabels []string                       // Labels for each video device
-	loaded       bool                           // Is module loaded?
+	devices      map[string]*V4L2VirtualCamera
 	logger       *zap.Logger
+	deviceLabels []string
+	loaded       bool
 }
 
 // V4L2VirtualCamera represents a virtual camera device
 type V4L2VirtualCamera struct {
-	DevicePath string // /dev/videoN
-	DeviceNum  int    // N in /dev/videoN
-	Label      string // "Ollama NPU Camera"
-	Backend    string // "ollama-npu"
+	DevicePath string
+	Label      string
+	Backend    string
+	Format     string
+	DeviceNum  int
 	Width      int
 	Height     int
-	Format     string // "yuyv", "mjpeg", "rgb24"
 	FPS        int
 }
 
@@ -81,7 +83,10 @@ func (v *V4L2Loopback) LoadModule(deviceNums []int, labels []string) error {
 		zap.Strings("labels", labels),
 	)
 
-	cmd := exec.Command("modprobe", args...)
+	cmd, err := cmdexec.Command("modprobe", args...)
+	if err != nil {
+		return fmt.Errorf("failed to create modprobe command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to load v4l2loopback module: %w (output: %s)", err, string(output))
@@ -126,7 +131,10 @@ func (v *V4L2Loopback) UnloadModule() error {
 
 	v.logger.Info("Unloading v4l2loopback module")
 
-	cmd := exec.Command("modprobe", "-r", "v4l2loopback")
+	cmd, err := cmdexec.Command("modprobe", "-r", "v4l2loopback")
+	if err != nil {
+		return fmt.Errorf("failed to create modprobe command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to unload v4l2loopback module: %w (output: %s)", err, string(output))
@@ -197,7 +205,10 @@ func (v *V4L2Loopback) waitForDevice(devicePath string) error {
 // VerifyDeviceCapabilities verifies a device has V4L2 capabilities
 func (v *V4L2Loopback) VerifyDeviceCapabilities(devicePath string) error {
 	// Use v4l2-ctl to verify capabilities
-	cmd := exec.Command("v4l2-ctl", "--device", devicePath, "--all")
+	cmd, err := cmdexec.Command("v4l2-ctl", strDevice, devicePath, "--all")
+	if err != nil {
+		return fmt.Errorf("failed to create v4l2-ctl command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to query device capabilities: %w (output: %s)", err, string(output))
@@ -276,12 +287,12 @@ options v4l2loopback devices=%d video_nr=%s card_label="%s" exclusive_caps=1
 
 	// Ensure directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Write config file
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

@@ -1,3 +1,4 @@
+// Package router chooses a backend for each request.
 package router
 
 import (
@@ -7,33 +8,25 @@ import (
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/confidence"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // ForwardingRouter extends Router with confidence-based forwarding
 type ForwardingRouter struct {
-	baseRouter         *Router
-	thermalRouter      *ThermalRouter
-	confidenceEstimator *confidence.ConfidenceEstimator
-	config             *ForwardingConfig
+	baseRouter          *Router
+	thermalRouter       *ThermalRouter
+	confidenceEstimator *confidence.Estimator
+	config              *ForwardingConfig
 }
 
 // ForwardingConfig configures forwarding behavior
 type ForwardingConfig struct {
-	// Enable forwarding
-	Enabled bool
-
-	// Confidence thresholds
-	MinConfidence    float64 // Minimum acceptable confidence (0.75 = 75%)
-	MaxRetries       int     // Maximum forwarding attempts (3)
-
-	// Escalation strategy
-	EscalationPath   []string // Ordered list of backend IDs to try
-
-	// Thermal integration
-	RespectThermalLimits bool // Skip backends that are unhealthy
-
-	// Fallback behavior
-	ReturnBestAttempt bool // Return best attempt even if below threshold
+	EscalationPath       []string
+	MinConfidence        float64
+	MaxRetries           int
+	Enabled              bool
+	RespectThermalLimits bool
+	ReturnBestAttempt    bool
 }
 
 // DefaultForwardingConfig returns sensible defaults
@@ -59,43 +52,36 @@ func NewForwardingRouter(
 	}
 
 	return &ForwardingRouter{
-		baseRouter:         baseRouter,
-		thermalRouter:      thermalRouter,
+		baseRouter:          baseRouter,
+		thermalRouter:       thermalRouter,
 		confidenceEstimator: confidence.NewConfidenceEstimator(nil),
-		config:             config,
+		config:              config,
 	}
 }
 
 // ForwardingAttempt represents one attempt in the forwarding chain
 type ForwardingAttempt struct {
-	Backend        backends.Backend
-	BackendID      string
-	Response       string
-	Confidence     *confidence.ConfidenceScore
-	LatencyMs      int32
-	Success        bool
-	Error          error
-	SkipReason     string // Why this backend was skipped (if applicable)
+	Backend    backends.Backend
+	Error      error
+	Confidence *confidence.Score
+	BackendID  string
+	Response   string
+	SkipReason string
+	LatencyMs  int32
+	Success    bool
 }
 
 // ForwardingResult represents the complete forwarding chain result
 type ForwardingResult struct {
-	// Final result
-	FinalResponse  string
-	FinalBackend   backends.Backend
-	FinalConfidence *confidence.ConfidenceScore
-
-	// Forwarding history
-	Attempts       []*ForwardingAttempt
-	TotalAttempts  int
-	Forwarded      bool
-
-	// Timing
-	TotalLatencyMs int32
-
-	// Decision info
-	Decision       *RoutingDecision
-	Reasoning      []string
+	FinalBackend    backends.Backend
+	FinalConfidence *confidence.Score
+	Decision        *RoutingDecision
+	FinalResponse   string
+	Attempts        []*ForwardingAttempt
+	Reasoning       []string
+	TotalAttempts   int
+	TotalLatencyMs  int32
+	Forwarded       bool
 }
 
 // GenerateWithForwarding performs generation with confidence-based forwarding
@@ -228,7 +214,7 @@ func (fr *ForwardingRouter) GenerateWithForwarding(
 		return result, fmt.Errorf("all backends failed or returned low confidence")
 	}
 
-	result.TotalLatencyMs = int32(time.Since(startTime).Milliseconds())
+	result.TotalLatencyMs = safeconv.Int32FromInt64(time.Since(startTime).Milliseconds())
 
 	return result, nil
 }
@@ -240,7 +226,7 @@ func (fr *ForwardingRouter) tryBackend(
 	backendID string,
 	prompt string,
 	model string,
-	annotations *backends.Annotations,
+	_ *backends.Annotations,
 ) *ForwardingAttempt {
 	attempt := &ForwardingAttempt{
 		Backend:   backend,
@@ -263,7 +249,7 @@ func (fr *ForwardingRouter) tryBackend(
 	}
 
 	attempt.Response = resp.Response
-	attempt.LatencyMs = int32(time.Since(startTime).Milliseconds())
+	attempt.LatencyMs = safeconv.Int32FromInt64(time.Since(startTime).Milliseconds())
 	attempt.Success = true
 
 	// Estimate confidence
@@ -286,14 +272,14 @@ func (fr *ForwardingRouter) buildEscalationPath(model string) []string {
 
 	// Small models: try NPU first
 	if isSmallModel(model) {
-		path = append(path, "ollama-npu")
+		path = append(path, strOllamaNpu)
 	}
 
 	// Medium models: try Intel GPU
-	path = append(path, "ollama-intel")
+	path = append(path, strOllamaIntel)
 
 	// Large models or fallback: NVIDIA GPU
-	path = append(path, "ollama-nvidia")
+	path = append(path, strOllamaNvidia)
 
 	// Final fallback: CPU
 	path = append(path, "ollama-cpu")
@@ -312,7 +298,7 @@ func (fr *ForwardingRouter) findBackend(backendID string) backends.Backend {
 
 	// Try thermal router if available
 	if fr.thermalRouter != nil {
-		for _, backend := range fr.thermalRouter.Router.backends {
+		for _, backend := range fr.thermalRouter.backends {
 			if backend.ID() == backendID {
 				return backend
 			}
@@ -341,10 +327,10 @@ func isSmallModel(model string) bool {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr ||
 		len(s) > 0 && len(substr) > 0 &&
-		(s == substr ||
-			(len(s) >= len(substr) && s[:len(substr)] == substr) ||
-			(len(s) >= len(substr) && s[len(s)-len(substr):] == substr) ||
-			(len(s) > len(substr) && findInString(s, substr))))
+			(s == substr ||
+				(len(s) >= len(substr) && s[:len(substr)] == substr) ||
+				(len(s) >= len(substr) && s[len(s)-len(substr):] == substr) ||
+				(len(s) > len(substr) && findInString(s, substr))))
 }
 
 func findInString(s, substr string) bool {
@@ -363,7 +349,7 @@ func (fr *ForwardingRouter) GenerateWithForwardingStream(
 	ctx context.Context,
 	prompt string,
 	model string,
-	annotations *backends.Annotations,
+	_ *backends.Annotations,
 ) (backends.StreamReader, backends.Backend, error) {
 
 	// Pre-analyze prompt to select best backend

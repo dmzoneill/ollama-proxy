@@ -3,6 +3,9 @@ version: "2"
 run:
   timeout: 5m
   tests: true
+  # Super-linter lints each changed Go file in its own process. Without this,
+  # those processes exit with "parallel golangci-lint is running".
+  allow-parallel-runners: true
 
 linters:
   enable:

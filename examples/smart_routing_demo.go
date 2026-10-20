@@ -100,9 +100,9 @@ func main() {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
 	examples := []struct {
-		prompt     string
-		expected   string
-		reasoning  string
+		prompt    string
+		expected  string
+		reasoning string
 	}{
 		{
 			prompt:    "What is the capital of France?",

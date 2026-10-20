@@ -13,13 +13,13 @@ const (
 	polkitInterface = "org.freedesktop.PolicyKit1.Authority"
 
 	// Polkit action IDs
-	actionDeviceRegister      = "ie.fio.ollama-proxy.device.register"
-	actionDeviceAccessCamera  = "ie.fio.ollama-proxy.device.access.camera"
-	actionDeviceAccessMic     = "ie.fio.ollama-proxy.device.access.microphone"
-	actionDeviceAccessScreen  = "ie.fio.ollama-proxy.device.access.screen"
-	actionDeviceAccessSpeaker = "ie.fio.ollama-proxy.device.access.speaker"
+	actionDeviceRegister       = "ie.fio.ollama-proxy.device.register"
+	actionDeviceAccessCamera   = "ie.fio.ollama-proxy.device.access.camera"
+	actionDeviceAccessMic      = "ie.fio.ollama-proxy.device.access.microphone"
+	actionDeviceAccessScreen   = "ie.fio.ollama-proxy.device.access.screen"
+	actionDeviceAccessSpeaker  = "ie.fio.ollama-proxy.device.access.speaker"
 	actionDeviceAccessKeyboard = "ie.fio.ollama-proxy.device.access.keyboard"
-	actionDeviceAccessMouse   = "ie.fio.ollama-proxy.device.access.mouse"
+	actionDeviceAccessMouse    = "ie.fio.ollama-proxy.device.access.mouse"
 )
 
 // PolkitAuthorizer handles Polkit authorization checks
@@ -60,9 +60,9 @@ func (p *PolkitAuthorizer) CheckAuthorization(sender string, action string) (boo
 
 	// Call CheckAuthorization
 	var result struct {
+		Details      map[string]string
 		IsAuthorized bool
 		IsChallenge  bool
-		Details      map[string]string
 	}
 
 	err := obj.Call(
@@ -96,7 +96,7 @@ func (p *PolkitAuthorizer) CheckAuthorization(sender string, action string) (boo
 }
 
 // CheckDeviceAccess checks authorization for device access based on device type
-func (p *PolkitAuthorizer) CheckDeviceAccess(sender string, deviceType DeviceType) (bool, error) {
+func (p *PolkitAuthorizer) CheckDeviceAccess(sender string, deviceType Type) (bool, error) {
 	var action string
 
 	switch deviceType {
@@ -152,12 +152,14 @@ func (p *PolkitAuthorizer) GetCallerPID(sender string) (uint32, error) {
 
 // LogAuditEvent logs an audit event for device access
 func (p *PolkitAuthorizer) LogAuditEvent(sender string, action string, deviceID string, authorized bool) {
-	uid, _ := p.GetCallerUID(sender)
-	pid, _ := p.GetCallerPID(sender)
+	uid, uidErr := p.GetCallerUID(sender)
+	warnErr("failed to get caller uid", uidErr, zap.String("sender", sender))
+	pid, pidErr := p.GetCallerPID(sender)
+	warnErr("failed to get caller pid", pidErr, zap.String("sender", sender))
 
 	p.logger.Info("Device access audit",
 		zap.String("action", action),
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("sender", sender),
 		zap.Uint32("uid", uid),
 		zap.Uint32("pid", pid),

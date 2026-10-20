@@ -1,3 +1,4 @@
+// Package circuit implements a circuit breaker for backend calls.
 package circuit
 
 import (
@@ -9,6 +10,7 @@ import (
 // State represents the circuit breaker state
 type State int
 
+// StateClosed is an exported const.
 const (
 	// StateClosed allows requests to pass through
 	StateClosed State = iota
@@ -32,33 +34,32 @@ func (s State) String() string {
 	}
 }
 
-// CircuitBreaker implements the circuit breaker pattern
-type CircuitBreaker struct {
-	mu           sync.RWMutex
-	state        State
-	failures     int
-	successes    int
-	lastFailure  time.Time
+// Breaker implements the circuit breaker pattern
+type Breaker struct {
+	lastFailure     time.Time
 	lastStateChange time.Time
-
-	maxFailures int
-	timeout     time.Duration
-	halfOpenMax int // max successes needed in half-open to close
+	state           State
+	failures        int
+	successes       int
+	maxFailures     int
+	timeout         time.Duration
+	halfOpenMax     int
+	mu              sync.RWMutex
 }
 
 // NewCircuitBreaker creates a new circuit breaker
-func NewCircuitBreaker(maxFailures int, timeout time.Duration) *CircuitBreaker {
-	return &CircuitBreaker{
-		state:        StateClosed,
-		maxFailures:  maxFailures,
-		timeout:      timeout,
-		halfOpenMax:  2, // Need 2 successes to close
+func NewCircuitBreaker(maxFailures int, timeout time.Duration) *Breaker {
+	return &Breaker{
+		state:           StateClosed,
+		maxFailures:     maxFailures,
+		timeout:         timeout,
+		halfOpenMax:     2, // Need 2 successes to close
 		lastStateChange: time.Now(),
 	}
 }
 
 // Call executes the function with circuit breaker protection
-func (cb *CircuitBreaker) Call(fn func() error) error {
+func (cb *Breaker) Call(fn func() error) error {
 	cb.mu.Lock()
 
 	// Check if we should transition from open to half-open
@@ -110,7 +111,8 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 	}
 
 	// Success
-	if cb.state == StateHalfOpen {
+	switch cb.state {
+	case StateHalfOpen:
 		cb.successes++
 		if cb.successes >= cb.halfOpenMax {
 			// Enough successes, close the circuit
@@ -119,7 +121,7 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 			cb.successes = 0
 			cb.lastStateChange = time.Now()
 		}
-	} else if cb.state == StateClosed {
+	case StateClosed:
 		// Reset failure count on success
 		cb.failures = 0
 	}
@@ -127,22 +129,22 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 	return nil
 }
 
-// State returns the current circuit breaker state
-func (cb *CircuitBreaker) GetState() State {
+// GetState returns the current circuit breaker state.
+func (cb *Breaker) GetState() State {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
 	return cb.state
 }
 
 // GetFailures returns the current failure count
-func (cb *CircuitBreaker) GetFailures() int {
+func (cb *Breaker) GetFailures() int {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
 	return cb.failures
 }
 
 // Reset manually resets the circuit breaker
-func (cb *CircuitBreaker) Reset() {
+func (cb *Breaker) Reset() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	cb.state = StateClosed

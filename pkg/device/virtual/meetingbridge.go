@@ -5,54 +5,41 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"os/exec"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 	"github.com/daoneill/ollama-proxy/pkg/pipeline"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // MeetingAudioBridge handles Google Meet audio processing:
 // Chrome Speaker → STT (NPU) → LLM (iGPU) → TTS (NPU) → Chrome Microphone
 type MeetingAudioBridge struct {
-	// Device names
-	speakerMonitor string // Where Chrome plays audio (e.g., "ollama-npu-speaker.monitor")
-	microphoneSink string // Where we write AI responses (e.g., "ollama-npu-mic")
-
-	// Backends for multi-stage processing (using interface{} for flexibility)
-	sttBackend interface{}  // NPU for Whisper STT
-	llmBackend interface{}  // iGPU for LLM
-	ttsBackend interface{}  // NPU for TTS
-
-	// Pipeline executor
-	pipelineExec *pipeline.PipelineExecutor
-
-	// Models
-	sttModel string
-	llmModel string
-	ttsModel string
-
-	// Configuration
-	sampleRate int
-	channels   int
-
-	// State
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	running  bool
-	mu       sync.RWMutex
-
-	// Audio buffering for streaming
-	audioBuffer     []byte
-	audioBufferMu   sync.Mutex
-	minBufferSize   int // Minimum audio size before processing (for better STT accuracy)
-	silenceTimeout  time.Duration
-	lastAudioTime   time.Time
-
-	logger *zap.Logger
+	lastAudioTime  time.Time
+	ctx            context.Context
+	sttBackend     interface{}
+	llmBackend     interface{}
+	ttsBackend     interface{}
+	logger         *zap.Logger
+	pipelineExec   *pipeline.Executor
+	cancel         context.CancelFunc
+	sttModel       string
+	llmModel       string
+	ttsModel       string
+	speakerMonitor string
+	microphoneSink string
+	audioBuffer    []byte
+	wg             sync.WaitGroup
+	channels       int
+	minBufferSize  int
+	silenceTimeout time.Duration
+	sampleRate     int
+	mu             sync.RWMutex
+	audioBufferMu  sync.Mutex
+	running        bool
 }
 
 // NewMeetingAudioBridge creates a new meeting audio bridge
@@ -62,29 +49,29 @@ func NewMeetingAudioBridge(
 	sttBackend interface{},
 	llmBackend interface{},
 	ttsBackend interface{},
-	pipelineExec *pipeline.PipelineExecutor,
+	pipelineExec *pipeline.Executor,
 	logger *zap.Logger,
 ) *MeetingAudioBridge {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &MeetingAudioBridge{
-		speakerMonitor:  speakerMonitor,
-		microphoneSink:  microphoneSink,
-		sttBackend:      sttBackend,
-		llmBackend:      llmBackend,
-		ttsBackend:      ttsBackend,
-		pipelineExec:    pipelineExec,
-		sttModel:        "whisper:tiny",  // Fast STT on NPU
-		llmModel:        "qwen2.5:0.5b",  // Fast LLM on iGPU
-		ttsModel:        "piper:en_US-lessac-medium", // TTS on NPU
-		sampleRate:      16000,
-		channels:        1,
-		ctx:             ctx,
-		cancel:          cancel,
-		audioBuffer:     make([]byte, 0, 320000), // ~10s at 16kHz mono
-		minBufferSize:   32000, // ~1s of audio before processing
-		silenceTimeout:  time.Second * 2,
-		logger:          logger,
+		speakerMonitor: speakerMonitor,
+		microphoneSink: microphoneSink,
+		sttBackend:     sttBackend,
+		llmBackend:     llmBackend,
+		ttsBackend:     ttsBackend,
+		pipelineExec:   pipelineExec,
+		sttModel:       "whisper:tiny",              // Fast STT on NPU
+		llmModel:       "qwen2.5:0.5b",              // Fast LLM on iGPU
+		ttsModel:       "piper:en_US-lessac-medium", // TTS on NPU
+		sampleRate:     16000,
+		channels:       1,
+		ctx:            ctx,
+		cancel:         cancel,
+		audioBuffer:    make([]byte, 0, 320000), // ~10s at 16kHz mono
+		minBufferSize:  32000,                   // ~1s of audio before processing
+		silenceTimeout: time.Second * 2,
+		logger:         logger,
 	}
 }
 
@@ -161,13 +148,17 @@ func (mab *MeetingAudioBridge) captureAudio() {
 
 	// Use parec to capture audio from speaker monitor
 	args := []string{
-		"--device", mab.speakerMonitor,
-		"--format", "s16le",
-		"--rate", fmt.Sprintf("%d", mab.sampleRate),
-		"--channels", fmt.Sprintf("%d", mab.channels),
+		strDevice, mab.speakerMonitor,
+		strFormat, strS16le,
+		strRate, fmt.Sprintf("%d", mab.sampleRate),
+		strChannels, fmt.Sprintf("%d", mab.channels),
 	}
 
-	cmd := exec.CommandContext(mab.ctx, "parec", args...)
+	cmd, err := cmdexec.CommandContext(mab.ctx, "parec", args...)
+	if err != nil {
+		mab.logger.Error("Failed to create parec command", zap.Error(err))
+		return
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -188,8 +179,8 @@ func (mab *MeetingAudioBridge) captureAudio() {
 	for {
 		select {
 		case <-mab.ctx.Done():
-			mab.logger.Info("Audio capture stopped (context cancelled)")
-			cmd.Process.Kill()
+			mab.logger.Info("Audio capture stopped (context canceled)")
+			warnErr("failed to kill parec", cmd.Process.Kill())
 			return
 		default:
 		}
@@ -373,11 +364,11 @@ func (mab *MeetingAudioBridge) createPipeline() *pipeline.Pipeline {
 				Model:            mab.ttsModel,
 			},
 		},
-		Options: &pipeline.PipelineOptions{
-			EnableStreaming:  false, // Use batch processing for better quality
-			PreserveContext:  true,
-			ContinueOnError:  false,
-			CollectMetrics:   true,
+		Options: &pipeline.Options{
+			EnableStreaming: false, // Use batch processing for better quality
+			PreserveContext: true,
+			ContinueOnError: false,
+			CollectMetrics:  true,
 		},
 	}
 }
@@ -409,13 +400,16 @@ Response:`, text)
 func (mab *MeetingAudioBridge) writeToMicrophone(audioData []byte) error {
 	// Use pacat to play audio to virtual microphone
 	args := []string{
-		"--device", mab.microphoneSink,
-		"--format", "s16le",
-		"--rate", "22050", // TTS output sample rate
-		"--channels", "1",
+		strDevice, mab.microphoneSink,
+		strFormat, strS16le,
+		strRate, "22050", // TTS output sample rate
+		strChannels, "1",
 	}
 
-	cmd := exec.CommandContext(mab.ctx, "pacat", args...)
+	cmd, err := cmdexec.CommandContext(mab.ctx, "pacat", args...)
+	if err != nil {
+		return fmt.Errorf("failed to create pacat command: %w", err)
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -423,17 +417,20 @@ func (mab *MeetingAudioBridge) writeToMicrophone(audioData []byte) error {
 	}
 
 	if err := cmd.Start(); err != nil {
+		warnErr("failed to close pacat stdin", stdin.Close())
 		return fmt.Errorf("failed to start pacat: %w", err)
 	}
 
 	// Write audio data
 	if _, err := stdin.Write(audioData); err != nil {
-		stdin.Close()
+		warnErr("failed to close pacat stdin", stdin.Close())
 		return fmt.Errorf("failed to write audio data: %w", err)
 	}
 
 	// Close stdin to signal end of data
-	stdin.Close()
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close pacat stdin: %w", err)
+	}
 
 	// Wait for pacat to finish
 	if err := cmd.Wait(); err != nil {
@@ -455,22 +452,22 @@ func (mab *MeetingAudioBridge) pcmToWAV(pcmData []byte, sampleRate, channels int
 
 	// RIFF chunk
 	copy(header[0:4], "RIFF")
-	putUint32LE(header[4:8], uint32(fileSize))
+	putUint32LE(header[4:8], safeconv.Uint32FromInt(fileSize))
 	copy(header[8:12], "WAVE")
 
 	// fmt chunk
 	copy(header[12:16], "fmt ")
-	putUint32LE(header[16:20], 16)                    // fmt chunk size
-	putUint16LE(header[20:22], 1)                     // audio format (PCM)
-	putUint16LE(header[22:24], uint16(channels))      // num channels
-	putUint32LE(header[24:28], uint32(sampleRate))    // sample rate
-	putUint32LE(header[28:32], uint32(sampleRate*channels*2)) // byte rate
-	putUint16LE(header[32:34], uint16(channels*2))    // block align
-	putUint16LE(header[34:36], 16)                    // bits per sample
+	putUint32LE(header[16:20], 16)                                            // fmt chunk size
+	putUint16LE(header[20:22], 1)                                             // audio format (PCM)
+	putUint16LE(header[22:24], safeconv.Uint16FromInt(channels))              // num channels
+	putUint32LE(header[24:28], safeconv.Uint32FromInt(sampleRate))            // sample rate
+	putUint32LE(header[28:32], safeconv.Uint32FromInt(sampleRate*channels*2)) // byte rate
+	putUint16LE(header[32:34], safeconv.Uint16FromInt(channels*2))            // block align
+	putUint16LE(header[34:36], 16)                                            // bits per sample
 
 	// data chunk
 	copy(header[36:40], "data")
-	putUint32LE(header[40:44], uint32(dataSize))
+	putUint32LE(header[40:44], safeconv.Uint32FromInt(dataSize))
 
 	// Combine header and data
 	wavData := make([]byte, len(header)+len(pcmData))
@@ -484,15 +481,15 @@ func (mab *MeetingAudioBridge) pcmToWAV(pcmData []byte, sampleRate, channels int
 
 // Helper functions for WAV header
 func putUint16LE(b []byte, v uint16) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
+	b[0] = safeconv.Low8(uint32(v))
+	b[1] = safeconv.Low8(uint32(v >> 8))
 }
 
 func putUint32LE(b []byte, v uint32) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
-	b[2] = byte(v >> 16)
-	b[3] = byte(v >> 24)
+	b[0] = safeconv.Low8(v)
+	b[1] = safeconv.Low8(v >> 8)
+	b[2] = safeconv.Low8(v >> 16)
+	b[3] = safeconv.Low8(v >> 24)
 }
 
 // IsRunning returns whether the bridge is running

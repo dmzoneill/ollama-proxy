@@ -1,10 +1,12 @@
+// Package settings reads and writes desktop settings.
 package settings
 
 import (
+	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 	"github.com/daoneill/ollama-proxy/pkg/efficiency"
 )
 
@@ -26,8 +28,7 @@ func NewSettings() *Settings {
 
 // checkAvailable checks if GSettings is available on the system
 func (s *Settings) checkAvailable() bool {
-	cmd := exec.Command("gsettings", "list-schemas")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("list-schemas")
 	if err != nil {
 		return false
 	}
@@ -43,13 +44,12 @@ func (s *Settings) IsAvailable() bool {
 }
 
 // GetDefaultMode returns the configured default efficiency mode
-func (s *Settings) GetDefaultMode() (efficiency.EfficiencyMode, error) {
+func (s *Settings) GetDefaultMode() (efficiency.Mode, error) {
 	if !s.available {
-		return efficiency.ModeBalanced, fmt.Errorf("GSettings not available")
+		return efficiency.ModeBalanced, errors.New(strGSettingsNotAvailable)
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "default-mode")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "default-mode")
 	if err != nil {
 		return efficiency.ModeBalanced, err
 	}
@@ -61,13 +61,12 @@ func (s *Settings) GetDefaultMode() (efficiency.EfficiencyMode, error) {
 }
 
 // GetLastMode returns the last used efficiency mode
-func (s *Settings) GetLastMode() (efficiency.EfficiencyMode, error) {
+func (s *Settings) GetLastMode() (efficiency.Mode, error) {
 	if !s.available {
-		return efficiency.ModeBalanced, fmt.Errorf("GSettings not available")
+		return efficiency.ModeBalanced, errors.New(strGSettingsNotAvailable)
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "last-mode")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "last-mode")
 	if err != nil {
 		return efficiency.ModeBalanced, err
 	}
@@ -77,29 +76,27 @@ func (s *Settings) GetLastMode() (efficiency.EfficiencyMode, error) {
 }
 
 // SetLastMode saves the last used efficiency mode
-func (s *Settings) SetLastMode(mode efficiency.EfficiencyMode) error {
+func (s *Settings) SetLastMode(mode efficiency.Mode) error {
 	if !s.available {
 		return nil // Gracefully ignore if not available
 	}
 
-	cmd := exec.Command("gsettings", "set", schemaID, "last-mode", mode.String())
-	return cmd.Run()
+	return gsettingsRun("set", schemaID, "last-mode", mode.String())
 }
 
 // ShouldRememberMode returns whether to remember the last used mode
 func (s *Settings) ShouldRememberMode() (bool, error) {
 	if !s.available {
-		return false, fmt.Errorf("GSettings not available")
+		return false, errors.New(strGSettingsNotAvailable)
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "remember-last-mode")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "remember-last-mode")
 	if err != nil {
 		return false, err
 	}
 
 	result := strings.TrimSpace(string(output))
-	return result == "true", nil
+	return result == strTrue, nil
 }
 
 // GetQuietHoursEnabled returns whether quiet hours are enabled for Auto mode
@@ -108,15 +105,13 @@ func (s *Settings) GetQuietHoursEnabled() (bool, error) {
 		return true, nil // Default to true
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-enabled")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "auto-quiet-hours-enabled")
 	if err != nil {
-		_ = err // Explicitly ignore - returning default
-		return true, nil
+		return true, err
 	}
 
 	result := strings.TrimSpace(string(output))
-	return result == "true", nil
+	return result == strTrue, nil
 }
 
 // GetQuietHoursStart returns the start hour for quiet hours (0-23)
@@ -125,15 +120,15 @@ func (s *Settings) GetQuietHoursStart() (int, error) {
 		return 22, nil // Default
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-start")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "auto-quiet-hours-start")
 	if err != nil {
-		_ = err // Explicitly ignore - returning default
-		return 22, nil
+		return 22, err
 	}
 
-	var hour int
-	fmt.Sscanf(string(output), "%d", &hour)
+	hour, err := sscanfInt(string(output))
+	if err != nil {
+		return 22, err
+	}
 	return hour, nil
 }
 
@@ -143,15 +138,15 @@ func (s *Settings) GetQuietHoursEnd() (int, error) {
 		return 7, nil // Default
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "auto-quiet-hours-end")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "auto-quiet-hours-end")
 	if err != nil {
-		_ = err // Explicitly ignore - returning default
-		return 7, nil
+		return 7, err
 	}
 
-	var hour int
-	fmt.Sscanf(string(output), "%d", &hour)
+	hour, err := sscanfInt(string(output))
+	if err != nil {
+		return 7, err
+	}
 	return hour, nil
 }
 
@@ -161,14 +156,13 @@ func (s *Settings) GetNotifyOnModeChange() bool {
 		return true
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "notify-on-mode-change")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "notify-on-mode-change")
 	if err != nil {
 		return true
 	}
 
 	result := strings.TrimSpace(string(output))
-	return result == "true"
+	return result == strTrue
 }
 
 // GetNotifyOnBackendFailure returns whether to show notifications on backend failure
@@ -177,14 +171,13 @@ func (s *Settings) GetNotifyOnBackendFailure() bool {
 		return true
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "notify-on-backend-failure")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "notify-on-backend-failure")
 	if err != nil {
 		return true
 	}
 
 	result := strings.TrimSpace(string(output))
-	return result == "true"
+	return result == strTrue
 }
 
 // GetNotifyOnThermalThrottle returns whether to show notifications on thermal throttling
@@ -193,30 +186,53 @@ func (s *Settings) GetNotifyOnThermalThrottle() bool {
 		return false
 	}
 
-	cmd := exec.Command("gsettings", "get", schemaID, "notify-on-thermal-throttle")
-	output, err := cmd.Output()
+	output, err := gsettingsOutput("get", schemaID, "notify-on-thermal-throttle")
 	if err != nil {
 		return false
 	}
 
 	result := strings.TrimSpace(string(output))
-	return result == "true"
+	return result == strTrue
 }
 
-// parseMode converts a string to an EfficiencyMode
-func parseMode(modeStr string) efficiency.EfficiencyMode {
+func gsettingsOutput(args ...string) ([]byte, error) {
+	cmd, err := cmdexec.Command("gsettings", args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Output()
+}
+
+func gsettingsRun(args ...string) error {
+	cmd, err := cmdexec.Command("gsettings", args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
+}
+
+func sscanfInt(value string) (int, error) {
+	var hour int
+	if _, err := fmt.Sscanf(value, "%d", &hour); err != nil {
+		return 0, err
+	}
+	return hour, nil
+}
+
+// parseMode converts a string to an Mode
+func parseMode(modeStr string) efficiency.Mode {
 	switch modeStr {
-	case "Performance":
+	case strPerformance:
 		return efficiency.ModePerformance
-	case "Balanced":
+	case strBalanced:
 		return efficiency.ModeBalanced
-	case "Efficiency":
+	case strEfficiency:
 		return efficiency.ModeEfficiency
-	case "Quiet":
+	case strQuiet:
 		return efficiency.ModeQuiet
-	case "Auto":
+	case strAuto:
 		return efficiency.ModeAuto
-	case "UltraEfficiency":
+	case strUltraEfficiency:
 		return efficiency.ModeUltraEfficiency
 	default:
 		return efficiency.ModeBalanced
@@ -225,7 +241,7 @@ func parseMode(modeStr string) efficiency.EfficiencyMode {
 
 // LoadInitialMode loads the initial efficiency mode based on settings
 // Returns the mode to use on startup
-func (s *Settings) LoadInitialMode() efficiency.EfficiencyMode {
+func (s *Settings) LoadInitialMode() efficiency.Mode {
 	if !s.available {
 		return efficiency.ModeBalanced
 	}

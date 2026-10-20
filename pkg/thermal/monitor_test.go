@@ -7,8 +7,9 @@ import (
 	"time"
 )
 
+// TestNewThermalMonitor is part of the public API.
 func TestNewThermalMonitor(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -37,6 +38,7 @@ func TestNewThermalMonitor(t *testing.T) {
 	}
 }
 
+// TestNewThermalMonitor_DefaultConfig is part of the public API.
 func TestNewThermalMonitor_DefaultConfig(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
@@ -54,6 +56,7 @@ func TestNewThermalMonitor_DefaultConfig(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_StartStop is part of the public API.
 func TestThermalMonitor_StartStop(t *testing.T) {
 	tm := NewThermalMonitor(nil, 100*time.Millisecond)
 
@@ -73,6 +76,7 @@ func TestThermalMonitor_StartStop(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_GetState is part of the public API.
 func TestThermalMonitor_GetState(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
@@ -84,7 +88,7 @@ func TestThermalMonitor_GetState(t *testing.T) {
 
 	// Add a mock state
 	tm.mu.Lock()
-	tm.states["nvidia"] = &ThermalState{
+	tm.states["nvidia"] = &State{
 		Temperature: 65.0,
 		FanPercent:  45,
 		PowerDraw:   150.0,
@@ -109,6 +113,7 @@ func TestThermalMonitor_GetState(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_GetAllStates is part of the public API.
 func TestThermalMonitor_GetAllStates(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
@@ -123,8 +128,8 @@ func TestThermalMonitor_GetAllStates(t *testing.T) {
 
 	// Add multiple mock states
 	tm.mu.Lock()
-	tm.states["nvidia"] = &ThermalState{Temperature: 65.0, FanPercent: 45}
-	tm.states["cpu"] = &ThermalState{Temperature: 55.0, FanPercent: 30}
+	tm.states["nvidia"] = &State{Temperature: 65.0, FanPercent: 45}
+	tm.states["cpu"] = &State{Temperature: 55.0, FanPercent: 30}
 	tm.mu.Unlock()
 
 	states = tm.GetAllStates()
@@ -141,8 +146,9 @@ func TestThermalMonitor_GetAllStates(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_IsHealthy is part of the public API.
 func TestThermalMonitor_IsHealthy(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -160,17 +166,17 @@ func TestThermalMonitor_IsHealthy(t *testing.T) {
 		throttling  bool
 		expected    bool
 	}{
-		{"Normal temp", 60.0, false, true},
-		{"Warning temp", 75.0, false, true},
-		{"Critical temp", 90.0, false, false},
-		{"Shutdown temp", 95.0, false, false},
-		{"Throttling", 60.0, true, false},
+		{name: "Normal temp", temperature: 60.0, throttling: false, expected: true},
+		{name: "Warning temp", temperature: 75.0, throttling: false, expected: true},
+		{name: "Critical temp", temperature: 90.0, throttling: false, expected: false},
+		{name: "Shutdown temp", temperature: 95.0, throttling: false, expected: false},
+		{name: "Throttling", temperature: 60.0, throttling: true, expected: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm.mu.Lock()
-			tm.states["test"] = &ThermalState{
+			tm.states["test"] = &State{
 				Temperature: tt.temperature,
 				Throttling:  tt.throttling,
 				UpdatedAt:   time.Now(),
@@ -186,8 +192,9 @@ func TestThermalMonitor_IsHealthy(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_CanUse is part of the public API.
 func TestThermalMonitor_CanUse(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -202,12 +209,18 @@ func TestThermalMonitor_CanUse(t *testing.T) {
 	// No state - should be usable
 	canUse, reason := tm.CanUse("unknown")
 	if !canUse {
-		t.Error("Expected CanUse=true for unknown hardware")
+		t.Errorf("Expected CanUse=true for unknown hardware: %s", reason)
+	}
+	if reason != "" {
+		t.Errorf("expected empty reason for unknown hardware, got %s", reason)
+	}
+	if reason != "" {
+		t.Errorf("Expected empty reason for unknown hardware, got %s", reason)
 	}
 
 	// Normal temperature - usable
 	tm.mu.Lock()
-	tm.states["normal"] = &ThermalState{
+	tm.states["normal"] = &State{
 		Temperature: 65.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -221,7 +234,7 @@ func TestThermalMonitor_CanUse(t *testing.T) {
 
 	// Critical temperature - not usable
 	tm.mu.Lock()
-	tm.states["hot"] = &ThermalState{
+	tm.states["hot"] = &State{
 		Temperature: 90.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -238,7 +251,7 @@ func TestThermalMonitor_CanUse(t *testing.T) {
 
 	// Throttling - not usable
 	tm.mu.Lock()
-	tm.states["throttling"] = &ThermalState{
+	tm.states["throttling"] = &State{
 		Temperature: 65.0,
 		Throttling:  true,
 		UpdatedAt:   time.Now(),
@@ -249,10 +262,14 @@ func TestThermalMonitor_CanUse(t *testing.T) {
 	if canUse {
 		t.Errorf("Expected CanUse=false for throttling, got true")
 	}
+	if reason == "" {
+		t.Error("Expected reason for throttling")
+	}
 }
 
+// TestThermalMonitor_GetThermalPenalty is part of the public API.
 func TestThermalMonitor_GetThermalPenalty(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -265,22 +282,22 @@ func TestThermalMonitor_GetThermalPenalty(t *testing.T) {
 	tm := NewThermalMonitor(config, 5*time.Second)
 
 	tests := []struct {
-		name           string
-		temperature    float64
-		expectNonZero  bool
-		expectHigh     bool // penalty > 100
+		name          string
+		temperature   float64
+		expectNonZero bool
+		expectHigh    bool // penalty > 100
 	}{
-		{"Cool", 50.0, false, false},
-		{"Normal", 65.0, false, false},
-		{"Warning", 75.0, true, true},    // Exponential penalty kicks in
-		{"High", 82.0, true, true},       // Higher exponential penalty
-		{"Critical", 88.0, true, true},   // Very high penalty
+		{name: "Cool", temperature: 50.0, expectNonZero: false, expectHigh: false},
+		{name: "Normal", temperature: 65.0, expectNonZero: false, expectHigh: false},
+		{name: "Warning", temperature: 75.0, expectNonZero: true, expectHigh: true},  // Exponential penalty kicks in
+		{name: "High", temperature: 82.0, expectNonZero: true, expectHigh: true},     // Higher exponential penalty
+		{name: "Critical", temperature: 88.0, expectNonZero: true, expectHigh: true}, // Very high penalty
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm.mu.Lock()
-			tm.states["test"] = &ThermalState{
+			tm.states["test"] = &State{
 				Temperature: tt.temperature,
 				UpdatedAt:   time.Now(),
 			}
@@ -307,7 +324,7 @@ func TestThermalMonitor_GetThermalPenalty(t *testing.T) {
 	// Test throttling penalty
 	t.Run("Throttling", func(t *testing.T) {
 		tm.mu.Lock()
-		tm.states["test"] = &ThermalState{
+		tm.states["test"] = &State{
 			Temperature: 65.0,
 			Throttling:  true,
 			UpdatedAt:   time.Now(),
@@ -321,8 +338,9 @@ func TestThermalMonitor_GetThermalPenalty(t *testing.T) {
 	})
 }
 
+// TestThermalMonitor_GetCoolestBackend is part of the public API.
 func TestThermalMonitor_GetCoolestBackend(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -336,24 +354,24 @@ func TestThermalMonitor_GetCoolestBackend(t *testing.T) {
 
 	// Add states for multiple hardware
 	tm.mu.Lock()
-	tm.states["hot"] = &ThermalState{
+	tm.states["hot"] = &State{
 		Temperature: 85.0,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["warm"] = &ThermalState{
+	tm.states["warm"] = &State{
 		Temperature: 70.0,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["cool"] = &ThermalState{
+	tm.states[strCool] = &State{
 		Temperature: 55.0,
 		UpdatedAt:   time.Now(),
 	}
 	tm.mu.Unlock()
 
-	candidates := []string{"hot", "warm", "cool"}
+	candidates := []string{"hot", "warm", strCool}
 	coolest := tm.GetCoolestBackend(candidates)
 
-	if coolest != "cool" {
+	if coolest != strCool {
 		t.Errorf("Expected 'cool' as coolest, got %s", coolest)
 	}
 
@@ -364,14 +382,15 @@ func TestThermalMonitor_GetCoolestBackend(t *testing.T) {
 	}
 
 	// Test with unknown hardware (no states) - returns empty since all are nil
-	coolest = tm.GetCoolestBackend([]string{"unknown1", "unknown2"})
+	coolest = tm.GetCoolestBackend([]string{strUnknown1, strUnknown2})
 	if coolest != "" {
 		t.Errorf("Expected empty string for unknown hardware (no states), got %s", coolest)
 	}
 }
 
+// TestThermalMonitor_ShouldPreferQuiet is part of the public API.
 func TestThermalMonitor_ShouldPreferQuiet(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -390,7 +409,7 @@ func TestThermalMonitor_ShouldPreferQuiet(t *testing.T) {
 
 	// Low fan speed only - not quiet hours (no fans > moderate)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		FanPercent: 25,
 		UpdatedAt:  time.Now(),
 	}
@@ -402,7 +421,7 @@ func TestThermalMonitor_ShouldPreferQuiet(t *testing.T) {
 
 	// High fan speed - triggers quiet mode (fan > moderate threshold)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		FanPercent: 70,
 		UpdatedAt:  time.Now(),
 	}
@@ -413,8 +432,9 @@ func TestThermalMonitor_ShouldPreferQuiet(t *testing.T) {
 	}
 }
 
+// TestThermalMonitor_GetConfig is part of the public API.
 func TestThermalMonitor_GetConfig(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -441,13 +461,14 @@ func TestThermalMonitor_GetConfig(t *testing.T) {
 	}
 }
 
+// TestThermalState_UpdatedAt is part of the public API.
 func TestThermalState_UpdatedAt(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	now := time.Now()
 
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 65.0,
 		UpdatedAt:   now,
 	}
@@ -464,7 +485,8 @@ func TestThermalState_UpdatedAt(t *testing.T) {
 	}
 }
 
-func TestThermalMonitor_ConcurrentAccess(t *testing.T) {
+// TestThermalMonitor_ConcurrentAccess is part of the public API.
+func TestThermalMonitor_ConcurrentAccess(_ *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	// Test concurrent read/write access
@@ -474,7 +496,7 @@ func TestThermalMonitor_ConcurrentAccess(t *testing.T) {
 	go func() {
 		for i := 0; i < 100; i++ {
 			tm.mu.Lock()
-			tm.states["concurrent"] = &ThermalState{
+			tm.states["concurrent"] = &State{
 				Temperature: float64(50 + i%30),
 				UpdatedAt:   time.Now(),
 			}
@@ -501,9 +523,9 @@ func TestThermalMonitor_ConcurrentAccess(t *testing.T) {
 	// If we get here without panicking, concurrent access works
 }
 
-// TestThermalState_String tests the String method of ThermalState
+// TestThermalState_String tests the String method of State
 func TestThermalState_String(t *testing.T) {
-	state := &ThermalState{
+	state := &State{
 		Temperature: 72.5,
 		FanPercent:  65,
 		PowerDraw:   125.3,
@@ -548,7 +570,7 @@ func TestThermalMonitor_IsHealthy_NilState(t *testing.T) {
 
 // TestThermalMonitor_CanUse_EdgeCases tests edge cases in CanUse
 func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -562,7 +584,7 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 
 	// Test at exactly warning temperature (should be usable)
 	tm.mu.Lock()
-	tm.states["warning"] = &ThermalState{
+	tm.states["warning"] = &State{
 		Temperature: 70.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -576,7 +598,7 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 
 	// Test just below critical temperature
 	tm.mu.Lock()
-	tm.states["nearCrit"] = &ThermalState{
+	tm.states["nearCrit"] = &State{
 		Temperature: 84.9,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -590,7 +612,7 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 
 	// Test at exactly critical temperature
 	tm.mu.Lock()
-	tm.states["critical"] = &ThermalState{
+	tm.states["critical"] = &State{
 		Temperature: 85.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -608,7 +630,7 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 	// Test at shutdown temperature - note: it triggers "critical" message first
 	// since critical (85) is checked before shutdown (95) in CanUse()
 	tm.mu.Lock()
-	tm.states["shutdown"] = &ThermalState{
+	tm.states["shutdown"] = &State{
 		Temperature: 95.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -625,7 +647,7 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 
 	// Test above shutdown temperature
 	tm.mu.Lock()
-	tm.states["extreme"] = &ThermalState{
+	tm.states["extreme"] = &State{
 		Temperature: 100.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -636,11 +658,14 @@ func TestThermalMonitor_CanUse_EdgeCases(t *testing.T) {
 	if canUse {
 		t.Error("Expected CanUse=false above shutdown")
 	}
+	if reason == "" {
+		t.Error("Expected reason above shutdown")
+	}
 }
 
 // TestThermalMonitor_GetThermalPenalty_FanNoise tests fan noise penalty calculation
 func TestThermalMonitor_GetThermalPenalty_FanNoise(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -654,7 +679,7 @@ func TestThermalMonitor_GetThermalPenalty_FanNoise(t *testing.T) {
 
 	// Test at exactly loud threshold (no penalty)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		FanPercent:  85,
 		UpdatedAt:   time.Now(),
@@ -668,7 +693,7 @@ func TestThermalMonitor_GetThermalPenalty_FanNoise(t *testing.T) {
 
 	// Test above loud threshold
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		FanPercent:  90,
 		UpdatedAt:   time.Now(),
@@ -687,7 +712,7 @@ func TestThermalMonitor_GetThermalPenalty_FanNoise(t *testing.T) {
 
 	// Test high fan speed
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		FanPercent:  100,
 		UpdatedAt:   time.Now(),
@@ -703,7 +728,7 @@ func TestThermalMonitor_GetThermalPenalty_FanNoise(t *testing.T) {
 
 // TestThermalMonitor_GetThermalPenalty_HighUtilization tests utilization penalty
 func TestThermalMonitor_GetThermalPenalty_HighUtilization(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -717,7 +742,7 @@ func TestThermalMonitor_GetThermalPenalty_HighUtilization(t *testing.T) {
 
 	// Test below utilization threshold (no penalty)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		Utilization: 75,
 		UpdatedAt:   time.Now(),
@@ -731,7 +756,7 @@ func TestThermalMonitor_GetThermalPenalty_HighUtilization(t *testing.T) {
 
 	// Test at exactly threshold (80%)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		Utilization: 80,
 		UpdatedAt:   time.Now(),
@@ -745,7 +770,7 @@ func TestThermalMonitor_GetThermalPenalty_HighUtilization(t *testing.T) {
 
 	// Test above threshold
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		Utilization: 95,
 		UpdatedAt:   time.Now(),
@@ -761,7 +786,7 @@ func TestThermalMonitor_GetThermalPenalty_HighUtilization(t *testing.T) {
 
 // TestThermalMonitor_GetThermalPenalty_CombinedPenalties tests combined penalty factors
 func TestThermalMonitor_GetThermalPenalty_CombinedPenalties(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -775,11 +800,11 @@ func TestThermalMonitor_GetThermalPenalty_CombinedPenalties(t *testing.T) {
 
 	// Test all penalties at once
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
-		Temperature: 78.0,    // Above warning
-		FanPercent:  90,      // Above loud
-		Utilization: 90,      // Above 80%
-		Throttling:  true,    // Throttling
+	tm.states["test"] = &State{
+		Temperature: 78.0, // Above warning
+		FanPercent:  90,   // Above loud
+		Utilization: 90,   // Above 80%
+		Throttling:  true, // Throttling
 		UpdatedAt:   time.Now(),
 	}
 	tm.mu.Unlock()
@@ -810,7 +835,7 @@ func TestThermalMonitor_GetThermalPenalty_NilState(t *testing.T) {
 
 // TestThermalMonitor_ShouldPreferQuiet_EdgeCases tests edge cases in quiet mode
 func TestThermalMonitor_ShouldPreferQuiet_EdgeCases(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -824,7 +849,7 @@ func TestThermalMonitor_ShouldPreferQuiet_EdgeCases(t *testing.T) {
 
 	// Test at exactly moderate threshold (should not trigger quiet mode)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		FanPercent: 60,
 		UpdatedAt:  time.Now(),
 	}
@@ -836,7 +861,7 @@ func TestThermalMonitor_ShouldPreferQuiet_EdgeCases(t *testing.T) {
 
 	// Test just above moderate (should trigger quiet mode)
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		FanPercent: 61,
 		UpdatedAt:  time.Now(),
 	}
@@ -848,11 +873,11 @@ func TestThermalMonitor_ShouldPreferQuiet_EdgeCases(t *testing.T) {
 
 	// Test with multiple backends, one loud
 	tm.mu.Lock()
-	tm.states["quiet"] = &ThermalState{
+	tm.states["quiet"] = &State{
 		FanPercent: 30,
 		UpdatedAt:  time.Now(),
 	}
-	tm.states["loud"] = &ThermalState{
+	tm.states["loud"] = &State{
 		FanPercent: 90,
 		UpdatedAt:  time.Now(),
 	}
@@ -865,7 +890,7 @@ func TestThermalMonitor_ShouldPreferQuiet_EdgeCases(t *testing.T) {
 
 // TestThermalMonitor_GetCoolestBackend_EdgeCases tests edge cases in GetCoolestBackend
 func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -879,7 +904,7 @@ func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
 
 	// Test with single candidate
 	tm.mu.Lock()
-	tm.states["single"] = &ThermalState{
+	tm.states["single"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -892,7 +917,7 @@ func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
 
 	// Test with mixed known/unknown
 	tm.mu.Lock()
-	tm.states["known"] = &ThermalState{
+	tm.states["known"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -904,18 +929,18 @@ func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
 	}
 
 	// Test with all candidates unknown
-	coolest = tm.GetCoolestBackend([]string{"unknown1", "unknown2", "unknown3"})
+	coolest = tm.GetCoolestBackend([]string{strUnknown1, strUnknown2, "unknown3"})
 	if coolest != "" {
 		t.Errorf("Expected empty string for all unknown, got %s", coolest)
 	}
 
 	// Test with temperature equality - first one should win
 	tm.mu.Lock()
-	tm.states["cool1"] = &ThermalState{
+	tm.states["cool1"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["cool2"] = &ThermalState{
+	tm.states["cool2"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -928,7 +953,7 @@ func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
 
 	// Test with zero temperature
 	tm.mu.Lock()
-	tm.states["zero"] = &ThermalState{
+	tm.states["zero"] = &State{
 		Temperature: 0.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -942,7 +967,7 @@ func TestThermalMonitor_GetCoolestBackend_EdgeCases(t *testing.T) {
 
 // TestThermalMonitor_TemperatureThresholdBoundaries tests exact boundary conditions
 func TestThermalMonitor_TemperatureThresholdBoundaries(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -960,21 +985,21 @@ func TestThermalMonitor_TemperatureThresholdBoundaries(t *testing.T) {
 		healthy     bool
 		canUse      bool
 	}{
-		{"Below warning", 69.9, true, true},
-		{"At warning", 70.0, true, true},
-		{"Above warning", 70.1, true, true},
-		{"Below critical", 84.9, true, true},
-		{"At critical", 85.0, false, false},
-		{"Above critical", 85.1, false, false},
-		{"Below shutdown", 94.9, false, false},
-		{"At shutdown", 95.0, false, false},
-		{"Above shutdown", 95.1, false, false},
+		{name: "Below warning", temperature: 69.9, healthy: true, canUse: true},
+		{name: "At warning", temperature: 70.0, healthy: true, canUse: true},
+		{name: "Above warning", temperature: 70.1, healthy: true, canUse: true},
+		{name: "Below critical", temperature: 84.9, healthy: true, canUse: true},
+		{name: "At critical", temperature: 85.0, healthy: false, canUse: false},
+		{name: "Above critical", temperature: 85.1, healthy: false, canUse: false},
+		{name: "Below shutdown", temperature: 94.9, healthy: false, canUse: false},
+		{name: "At shutdown", temperature: 95.0, healthy: false, canUse: false},
+		{name: "Above shutdown", temperature: 95.1, healthy: false, canUse: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm.mu.Lock()
-			tm.states["test"] = &ThermalState{
+			tm.states["test"] = &State{
 				Temperature: tt.temperature,
 				Throttling:  false,
 				UpdatedAt:   time.Now(),
@@ -1006,7 +1031,7 @@ func TestThermalMonitor_ConcurrentMultipleHardware(t *testing.T) {
 		go func(id string) {
 			for i := 0; i < 50; i++ {
 				tm.mu.Lock()
-				tm.states[id] = &ThermalState{
+				tm.states[id] = &State{
 					Temperature: float64(40 + (i % 50)),
 					FanPercent:  (i % 100),
 					Utilization: (i % 100),
@@ -1081,10 +1106,10 @@ func TestThermalMonitor_MonitorLoopExecution(t *testing.T) {
 // TestThermalMonitor_GetStateThreadSafety tests thread safety of GetState
 func TestThermalMonitor_GetStateThreadSafety(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
-	results := make(chan *ThermalState, 100)
+	results := make(chan *State, 100)
 
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -1155,7 +1180,7 @@ func TestThermalMonitor_GetAllStatesCopy(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	tm.mu.Lock()
-	tm.states["original"] = &ThermalState{
+	tm.states["original"] = &State{
 		Temperature: 50.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -1165,7 +1190,7 @@ func TestThermalMonitor_GetAllStatesCopy(t *testing.T) {
 	statesCopy := tm.GetAllStates()
 
 	// Modify the copy
-	statesCopy["modified"] = &ThermalState{
+	statesCopy["modified"] = &State{
 		Temperature: 99.0,
 		UpdatedAt:   time.Now(),
 	}
@@ -1183,7 +1208,7 @@ func TestThermalMonitor_GetAllStatesCopy(t *testing.T) {
 
 // TestThermalMonitor_TemperaturePenaltyExponential tests exponential temperature penalty
 func TestThermalMonitor_TemperaturePenaltyExponential(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -1201,7 +1226,7 @@ func TestThermalMonitor_TemperaturePenaltyExponential(t *testing.T) {
 
 	for _, temp := range temps {
 		tm.mu.Lock()
-		tm.states["test"] = &ThermalState{
+		tm.states["test"] = &State{
 			Temperature: temp,
 			UpdatedAt:   time.Now(),
 		}
@@ -1220,7 +1245,7 @@ func TestThermalMonitor_TemperaturePenaltyExponential(t *testing.T) {
 
 	// At critical temperature, penalty should approach or exceed 1000
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 84.9,
 		UpdatedAt:   time.Now(),
 	}
@@ -1234,7 +1259,7 @@ func TestThermalMonitor_TemperaturePenaltyExponential(t *testing.T) {
 
 // TestThermalMonitor_MultipleHardwareSelection tests backend selection logic
 func TestThermalMonitor_MultipleHardwareSelection(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -1249,20 +1274,20 @@ func TestThermalMonitor_MultipleHardwareSelection(t *testing.T) {
 	// Set up multiple backends with different thermal states
 	// Use temps above warning to show clear penalty differences
 	tm.mu.Lock()
-	tm.states["hot"] = &ThermalState{
+	tm.states["hot"] = &State{
 		Temperature: 82.0,
 		FanPercent:  80,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["warm"] = &ThermalState{
-		Temperature: 75.0,  // Above warning (70), so has temperature penalty
+	tm.states["warm"] = &State{
+		Temperature: 75.0, // Above warning (70), so has temperature penalty
 		FanPercent:  50,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["cool"] = &ThermalState{
-		Temperature: 68.0,  // Below warning, so no temperature penalty
+	tm.states[strCool] = &State{
+		Temperature: 68.0, // Below warning, so no temperature penalty
 		FanPercent:  30,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -1272,7 +1297,7 @@ func TestThermalMonitor_MultipleHardwareSelection(t *testing.T) {
 	// All backends should be usable
 	hotUsable, _ := tm.CanUse("hot")
 	warmUsable, _ := tm.CanUse("warm")
-	coolUsable, _ := tm.CanUse("cool")
+	coolUsable, _ := tm.CanUse(strCool)
 
 	if !hotUsable {
 		t.Error("Expected hot backend to be usable")
@@ -1287,7 +1312,7 @@ func TestThermalMonitor_MultipleHardwareSelection(t *testing.T) {
 	// Cool should be preferred (lowest penalty)
 	hotPenalty := tm.GetThermalPenalty("hot")
 	warmPenalty := tm.GetThermalPenalty("warm")
-	coolPenalty := tm.GetThermalPenalty("cool")
+	coolPenalty := tm.GetThermalPenalty(strCool)
 
 	// Cool has no temp penalty, warm has some, hot has high temp penalty + fan penalty
 	if coolPenalty >= warmPenalty || warmPenalty >= hotPenalty {
@@ -1296,8 +1321,8 @@ func TestThermalMonitor_MultipleHardwareSelection(t *testing.T) {
 	}
 
 	// GetCoolestBackend should select cool
-	coolest := tm.GetCoolestBackend([]string{"hot", "warm", "cool"})
-	if coolest != "cool" {
+	coolest := tm.GetCoolestBackend([]string{"hot", "warm", strCool})
+	if coolest != strCool {
 		t.Errorf("Expected 'cool' as coolest, got %s", coolest)
 	}
 }
@@ -1318,7 +1343,7 @@ func TestThermalMonitor_CanUse_NilState(t *testing.T) {
 
 // TestThermalMonitor_CanUse_Throttling tests CanUse when throttling is active
 func TestThermalMonitor_CanUse_Throttling(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -1332,7 +1357,7 @@ func TestThermalMonitor_CanUse_Throttling(t *testing.T) {
 
 	// Set hardware with normal temp but throttling
 	tm.mu.Lock()
-	tm.states["throttling"] = &ThermalState{
+	tm.states["throttling"] = &State{
 		Temperature: 60.0,
 		Throttling:  true,
 		UpdatedAt:   time.Now(),
@@ -1353,18 +1378,18 @@ func TestThermalMonitor_CoolestBackend_WithNilStates(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	tm.mu.Lock()
-	tm.states["hw1"] = &ThermalState{
+	tm.states["hw1"] = &State{
 		Temperature: 55.0,
 		UpdatedAt:   time.Now(),
 	}
-	tm.states["hw2"] = &ThermalState{
+	tm.states["hw2"] = &State{
 		Temperature: 65.0,
 		UpdatedAt:   time.Now(),
 	}
 	tm.mu.Unlock()
 
 	// Include some non-existent candidates
-	coolest := tm.GetCoolestBackend([]string{"unknown1", "hw1", "unknown2", "hw2"})
+	coolest := tm.GetCoolestBackend([]string{strUnknown1, "hw1", strUnknown2, "hw2"})
 	if coolest != "hw1" {
 		t.Errorf("Expected hw1 (lowest among existing), got %s", coolest)
 	}
@@ -1372,7 +1397,7 @@ func TestThermalMonitor_CoolestBackend_WithNilStates(t *testing.T) {
 
 // TestThermalMonitor_ShouldPreferQuiet_MultipleBackends tests with multiple backends
 func TestThermalMonitor_ShouldPreferQuiet_MultipleBackends(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		FanModerate: 60,
 	}
 	tm := NewThermalMonitor(config, 5*time.Second)
@@ -1380,7 +1405,7 @@ func TestThermalMonitor_ShouldPreferQuiet_MultipleBackends(t *testing.T) {
 	// Add many backends all below moderate
 	tm.mu.Lock()
 	for i := 1; i <= 5; i++ {
-		tm.states[fmt.Sprintf("hw%d", i)] = &ThermalState{
+		tm.states[fmt.Sprintf("hw%d", i)] = &State{
 			FanPercent: 40,
 			UpdatedAt:  time.Now(),
 		}
@@ -1393,7 +1418,7 @@ func TestThermalMonitor_ShouldPreferQuiet_MultipleBackends(t *testing.T) {
 
 	// Add one backend above moderate
 	tm.mu.Lock()
-	tm.states["loud"] = &ThermalState{
+	tm.states["loud"] = &State{
 		FanPercent: 70,
 		UpdatedAt:  time.Now(),
 	}
@@ -1406,14 +1431,14 @@ func TestThermalMonitor_ShouldPreferQuiet_MultipleBackends(t *testing.T) {
 
 // TestThermalMonitor_IsHealthy_HealthyCases tests various healthy scenarios
 func TestThermalMonitor_IsHealthy_HealthyCases(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempCritical: 85.0,
 	}
 	tm := NewThermalMonitor(config, 5*time.Second)
 
 	// Low temperature, no throttling
 	tm.mu.Lock()
-	tm.states["healthy1"] = &ThermalState{
+	tm.states["healthy1"] = &State{
 		Temperature: 40.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -1426,7 +1451,7 @@ func TestThermalMonitor_IsHealthy_HealthyCases(t *testing.T) {
 
 	// Just below critical
 	tm.mu.Lock()
-	tm.states["healthy2"] = &ThermalState{
+	tm.states["healthy2"] = &State{
 		Temperature: 84.5,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -1443,7 +1468,7 @@ func TestThermalMonitor_GetThermalPenalty_ZeroUtilization(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	tm.mu.Lock()
-	tm.states["idle"] = &ThermalState{
+	tm.states["idle"] = &State{
 		Temperature: 50.0,
 		Utilization: 0,
 		FanPercent:  10,
@@ -1459,7 +1484,7 @@ func TestThermalMonitor_GetThermalPenalty_ZeroUtilization(t *testing.T) {
 
 // TestThermalMonitor_GetThermalPenalty_MaxFanSpeed tests maximum fan speed penalty
 func TestThermalMonitor_GetThermalPenalty_MaxFanSpeed(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		TempShutdown: 95.0,
@@ -1471,7 +1496,7 @@ func TestThermalMonitor_GetThermalPenalty_MaxFanSpeed(t *testing.T) {
 	tm := NewThermalMonitor(config, 5*time.Second)
 
 	tm.mu.Lock()
-	tm.states["maxfan"] = &ThermalState{
+	tm.states["maxfan"] = &State{
 		Temperature: 50.0,
 		FanPercent:  100,
 		UpdatedAt:   time.Now(),
@@ -1490,7 +1515,7 @@ func TestThermalMonitor_GetThermalPenalty_MaxUtilization(t *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 
 	tm.mu.Lock()
-	tm.states["maxutil"] = &ThermalState{
+	tm.states["maxutil"] = &State{
 		Temperature: 50.0,
 		Utilization: 100,
 		UpdatedAt:   time.Now(),
@@ -1506,14 +1531,14 @@ func TestThermalMonitor_GetThermalPenalty_MaxUtilization(t *testing.T) {
 
 // TestThermalMonitor_IsHealthy_Unhealthy tests unhealthy scenarios
 func TestThermalMonitor_IsHealthy_Unhealthy(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempCritical: 85.0,
 	}
 	tm := NewThermalMonitor(config, 5*time.Second)
 
 	// At critical
 	tm.mu.Lock()
-	tm.states["critical"] = &ThermalState{
+	tm.states["critical"] = &State{
 		Temperature: 85.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -1526,7 +1551,7 @@ func TestThermalMonitor_IsHealthy_Unhealthy(t *testing.T) {
 
 	// Above critical
 	tm.mu.Lock()
-	tm.states["hot"] = &ThermalState{
+	tm.states["hot"] = &State{
 		Temperature: 90.0,
 		Throttling:  false,
 		UpdatedAt:   time.Now(),
@@ -1539,7 +1564,7 @@ func TestThermalMonitor_IsHealthy_Unhealthy(t *testing.T) {
 
 	// Throttling only
 	tm.mu.Lock()
-	tm.states["throttle"] = &ThermalState{
+	tm.states["throttle"] = &State{
 		Temperature: 50.0,
 		Throttling:  true,
 		UpdatedAt:   time.Now(),
@@ -1552,7 +1577,7 @@ func TestThermalMonitor_IsHealthy_Unhealthy(t *testing.T) {
 }
 
 // TestThermalMonitor_ConcurrentReadWrite tests mixed read/write concurrency
-func TestThermalMonitor_ConcurrentReadWrite(t *testing.T) {
+func TestThermalMonitor_ConcurrentReadWrite(_ *testing.T) {
 	tm := NewThermalMonitor(nil, 5*time.Second)
 	done := make(chan bool, 10)
 
@@ -1561,7 +1586,7 @@ func TestThermalMonitor_ConcurrentReadWrite(t *testing.T) {
 		go func(hwNum int) {
 			for i := 0; i < 30; i++ {
 				tm.mu.Lock()
-				tm.states[fmt.Sprintf("hw%d", hwNum)] = &ThermalState{
+				tm.states[fmt.Sprintf("hw%d", hwNum)] = &State{
 					Temperature: float64(50 + i%40),
 					FanPercent:  (i % 100),
 					Utilization: (i % 100),
@@ -1598,7 +1623,7 @@ func TestThermalMonitor_ConcurrentReadWrite(t *testing.T) {
 
 // TestThermalMonitor_TemperaturePenalty_Precision tests penalty calculations
 func TestThermalMonitor_TemperaturePenalty_Precision(t *testing.T) {
-	config := &ThermalConfig{
+	config := &Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 	}
@@ -1606,7 +1631,7 @@ func TestThermalMonitor_TemperaturePenalty_Precision(t *testing.T) {
 
 	// Test at just above warning
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 70.1,
 		UpdatedAt:   time.Now(),
 	}
@@ -1620,7 +1645,7 @@ func TestThermalMonitor_TemperaturePenalty_Precision(t *testing.T) {
 
 	// Test just below critical
 	tm.mu.Lock()
-	tm.states["test"] = &ThermalState{
+	tm.states["test"] = &State{
 		Temperature: 84.5,
 		UpdatedAt:   time.Now(),
 	}
@@ -1641,7 +1666,7 @@ func TestThermalMonitor_LargeScaleSimulation(t *testing.T) {
 	tm.mu.Lock()
 	for i := 0; i < 100; i++ {
 		hw := fmt.Sprintf("hw%03d", i)
-		tm.states[hw] = &ThermalState{
+		tm.states[hw] = &State{
 			Temperature: float64(30 + (i % 60)),
 			FanPercent:  (i % 100),
 			Utilization: (i % 100),

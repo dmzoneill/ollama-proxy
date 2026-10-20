@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 	"github.com/daoneill/ollama-proxy/pkg/router"
@@ -34,59 +36,155 @@ func TestMain(m *testing.M) {
 
 // MockBackend implements backends.Backend for testing
 type MockBackend struct {
-	id               string
-	healthy          bool
 	generateErr      error
-	generateResponse *backends.GenerateResponse
 	streamErr        error
+	generateResponse *backends.GenerateResponse
+	id               string
 	streamChunks     []*backends.StreamChunk
-	mutex            sync.Mutex
 	generateCalled   int
 	streamCalled     int
+	mutex            sync.Mutex
+	healthy          bool
 }
 
-func (m *MockBackend) ID() string                                                   { return m.id }
-func (m *MockBackend) Type() string                                                 { return "mock" }
-func (m *MockBackend) Name() string                                                 { return "mock-" + m.id }
-func (m *MockBackend) Hardware() string                                             { return "cpu" }
-func (m *MockBackend) IsHealthy() bool                                              { return m.healthy }
-func (m *MockBackend) PowerWatts() float64                                          { return 10.0 }
-func (m *MockBackend) AvgLatencyMs() int32                                          { return 100 }
-func (m *MockBackend) Priority() int                                                { return 1 }
-func (m *MockBackend) SupportsGenerate() bool                                       { return true }
-func (m *MockBackend) SupportsStream() bool                                         { return true }
-func (m *MockBackend) SupportsEmbed() bool                                          { return true }
-func (m *MockBackend) ListModels(ctx context.Context) ([]string, error)             { return []string{}, nil }
-func (m *MockBackend) SupportsModel(modelName string) bool                          { return true }
-func (m *MockBackend) GetMaxModelSizeGB() int                                       { return 50 }
-func (m *MockBackend) GetSupportedModelPatterns() []string                          { return []string{} }
-func (m *MockBackend) GetPreferredModels() []string                                 { return []string{} }
-func (m *MockBackend) UpdateMetrics(latencyMs int32, success bool)                  {}
-func (m *MockBackend) GetMetrics() *backends.BackendMetrics                         { return &backends.BackendMetrics{} }
-func (m *MockBackend) Start(ctx context.Context) error                              { return nil }
-func (m *MockBackend) Stop(ctx context.Context) error                               { return nil }
+// ID is part of the public API.
+func (m *MockBackend) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *MockBackend) Type() string { return "mock" }
+
+// Name is part of the public API.
+func (m *MockBackend) Name() string { return "mock-" + m.id }
+
+// Hardware is part of the public API.
+func (m *MockBackend) Hardware() string { return "cpu" }
+
+// IsHealthy reports whether the condition holds.
+func (m *MockBackend) IsHealthy() bool { return m.healthy }
+
+// PowerWatts is part of the public API.
+func (m *MockBackend) PowerWatts() float64 { return 10.0 }
+
+// AvgLatencyMs is part of the public API.
+func (m *MockBackend) AvgLatencyMs() int32 { return 100 }
+
+// Priority is part of the public API.
+func (m *MockBackend) Priority() int { return 1 }
+
+// SupportsGenerate is part of the public API.
+func (m *MockBackend) SupportsGenerate() bool { return true }
+
+// SupportsStream is part of the public API.
+func (m *MockBackend) SupportsStream() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *MockBackend) SupportsEmbed() bool { return true }
+
+// ListModels is part of the public API.
+func (m *MockBackend) ListModels(_ context.Context) ([]string, error) { return []string{}, nil }
+
+// SupportsModel is part of the public API.
+func (m *MockBackend) SupportsModel(_ string) bool { return true }
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *MockBackend) GetMaxModelSizeGB() int { return 50 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *MockBackend) GetSupportedModelPatterns() []string { return []string{} }
+
+// GetPreferredModels is part of the public API.
+func (m *MockBackend) GetPreferredModels() []string { return []string{} }
+
+// UpdateMetrics is part of the public API.
+func (m *MockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// GetMetrics is part of the public API.
+func (m *MockBackend) GetMetrics() *backends.BackendMetrics { return &backends.BackendMetrics{} }
+
+// Start is part of the public API.
+func (m *MockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *MockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *MockBackend) SupportsAudioToText() bool { return false }
-func (m *MockBackend) SupportsTextToAudio() bool { return false }
-func (m *MockBackend) SupportsImageToText() bool { return false }
-func (m *MockBackend) SupportsTextToImage() bool { return false }
-func (m *MockBackend) SupportsVideoToText() bool { return false }
-func (m *MockBackend) SupportsTextToVideo() bool { return false }
-func (m *MockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) HealthCheck(ctx context.Context) error                        { return nil }
 
-func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// SupportsTextToAudio is part of the public API.
+func (m *MockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *MockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *MockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *MockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *MockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *MockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *MockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *MockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *MockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *MockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *MockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *MockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *MockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *MockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *MockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *MockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// HealthCheck is part of the public API.
+func (m *MockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// Generate is part of the public API.
+func (m *MockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.generateCalled++
@@ -99,7 +197,8 @@ func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateReques
 	return &backends.GenerateResponse{Response: "test response"}, nil
 }
 
-func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *MockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.streamCalled++
@@ -109,7 +208,8 @@ func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.Generate
 	return &MockStreamReader{chunks: m.streamChunks}, nil
 }
 
-func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *MockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return nil, nil
 }
 
@@ -120,6 +220,7 @@ type MockStreamReader struct {
 	mutex  sync.Mutex
 }
 
+// Recv is part of the public API.
 func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -131,6 +232,7 @@ func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return chunk, nil
 }
 
+// Close is part of the public API.
 func (m *MockStreamReader) Close() error {
 	return nil
 }
@@ -145,7 +247,7 @@ func createTestServer(r *router.Router) *httptest.Server {
 // createTestRouter creates a test router with mocked backends
 func createTestRouter() *router.Router {
 	r := router.NewRouter(router.Config{
-		DefaultBackendID: "mock1",
+		DefaultBackendID: strMock1,
 		PowerAware:       false,
 		AutoOptimize:     false,
 	})
@@ -155,8 +257,8 @@ func createTestRouter() *router.Router {
 // Test: WebSocket connection establishment
 func TestWebSocketConnectionEstablishment(t *testing.T) {
 	r := createTestRouter()
-	backend := &MockBackend{id: "mock1", healthy: true}
-	r.RegisterBackend(backend)
+	backend := &MockBackend{id: strMock1, healthy: true}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -165,11 +267,16 @@ func TestWebSocketConnectionEstablishment(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
 	// Attempt to upgrade connection
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Verify connection is established
 	if conn.RemoteAddr() == nil {
@@ -181,31 +288,36 @@ func TestWebSocketConnectionEstablishment(t *testing.T) {
 func TestWebSocketStreamingMessageHandling(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "hello", Done: false},
+			{Token: strHello, Done: false},
 			{Token: " ", Done: false},
 			{Token: "world", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send streaming request
-	req := WebSocketRequest{
-		RequestID: "test-123",
-		Model:     "test-model",
-		Prompt:    "hello",
+	req := Request{
+		RequestID: strTest123,
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -213,9 +325,9 @@ func TestWebSocketStreamingMessageHandling(t *testing.T) {
 	}
 
 	// Read responses
-	var responses []WebSocketChunk
+	var responses []Chunk
 	for i := 0; i < 3; i++ {
-		var chunk WebSocketChunk
+		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
 			t.Fatalf("Failed to read chunk %d: %v", i, err)
 		}
@@ -227,13 +339,13 @@ func TestWebSocketStreamingMessageHandling(t *testing.T) {
 		t.Errorf("Expected 3 chunks, got %d", len(responses))
 	}
 
-	if responses[0].Token != "hello" {
+	if responses[0].Token != strHello {
 		t.Errorf("Expected first token 'hello', got '%s'", responses[0].Token)
 	}
 	if responses[2].Done != true {
 		t.Error("Expected last chunk to have Done=true")
 	}
-	if responses[2].RequestID != "test-123" {
+	if responses[2].RequestID != strTest123 {
 		t.Errorf("Expected RequestID 'test-123', got '%s'", responses[2].RequestID)
 	}
 
@@ -247,27 +359,32 @@ func TestWebSocketStreamingMessageHandling(t *testing.T) {
 func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:                 "mock1",
-		healthy:            true,
-		generateResponse:   &backends.GenerateResponse{Response: "full response"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: "full response"},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send non-streaming request
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-456",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -275,7 +392,7 @@ func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 	}
 
 	// Read response
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -295,18 +412,23 @@ func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 // Test: Error handling - invalid request
 func TestWebSocketErrorHandlingInvalidRequest(t *testing.T) {
 	r := createTestRouter()
-	backend := &MockBackend{id: "mock1", healthy: true}
-	r.RegisterBackend(backend)
+	backend := &MockBackend{id: strMock1, healthy: true}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send invalid JSON
 	if err := conn.WriteMessage(websocket.TextMessage, []byte("invalid json")); err != nil {
@@ -314,7 +436,7 @@ func TestWebSocketErrorHandlingInvalidRequest(t *testing.T) {
 	}
 
 	// Read error response
-	var errMsg WebSocketError
+	var errMsg Error
 	if err := conn.ReadJSON(&errMsg); err != nil {
 		t.Fatalf("Failed to read error: %v", err)
 	}
@@ -328,27 +450,32 @@ func TestWebSocketErrorHandlingInvalidRequest(t *testing.T) {
 func TestWebSocketErrorHandlingBackendError(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
-		healthy: true,
+		id:          strMock1,
+		healthy:     true,
 		generateErr: fmt.Errorf("backend error"),
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send non-streaming request
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-error",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -356,7 +483,7 @@ func TestWebSocketErrorHandlingBackendError(t *testing.T) {
 	}
 
 	// Read error response
-	var errMsg WebSocketError
+	var errMsg Error
 	if err := conn.ReadJSON(&errMsg); err != nil {
 		t.Fatalf("Failed to read error: %v", err)
 	}
@@ -370,27 +497,32 @@ func TestWebSocketErrorHandlingBackendError(t *testing.T) {
 func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:        "mock1",
+		id:        strMock1,
 		healthy:   true,
 		streamErr: fmt.Errorf("stream error"),
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send streaming request
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-stream-error",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -398,7 +530,7 @@ func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 	}
 
 	// Read error response
-	var errMsg WebSocketError
+	var errMsg Error
 	if err := conn.ReadJSON(&errMsg); err != nil {
 		t.Fatalf("Failed to read error: %v", err)
 	}
@@ -411,14 +543,17 @@ func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 // Test: Connection close
 func TestWebSocketConnectionClose(t *testing.T) {
 	r := createTestRouter()
-	backend := &MockBackend{id: "mock1", healthy: true}
-	r.RegisterBackend(backend)
+	backend := &MockBackend{id: strMock1, healthy: true}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
@@ -439,13 +574,13 @@ func TestWebSocketConnectionClose(t *testing.T) {
 func TestWebSocketConcurrentConnections(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "response", Done: true},
+			{Token: strResponse, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -463,18 +598,23 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 		go func(connID int) {
 			defer wg.Done()
 
-			conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+			conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+			if dialResp != nil && dialResp.Body != nil {
+				testutil.CheckCleanup(t, dialResp.Body.Close())
+			}
 			if err != nil {
 				errorCount.Add(1)
 				return
 			}
-			defer conn.Close()
+			defer func() {
+				testutil.CheckCleanup(t, conn.Close())
+			}()
 
 			// Send request
-			req := WebSocketRequest{
+			req := Request{
 				RequestID: fmt.Sprintf("conn-%d", connID),
-				Model:     "test-model",
-				Prompt:    "hello",
+				Model:     strTestModel,
+				Prompt:    strHello,
 				Stream:    true,
 			}
 			if err := conn.WriteJSON(req); err != nil {
@@ -483,7 +623,7 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 			}
 
 			// Read response
-			var chunk WebSocketChunk
+			var chunk Chunk
 			if err := conn.ReadJSON(&chunk); err != nil {
 				errorCount.Add(1)
 				return
@@ -511,29 +651,34 @@ func TestWebSocketContextCancellation(t *testing.T) {
 
 	// Create a backend that will be called
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send request
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-cancel",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -541,7 +686,7 @@ func TestWebSocketContextCancellation(t *testing.T) {
 	}
 
 	// Read response - should succeed normally
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -554,29 +699,29 @@ func TestWebSocketContextCancellation(t *testing.T) {
 // Test: Priority parsing
 func TestWebSocketPriorityParsing(t *testing.T) {
 	tests := []struct {
-		name       string
-		priority   string
-		expected   backends.Priority
+		name     string
+		priority string
+		expected backends.Priority
 	}{
-		{"best-effort", "best-effort", backends.PriorityBestEffort},
-		{"low", "low", backends.PriorityBestEffort},
-		{"normal", "normal", backends.PriorityNormal},
-		{"", "", backends.PriorityNormal},
-		{"high", "high", backends.PriorityHigh},
-		{"critical", "critical", backends.PriorityCritical},
-		{"realtime", "realtime", backends.PriorityCritical},
-		{"unknown", "unknown", backends.PriorityNormal},
+		{name: strBestEffort, priority: strBestEffort, expected: backends.PriorityBestEffort},
+		{name: strLow, priority: strLow, expected: backends.PriorityBestEffort},
+		{name: "normal", priority: "normal", expected: backends.PriorityNormal},
+		{name: "", priority: "", expected: backends.PriorityNormal},
+		{name: strHigh, priority: strHigh, expected: backends.PriorityHigh},
+		{name: strCritical, priority: strCritical, expected: backends.PriorityCritical},
+		{name: strRealtime, priority: strRealtime, expected: backends.PriorityCritical},
+		{name: "unknown", priority: "unknown", expected: backends.PriorityNormal},
 	}
 
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -584,16 +729,21 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-			conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+			conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+			if dialResp != nil && dialResp.Body != nil {
+				testutil.CheckCleanup(t, dialResp.Body.Close())
+			}
 			if err != nil {
 				t.Fatalf("Failed to establish WebSocket connection: %v", err)
 			}
-			defer conn.Close()
+			defer func() {
+				testutil.CheckCleanup(t, conn.Close())
+			}()
 
-			req := WebSocketRequest{
+			req := Request{
 				RequestID: "test-priority",
-				Model:     "test-model",
-				Prompt:    "hello",
+				Model:     strTestModel,
+				Prompt:    strHello,
 				Stream:    true,
 				Priority:  tt.priority,
 			}
@@ -601,7 +751,7 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 				t.Fatalf("Failed to send request: %v", err)
 			}
 
-			var chunk WebSocketChunk
+			var chunk Chunk
 			if err := conn.ReadJSON(&chunk); err != nil {
 				t.Fatalf("Failed to read response: %v", err)
 			}
@@ -613,39 +763,44 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 func TestWebSocketOptionsConversion(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
-		healthy: true,
-		generateResponse: &backends.GenerateResponse{Response: "test"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-options",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 		Options: map[string]interface{}{
-			"temperature": 0.7,
-			"top_p":       0.9,
-			"top_k":       40.0,
-			"max_tokens":  100.0,
+			strTemperature: 0.7,
+			strTopP:        0.9,
+			"top_k":        40.0,
+			"max_tokens":   100.0,
 		},
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -659,29 +814,34 @@ func TestWebSocketOptionsConversion(t *testing.T) {
 func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
 			{Token: "chunk1", Done: false},
 			{Token: "chunk2", Done: false},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-stream-error",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -689,7 +849,7 @@ func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 	}
 
 	// Read first chunk
-	var chunk1 WebSocketChunk
+	var chunk1 Chunk
 	if err := conn.ReadJSON(&chunk1); err != nil {
 		t.Fatalf("Failed to read first chunk: %v", err)
 	}
@@ -699,7 +859,7 @@ func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 	}
 
 	// Read second chunk
-	var chunk2 WebSocketChunk
+	var chunk2 Chunk
 	if err := conn.ReadJSON(&chunk2); err != nil {
 		t.Fatalf("Failed to read second chunk: %v", err)
 	}
@@ -713,7 +873,7 @@ func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 func TestWebSocketMetricsCalculation(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
 			{Token: "t1", Done: false},
@@ -721,22 +881,27 @@ func TestWebSocketMetricsCalculation(t *testing.T) {
 			{Token: "t3", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-metrics",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -744,7 +909,7 @@ func TestWebSocketMetricsCalculation(t *testing.T) {
 	}
 
 	// Read all chunks
-	var finalChunk WebSocketChunk
+	var finalChunk Chunk
 	for i := 0; i < 3; i++ {
 		if err := conn.ReadJSON(&finalChunk); err != nil {
 			t.Fatalf("Failed to read chunk %d: %v", i, err)
@@ -767,7 +932,7 @@ func TestWebSocketMetricsCalculation(t *testing.T) {
 func TestWebSocketTTFTCalculation(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
 			{Token: "first", Done: false},
@@ -775,22 +940,27 @@ func TestWebSocketTTFTCalculation(t *testing.T) {
 			{Token: "second", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-ttft",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -798,7 +968,7 @@ func TestWebSocketTTFTCalculation(t *testing.T) {
 	}
 
 	// Read all chunks
-	var finalChunk WebSocketChunk
+	var finalChunk Chunk
 	for i := 0; i < 3; i++ {
 		if err := conn.ReadJSON(&finalChunk); err != nil {
 			t.Fatalf("Failed to read chunk %d: %v", i, err)
@@ -816,26 +986,31 @@ func TestWebSocketTTFTCalculation(t *testing.T) {
 func TestWebSocketEmptyOptionsHandling(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
-		healthy: true,
-		generateResponse: &backends.GenerateResponse{Response: "test"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-no-options",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 		// No options provided
 	}
@@ -843,7 +1018,7 @@ func TestWebSocketEmptyOptionsHandling(t *testing.T) {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -857,25 +1032,30 @@ func TestWebSocketEmptyOptionsHandling(t *testing.T) {
 func TestWebSocketBackendNotHealthy(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: false, // Not healthy
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-unhealthy",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -883,7 +1063,7 @@ func TestWebSocketBackendNotHealthy(t *testing.T) {
 	}
 
 	// Read error response (no healthy backends available)
-	var errMsg WebSocketError
+	var errMsg Error
 	if err := conn.ReadJSON(&errMsg); err != nil {
 		t.Fatalf("Failed to read error: %v", err)
 	}
@@ -906,30 +1086,35 @@ func TestWebSocketMultipleBackends(t *testing.T) {
 		},
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	testutil.Check(t, r.RegisterBackend(backend1))
+	testutil.Check(t, r.RegisterBackend(backend2))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-multi-backend",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -944,13 +1129,13 @@ func TestWebSocketMultipleBackends(t *testing.T) {
 func TestWebSocketStressRapidRequests(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "response", Done: true},
+			{Token: strResponse, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -959,32 +1144,35 @@ func TestWebSocketStressRapidRequests(t *testing.T) {
 
 	// Send 20 rapid requests with separate connections
 	for i := 0; i < 20; i++ {
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if dialResp != nil && dialResp.Body != nil {
+			testutil.CheckCleanup(t, dialResp.Body.Close())
+		}
 		if err != nil {
 			t.Fatalf("Failed to establish WebSocket connection %d: %v", i, err)
 		}
 
-		req := WebSocketRequest{
+		req := Request{
 			RequestID: fmt.Sprintf("stress-%d", i),
-			Model:     "test-model",
-			Prompt:    "hello",
+			Model:     strTestModel,
+			Prompt:    strHello,
 			Stream:    true,
 		}
 		if err := conn.WriteJSON(req); err != nil {
-			conn.Close()
+			testutil.CheckCleanup(t, conn.Close())
 			t.Fatalf("Failed to send request %d: %v", i, err)
 		}
 
-		var chunk WebSocketChunk
+		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
-			conn.Close()
+			testutil.CheckCleanup(t, conn.Close())
 			t.Fatalf("Failed to read response %d: %v", i, err)
 		}
 
 		if chunk.RequestID != req.RequestID {
 			t.Errorf("Request %d: RequestID mismatch", i)
 		}
-		conn.Close()
+		testutil.CheckCleanup(t, conn.Close())
 	}
 }
 
@@ -1009,31 +1197,36 @@ func TestWebSocketMaxLatencyConstraint(t *testing.T) {
 		},
 	}
 
-	r.RegisterBackend(slowBackend)
-	r.RegisterBackend(fastBackend)
+	testutil.Check(t, r.RegisterBackend(slowBackend))
+	testutil.Check(t, r.RegisterBackend(fastBackend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
-		RequestID: "test-max-latency",
-		Model:     "test-model",
-		Prompt:    "hello",
-		Stream:    true,
+	req := Request{
+		RequestID:  "test-max-latency",
+		Model:      strTestModel,
+		Prompt:     strHello,
+		Stream:     true,
 		MaxLatency: 100,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1047,28 +1240,33 @@ func TestWebSocketMaxLatencyConstraint(t *testing.T) {
 func TestWebSocketWriteDeadline(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-deadline",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -1076,8 +1274,8 @@ func TestWebSocketWriteDeadline(t *testing.T) {
 	}
 
 	// Read response with reasonable timeout
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	var chunk WebSocketChunk
+	testutil.Check(t, conn.SetReadDeadline(time.Now().Add(10*time.Second)))
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1091,33 +1289,38 @@ func TestWebSocketWriteDeadline(t *testing.T) {
 func TestWebSocketBackendCalledMetrics(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
-		healthy: true,
-		generateResponse: &backends.GenerateResponse{Response: "test"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-metrics-backend",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1133,35 +1336,40 @@ func TestWebSocketBackendCalledMetrics(t *testing.T) {
 func TestWebSocketStreamingBackendCalledMetrics(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-stream-metrics-backend",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1177,37 +1385,42 @@ func TestWebSocketStreamingBackendCalledMetrics(t *testing.T) {
 func BenchmarkWebSocketMessageThroughput(b *testing.B) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
 			{Token: "x", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(b, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(b, dialResp.Body.Close())
+	}
 	if err != nil {
 		b.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(b, conn.Close())
+	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := WebSocketRequest{
+		req := Request{
 			RequestID: fmt.Sprintf("bench-%d", i),
-			Model:     "test-model",
-			Prompt:    "hello",
+			Model:     strTestModel,
+			Prompt:    strHello,
 			Stream:    true,
 		}
 		if err := conn.WriteJSON(req); err != nil {
 			b.Fatalf("Failed to send request: %v", err)
 		}
 
-		var chunk WebSocketChunk
+		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
 			b.Fatalf("Failed to read response: %v", err)
 		}
@@ -1219,25 +1432,30 @@ func TestSendErrorHelper(t *testing.T) {
 	// This test verifies sendError is called with correct parameters
 	// by checking the output through the mock backend
 	r := createTestRouter()
-	backend := &MockBackend{id: "mock1", healthy: true}
-	r.RegisterBackend(backend)
+	backend := &MockBackend{id: strMock1, healthy: true}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Send invalid request to trigger sendError
 	if err := conn.WriteMessage(websocket.TextMessage, []byte("not json")); err != nil {
 		t.Fatalf("Failed to send message: %v", err)
 	}
 
-	var errMsg WebSocketError
+	var errMsg Error
 	if err := conn.ReadJSON(&errMsg); err != nil {
 		t.Fatalf("Failed to read error: %v", err)
 	}
@@ -1249,14 +1467,14 @@ func TestSendErrorHelper(t *testing.T) {
 
 // Test: ConvertWebSocketRequest helper function
 func TestConvertWebSocketRequest(t *testing.T) {
-	wsReq := &WebSocketRequest{
+	wsReq := &Request{
 		Prompt: "test prompt",
-		Model:  "test-model",
+		Model:  strTestModel,
 		Options: map[string]interface{}{
-			"temperature": 0.5,
-			"top_p":       0.8,
-			"top_k":       50.0,
-			"max_tokens":  200.0,
+			strTemperature: 0.5,
+			strTopP:        0.8,
+			"top_k":        50.0,
+			"max_tokens":   200.0,
 		},
 	}
 
@@ -1265,7 +1483,7 @@ func TestConvertWebSocketRequest(t *testing.T) {
 	if result.Prompt != "test prompt" {
 		t.Errorf("Expected prompt 'test prompt', got '%s'", result.Prompt)
 	}
-	if result.Model != "test-model" {
+	if result.Model != strTestModel {
 		t.Errorf("Expected model 'test-model', got '%s'", result.Model)
 	}
 	if result.Options == nil {
@@ -1288,15 +1506,15 @@ func TestConvertWebSocketRequest(t *testing.T) {
 
 // Test: ConvertWebSocketRequest with nil options
 func TestConvertWebSocketRequestNilOptions(t *testing.T) {
-	wsReq := &WebSocketRequest{
-		Prompt: "test",
-		Model:  "test-model",
+	wsReq := &Request{
+		Prompt:  strTest,
+		Model:   strTestModel,
 		Options: nil,
 	}
 
 	result := convertWebSocketRequest(wsReq)
 
-	if result.Prompt != "test" {
+	if result.Prompt != strTest {
 		t.Errorf("Expected prompt 'test', got '%s'", result.Prompt)
 	}
 	if result.Options != nil {
@@ -1306,11 +1524,11 @@ func TestConvertWebSocketRequestNilOptions(t *testing.T) {
 
 // Test: ConvertWebSocketRequest with partial options
 func TestConvertWebSocketRequestPartialOptions(t *testing.T) {
-	wsReq := &WebSocketRequest{
-		Prompt: "test",
-		Model:  "test-model",
+	wsReq := &Request{
+		Prompt: strTest,
+		Model:  strTestModel,
 		Options: map[string]interface{}{
-			"temperature": 0.7,
+			strTemperature: 0.7,
 			// Missing other fields
 		},
 	}
@@ -1333,11 +1551,11 @@ func TestConvertWebSocketRequestPartialOptions(t *testing.T) {
 func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:                 "mock1",
-		healthy:            true,
-		generateResponse:   &backends.GenerateResponse{Response: "test"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1347,32 +1565,35 @@ func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 	testCases := []string{"req-1", "req-abc-123", "special-id_456"}
 
 	for _, requestID := range testCases {
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if dialResp != nil && dialResp.Body != nil {
+			testutil.CheckCleanup(t, dialResp.Body.Close())
+		}
 		if err != nil {
 			t.Fatalf("Failed to establish WebSocket connection: %v", err)
 		}
 
-		req := WebSocketRequest{
+		req := Request{
 			RequestID: requestID,
-			Model:     "test-model",
-			Prompt:    "hello",
+			Model:     strTestModel,
+			Prompt:    strHello,
 			Stream:    false,
 		}
 		if err := conn.WriteJSON(req); err != nil {
-			conn.Close()
+			testutil.CheckCleanup(t, conn.Close())
 			t.Fatalf("Failed to send request: %v", err)
 		}
 
-		var chunk WebSocketChunk
+		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
-			conn.Close()
+			testutil.CheckCleanup(t, conn.Close())
 			t.Fatalf("Failed to read response: %v", err)
 		}
 
 		if chunk.RequestID != requestID {
 			t.Errorf("Expected RequestID '%s', got '%s'", requestID, chunk.RequestID)
 		}
-		conn.Close()
+		testutil.CheckCleanup(t, conn.Close())
 	}
 }
 
@@ -1380,33 +1601,38 @@ func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 func TestWebSocketNonStreamingResponseFormat(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:                 "mock1",
-		healthy:            true,
-		generateResponse:   &backends.GenerateResponse{Response: "complete response"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: "complete response"},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-format",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    false,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1433,30 +1659,35 @@ func TestWebSocketNonStreamingResponseFormat(t *testing.T) {
 func TestWebSocketStreamingCompleteResponseFormat(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "hello", Done: false},
+			{Token: strHello, Done: false},
 			{Token: " ", Done: false},
 			{Token: "world", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-format-stream",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -1464,9 +1695,9 @@ func TestWebSocketStreamingCompleteResponseFormat(t *testing.T) {
 	}
 
 	// Read all chunks
-	chunks := make([]WebSocketChunk, 0)
+	chunks := make([]Chunk, 0)
 	for i := 0; i < 3; i++ {
-		var chunk WebSocketChunk
+		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
 			t.Fatalf("Failed to read chunk %d: %v", i, err)
 		}
@@ -1492,16 +1723,16 @@ func TestWebSocketStreamingCompleteResponseFormat(t *testing.T) {
 
 // Test: JSON encoding/decoding round-trip
 func TestWebSocketJSONRoundTrip(t *testing.T) {
-	req := WebSocketRequest{
-		RequestID: "test-123",
-		Model:     "test-model",
-		Prompt:    "hello world",
-		Stream:    true,
-		Priority:  "high",
+	req := Request{
+		RequestID:  strTest123,
+		Model:      strTestModel,
+		Prompt:     "hello world",
+		Stream:     true,
+		Priority:   strHigh,
 		MaxLatency: 100,
 		Options: map[string]interface{}{
-			"temperature": 0.7,
-			"top_p":       0.9,
+			strTemperature: 0.7,
+			strTopP:        0.9,
 		},
 	}
 
@@ -1512,7 +1743,7 @@ func TestWebSocketJSONRoundTrip(t *testing.T) {
 	}
 
 	// Unmarshal
-	var decoded WebSocketRequest
+	var decoded Request
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
@@ -1542,13 +1773,13 @@ func TestWebSocketJSONRoundTrip(t *testing.T) {
 func TestWebSocketConcurrentWriteSafety(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1566,31 +1797,34 @@ func TestWebSocketConcurrentWriteSafety(t *testing.T) {
 			defer wg.Done()
 
 			for j := 0; j < numRequestsPerConnection; j++ {
-				conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+				conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+				if dialResp != nil && dialResp.Body != nil {
+					testutil.CheckCleanup(t, dialResp.Body.Close())
+				}
 				if err != nil {
 					t.Errorf("Failed to connect: %v", err)
 					return
 				}
 
-				req := WebSocketRequest{
+				req := Request{
 					RequestID: fmt.Sprintf("conn-%d-req-%d", connID, j),
-					Model:     "test-model",
-					Prompt:    "hello",
+					Model:     strTestModel,
+					Prompt:    strHello,
 					Stream:    true,
 				}
 				if err := conn.WriteJSON(req); err != nil {
-					conn.Close()
+					testutil.CheckCleanup(t, conn.Close())
 					t.Errorf("Failed to write: %v", err)
 					return
 				}
 
-				var chunk WebSocketChunk
+				var chunk Chunk
 				if err := conn.ReadJSON(&chunk); err != nil {
-					conn.Close()
+					testutil.CheckCleanup(t, conn.Close())
 					t.Errorf("Failed to read: %v", err)
 					return
 				}
-				conn.Close()
+				testutil.CheckCleanup(t, conn.Close())
 			}
 		}(i)
 	}
@@ -1616,26 +1850,31 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 	}
 
 	backend := &MockBackend{
-		id:           "mock1",
+		id:           strMock1,
 		healthy:      true,
 		streamChunks: chunks,
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-large-stream",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
@@ -1643,7 +1882,7 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 	}
 
 	// Read all chunks
-	var finalChunk WebSocketChunk
+	var finalChunk Chunk
 	for i := 0; i < 100; i++ {
 		if err := conn.ReadJSON(&finalChunk); err != nil {
 			t.Fatalf("Failed to read chunk %d: %v", i, err)
@@ -1658,8 +1897,8 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 // Test: Upgrade failure handling
 func TestWebSocketUpgradeFailure(t *testing.T) {
 	r := createTestRouter()
-	backend := &MockBackend{id: "mock1", healthy: true}
-	r.RegisterBackend(backend)
+	backend := &MockBackend{id: strMock1, healthy: true}
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1669,7 +1908,9 @@ func TestWebSocketUpgradeFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make HTTP request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		testutil.CheckCleanup(t, resp.Body.Close())
+	}()
 
 	// Should fail because it's not a WebSocket upgrade request
 	if resp.StatusCode == http.StatusOK {
@@ -1681,25 +1922,30 @@ func TestWebSocketUpgradeFailure(t *testing.T) {
 func TestWebSocketEmptyPrompt(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:                 "mock1",
-		healthy:            true,
-		generateResponse:   &backends.GenerateResponse{Response: "response to empty"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: "response to empty"},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-empty-prompt",
-		Model:     "test-model",
+		Model:     strTestModel,
 		Prompt:    "", // Empty prompt
 		Stream:    false,
 	}
@@ -1707,7 +1953,7 @@ func TestWebSocketEmptyPrompt(t *testing.T) {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1721,25 +1967,30 @@ func TestWebSocketEmptyPrompt(t *testing.T) {
 func TestWebSocketSpecialCharactersInRequest(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:                 "mock1",
-		healthy:            true,
-		generateResponse:   &backends.GenerateResponse{Response: "response"},
+		id:               strMock1,
+		healthy:          true,
+		generateResponse: &backends.GenerateResponse{Response: strResponse},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-special-chars",
-		Model:     "test-model",
+		Model:     strTestModel,
 		Prompt:    "Hello 世界 🌍 ñ ü",
 		Stream:    false,
 	}
@@ -1747,7 +1998,7 @@ func TestWebSocketSpecialCharactersInRequest(t *testing.T) {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}
@@ -1761,38 +2012,43 @@ func TestWebSocketSpecialCharactersInRequest(t *testing.T) {
 func TestWebSocketReadDeadlineEnforcement(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{
-		id:      "mock1",
+		id:      strMock1,
 		healthy: true,
 		streamChunks: []*backends.StreamChunk{
-			{Token: "test", Done: true},
+			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	testutil.Check(t, r.RegisterBackend(backend))
 
 	server := createTestServer(r)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		testutil.CheckCleanup(t, dialResp.Body.Close())
+	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		testutil.CheckCleanup(t, conn.Close())
+	}()
 
 	// Set a read deadline
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	testutil.Check(t, conn.SetReadDeadline(time.Now().Add(30*time.Second)))
 
-	req := WebSocketRequest{
+	req := Request{
 		RequestID: "test-deadline",
-		Model:     "test-model",
-		Prompt:    "hello",
+		Model:     strTestModel,
+		Prompt:    strHello,
 		Stream:    true,
 	}
 	if err := conn.WriteJSON(req); err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
 
-	var chunk WebSocketChunk
+	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
 	}

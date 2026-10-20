@@ -61,34 +61,34 @@ func TestNewDBusService_WithManager(t *testing.T) {
 // Test StringToMode conversion for all mode strings
 func TestStringToEfficiencyMode(t *testing.T) {
 	tests := []struct {
-		name          string
-		modeString    string
-		expectedMode  EfficiencyMode
+		name         string
+		modeString   string
+		expectedMode Mode
 	}{
-		{"Performance", "Performance", ModePerformance},
-		{"Balanced", "Balanced", ModeBalanced},
-		{"Efficiency", "Efficiency", ModeEfficiency},
-		{"Quiet", "Quiet", ModeQuiet},
-		{"Auto", "Auto", ModeAuto},
-		{"UltraEfficiency", "UltraEfficiency", ModeUltraEfficiency},
+		{name: strPerformance, modeString: strPerformance, expectedMode: ModePerformance},
+		{name: strBalanced, modeString: strBalanced, expectedMode: ModeBalanced},
+		{name: strEfficiency, modeString: strEfficiency, expectedMode: ModeEfficiency},
+		{name: strQuiet, modeString: strQuiet, expectedMode: ModeQuiet},
+		{name: strAuto, modeString: strAuto, expectedMode: ModeAuto},
+		{name: strUltraEfficiency, modeString: strUltraEfficiency, expectedMode: ModeUltraEfficiency},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Simulate the string-to-mode conversion used in D-Bus methods
-			var mode EfficiencyMode
+			var mode Mode
 			switch tt.modeString {
-			case "Performance":
+			case strPerformance:
 				mode = ModePerformance
-			case "Balanced":
+			case strBalanced:
 				mode = ModeBalanced
-			case "Efficiency":
+			case strEfficiency:
 				mode = ModeEfficiency
-			case "Quiet":
+			case strQuiet:
 				mode = ModeQuiet
-			case "Auto":
+			case strAuto:
 				mode = ModeAuto
-			case "UltraEfficiency":
+			case strUltraEfficiency:
 				mode = ModeUltraEfficiency
 			default:
 				t.Fatalf("Unknown mode string: %s", tt.modeString)
@@ -103,7 +103,7 @@ func TestStringToEfficiencyMode(t *testing.T) {
 
 // Test mode info structure
 func TestGetModeInfo_Structure(t *testing.T) {
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -156,12 +156,12 @@ func TestListModes_AllPresent(t *testing.T) {
 		t.Errorf("Expected 6 modes, got %d", len(modes))
 	}
 
-	modeMap := make(map[EfficiencyMode]bool)
+	modeMap := make(map[Mode]bool)
 	for _, mode := range modes {
 		modeMap[mode] = true
 	}
 
-	expectedModes := []EfficiencyMode{
+	expectedModes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -184,7 +184,7 @@ func TestDBusPropertyMap_Structure(t *testing.T) {
 	em := NewEfficiencyManager(ModeBalanced)
 
 	currentMode := em.GetMode().String()
-	if currentMode != "Balanced" {
+	if currentMode != strBalanced {
 		t.Errorf("GetMode failed: expected Balanced, got %s", currentMode)
 	}
 
@@ -201,7 +201,7 @@ func TestDBusPropertyMap_Structure(t *testing.T) {
 func TestDBusSetMode_Simulation(t *testing.T) {
 	em := NewEfficiencyManager(ModePerformance)
 
-	modes := []EfficiencyMode{
+	modes := []Mode{
 		ModePerformance,
 		ModeBalanced,
 		ModeEfficiency,
@@ -227,15 +227,15 @@ func TestDBusSetMode_Simulation(t *testing.T) {
 // Test GetModeInfo for each mode with expected fields
 func TestGetModeInfo_ExpectedFields(t *testing.T) {
 	modeTests := []struct {
-		mode             EfficiencyMode
+		mode             Mode
 		expectedMaxPower int
 		expectedMaxFan   int
 	}{
-		{ModePerformance, 999, 100},
-		{ModeBalanced, 60, 80},
-		{ModeEfficiency, 15, 60},
-		{ModeQuiet, 15, 40},
-		{ModeUltraEfficiency, 5, 30},
+		{mode: ModePerformance, expectedMaxPower: 999, expectedMaxFan: 100},
+		{mode: ModeBalanced, expectedMaxPower: 60, expectedMaxFan: 80},
+		{mode: ModeEfficiency, expectedMaxPower: 15, expectedMaxFan: 60},
+		{mode: ModeQuiet, expectedMaxPower: 15, expectedMaxFan: 40},
+		{mode: ModeUltraEfficiency, expectedMaxPower: 5, expectedMaxFan: 30},
 	}
 
 	for _, tt := range modeTests {
@@ -299,8 +299,8 @@ func TestIntrospectionInterface_Methods(t *testing.T) {
 	}
 
 	expectedProperties := []string{
-		"CurrentMode",
-		"EffectiveMode",
+		strCurrentMode,
+		strEffectiveMode,
 	}
 
 	t.Logf("Expected D-Bus methods: %v", expectedMethods)
@@ -318,13 +318,13 @@ func TestIntrospectionInterface_Methods(t *testing.T) {
 
 	// GetMode equivalent
 	mode := em.GetMode()
-	if mode == EfficiencyMode(-1) {
+	if mode == Mode(-1) {
 		t.Error("GetMode not working")
 	}
 
 	// GetEffectiveMode equivalent
 	effective := em.GetEffectiveMode()
-	if effective == EfficiencyMode(-1) {
+	if effective == Mode(-1) {
 		t.Error("GetEffectiveMode not working")
 	}
 
@@ -358,13 +358,13 @@ func TestDBusSetMode(t *testing.T) {
 		expectedGet string
 		wantErr     bool
 	}{
-		{"Set Performance", "Performance", "Performance", false},
-		{"Set Balanced", "Balanced", "Balanced", false},
-		{"Set Efficiency", "Efficiency", "Efficiency", false},
-		{"Set Quiet", "Quiet", "Quiet", false},
-		{"Set Auto", "Auto", "Auto", false},
-		{"Set UltraEfficiency", "UltraEfficiency", "Ultra Efficiency", false},
-		{"Set Invalid", "InvalidMode", "", true},
+		{name: "Set Performance", mode: strPerformance, expectedGet: strPerformance, wantErr: false},
+		{name: "Set Balanced", mode: strBalanced, expectedGet: strBalanced, wantErr: false},
+		{name: "Set Efficiency", mode: strEfficiency, expectedGet: strEfficiency, wantErr: false},
+		{name: "Set Quiet", mode: strQuiet, expectedGet: strQuiet, wantErr: false},
+		{name: "Set Auto", mode: strAuto, expectedGet: strAuto, wantErr: false},
+		{name: "Set UltraEfficiency", mode: strUltraEfficiency, expectedGet: strUltraEfficiency2, wantErr: false},
+		{name: "Set Invalid", mode: "InvalidMode", expectedGet: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -375,7 +375,10 @@ func TestDBusSetMode(t *testing.T) {
 			}
 			if !tt.wantErr {
 				// Verify mode was actually set
-				currentMode, _ := svc.GetMode()
+				currentMode, err := svc.GetMode()
+				if err != nil {
+					t.Fatal(err)
+				}
 				if currentMode != tt.expectedGet {
 					t.Errorf("Mode not set correctly: got %s, want %s", currentMode, tt.expectedGet)
 				}
@@ -398,7 +401,7 @@ func TestDBusGetMode(t *testing.T) {
 		t.Fatalf("GetMode() error = %v", dbusErr)
 	}
 
-	if mode != "Balanced" {
+	if mode != strBalanced {
 		t.Errorf("GetMode() = %v, want Balanced", mode)
 	}
 }
@@ -443,12 +446,12 @@ func TestDBusListModes(t *testing.T) {
 	}
 
 	expectedModes := []string{
-		"Performance",
-		"Balanced",
-		"Efficiency",
-		"Quiet",
-		"Auto",
-		"Ultra Efficiency",
+		strPerformance,
+		strBalanced,
+		strEfficiency,
+		strQuiet,
+		strAuto,
+		strUltraEfficiency2,
 	}
 
 	modeMap := make(map[string]bool)
@@ -474,18 +477,18 @@ func TestDBusGetModeInfo(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		mode        string
+		name         string
+		mode         string
 		expectedName string
-		wantErr     bool
+		wantErr      bool
 	}{
-		{"Performance", "Performance", "Performance", false},
-		{"Balanced", "Balanced", "Balanced", false},
-		{"Efficiency", "Efficiency", "Efficiency", false},
-		{"Quiet", "Quiet", "Quiet", false},
-		{"Auto", "Auto", "Auto", false},
-		{"UltraEfficiency", "UltraEfficiency", "Ultra Efficiency", false},
-		{"Invalid", "InvalidMode", "", true},
+		{name: strPerformance, mode: strPerformance, expectedName: strPerformance, wantErr: false},
+		{name: strBalanced, mode: strBalanced, expectedName: strBalanced, wantErr: false},
+		{name: strEfficiency, mode: strEfficiency, expectedName: strEfficiency, wantErr: false},
+		{name: strQuiet, mode: strQuiet, expectedName: strQuiet, wantErr: false},
+		{name: strAuto, mode: strAuto, expectedName: strAuto, wantErr: false},
+		{name: strUltraEfficiency, mode: strUltraEfficiency, expectedName: strUltraEfficiency2, wantErr: false},
+		{name: "Invalid", mode: "InvalidMode", expectedName: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -538,8 +541,8 @@ func TestDBusMakePropertyMap(t *testing.T) {
 	props := propMap[dbusInterface]
 
 	// Check CurrentMode property
-	if currentModeProp, ok := props["CurrentMode"]; ok {
-		if currentModeProp.Value.(string) != "Balanced" {
+	if currentModeProp, ok := props[strCurrentMode]; ok {
+		if currentModeProp.Value.(string) != strBalanced {
 			t.Errorf("CurrentMode = %v, want Balanced", currentModeProp.Value)
 		}
 		if !currentModeProp.Writable {
@@ -550,7 +553,7 @@ func TestDBusMakePropertyMap(t *testing.T) {
 	}
 
 	// Check EffectiveMode property
-	if effectiveModeProp, ok := props["EffectiveMode"]; ok {
+	if effectiveModeProp, ok := props[strEffectiveMode]; ok {
 		if effectiveModeProp.Value.(string) == "" {
 			t.Error("EffectiveMode should not be empty")
 		}
@@ -572,30 +575,39 @@ func TestDBusModeSwitching(t *testing.T) {
 	}
 
 	// Get initial mode
-	initialMode, _ := svc.GetMode()
-	if initialMode != "Performance" {
+	initialMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initialMode != strPerformance {
 		t.Errorf("Initial mode = %s, want Performance", initialMode)
 	}
 
 	// Switch to Efficiency
-	if err := svc.SetMode("Efficiency"); err != nil {
+	if err := svc.SetMode(strEfficiency); err != nil {
 		t.Fatalf("SetMode(Efficiency) failed: %v", err)
 	}
 
 	// Verify mode changed
-	newMode, _ := svc.GetMode()
-	if newMode != "Efficiency" {
+	newMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newMode != strEfficiency {
 		t.Errorf("Mode after SetMode = %s, want Efficiency", newMode)
 	}
 
 	// Switch to Auto
-	if err := svc.SetMode("Auto"); err != nil {
+	if err := svc.SetMode(strAuto); err != nil {
 		t.Fatalf("SetMode(Auto) failed: %v", err)
 	}
 
 	// Verify mode changed
-	autoMode, _ := svc.GetMode()
-	if autoMode != "Auto" {
+	autoMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if autoMode != strAuto {
 		t.Errorf("Mode after SetMode(Auto) = %s, want Auto", autoMode)
 	}
 }

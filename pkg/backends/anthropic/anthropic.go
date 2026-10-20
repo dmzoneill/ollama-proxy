@@ -1,3 +1,4 @@
+// Package anthropic implements an Anthropic API backend.
 package anthropic
 
 import (
@@ -14,48 +15,39 @@ import (
 	"time"
 
 	"github.com/daoneill/ollama-proxy/pkg/backends"
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
+	"go.uber.org/zap"
 )
 
-// AnthropicBackend implements Backend interface for Anthropic Claude API
-type AnthropicBackend struct {
-	mu sync.RWMutex
-
-	// Config
-	id       string
-	name     string
-	apiKey   string
-	endpoint string
-
-	// Characteristics
-	powerWatts   float64 // 0 for cloud services
-	avgLatencyMs int32
-	priority     int
-
-	// Model capabilities
+// Backend implements Backend interface for Anthropic Claude API
+type Backend struct {
+	lastCheck       time.Time
+	metrics         *backends.BackendMetrics
 	modelCapability *backends.ModelCapability
-
-	// Health
-	healthy      atomic.Bool
-	lastCheck    time.Time
-	checkTimeout time.Duration
-
-	// Metrics
-	metrics *backends.BackendMetrics
-
-	// HTTP client
-	client *http.Client
+	client          *http.Client
+	id              string
+	name            string
+	apiKey          string
+	endpoint        string
+	powerWatts      float64
+	priority        int
+	checkTimeout    time.Duration
+	mu              sync.RWMutex
+	avgLatencyMs    int32
+	healthy         atomic.Bool
 }
 
 // Config for Anthropic backend
 type Config struct {
+	APIKey    string
+	APIKeyEnv string
+	Endpoint  string
 	backends.BackendConfig
-	APIKey    string // Direct API key
-	APIKeyEnv string // Or env var name
-	Endpoint  string // Optional: custom endpoint
 }
 
 // NewAnthropicBackend creates a new Anthropic API backend
-func NewAnthropicBackend(cfg Config) (*AnthropicBackend, error) {
+func NewAnthropicBackend(cfg Config) (*Backend, error) {
 	// Get API key from env if specified
 	apiKey := cfg.APIKey
 	if cfg.APIKeyEnv != "" {
@@ -72,7 +64,7 @@ func NewAnthropicBackend(cfg Config) (*AnthropicBackend, error) {
 		endpoint = "https://api.anthropic.com/v1"
 	}
 
-	backend := &AnthropicBackend{
+	backend := &Backend{
 		id:              cfg.ID,
 		name:            cfg.Name,
 		apiKey:          apiKey,
@@ -95,32 +87,32 @@ func NewAnthropicBackend(cfg Config) (*AnthropicBackend, error) {
 }
 
 // ID returns backend identifier
-func (b *AnthropicBackend) ID() string {
+func (b *Backend) ID() string {
 	return b.id
 }
 
 // Type returns backend type
-func (b *AnthropicBackend) Type() string {
-	return "anthropic"
+func (b *Backend) Type() string {
+	return strAnthropic
 }
 
 // Name returns human-readable name
-func (b *AnthropicBackend) Name() string {
+func (b *Backend) Name() string {
 	return b.name
 }
 
 // Hardware returns hardware type
-func (b *AnthropicBackend) Hardware() string {
+func (b *Backend) Hardware() string {
 	return "cloud"
 }
 
 // IsHealthy returns current health status
-func (b *AnthropicBackend) IsHealthy() bool {
+func (b *Backend) IsHealthy() bool {
 	return b.healthy.Load()
 }
 
 // HealthCheck performs health check (simple request test)
-func (b *AnthropicBackend) HealthCheck(ctx context.Context) error {
+func (b *Backend) HealthCheck(_ context.Context) error {
 	// Anthropic doesn't have a models endpoint, so we do a minimal request
 	// Just verify API key is valid by setting healthy to true if configured
 	// Real validation happens on first request
@@ -137,12 +129,12 @@ func (b *AnthropicBackend) HealthCheck(ctx context.Context) error {
 }
 
 // PowerWatts returns estimated power consumption (0 for cloud)
-func (b *AnthropicBackend) PowerWatts() float64 {
+func (b *Backend) PowerWatts() float64 {
 	return b.powerWatts
 }
 
 // AvgLatencyMs returns average latency
-func (b *AnthropicBackend) AvgLatencyMs() int32 {
+func (b *Backend) AvgLatencyMs() int32 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -153,40 +145,40 @@ func (b *AnthropicBackend) AvgLatencyMs() int32 {
 }
 
 // Priority returns backend priority
-func (b *AnthropicBackend) Priority() int {
+func (b *Backend) Priority() int {
 	return b.priority
 }
 
 // SupportsGenerate returns true
-func (b *AnthropicBackend) SupportsGenerate() bool {
+func (b *Backend) SupportsGenerate() bool {
 	return true
 }
 
 // SupportsStream returns true
-func (b *AnthropicBackend) SupportsStream() bool {
+func (b *Backend) SupportsStream() bool {
 	return true
 }
 
 // SupportsEmbed returns false (Anthropic doesn't offer embeddings)
-func (b *AnthropicBackend) SupportsEmbed() bool {
+func (b *Backend) SupportsEmbed() bool {
 	return false
 }
 
 // ListModels returns available Claude models
-func (b *AnthropicBackend) ListModels(ctx context.Context) ([]string, error) {
+func (b *Backend) ListModels(_ context.Context) ([]string, error) {
 	// Anthropic doesn't have a models list endpoint
 	// Return known models
 	return []string{
-		"claude-3-5-sonnet-20241022",
+		strClaude35Sonnet20241022,
 		"claude-3-5-haiku-20241022",
-		"claude-3-opus-20240229",
+		strClaude3Opus20240229,
 		"claude-3-sonnet-20240229",
 		"claude-3-haiku-20240307",
 	}, nil
 }
 
 // SupportsModel checks if this backend can run the specified model
-func (b *AnthropicBackend) SupportsModel(modelName string) bool {
+func (b *Backend) SupportsModel(modelName string) bool {
 	if b.modelCapability == nil {
 		// Default: support all Claude models
 		return strings.HasPrefix(modelName, "claude-")
@@ -214,35 +206,35 @@ func (b *AnthropicBackend) SupportsModel(modelName string) bool {
 }
 
 // GetMaxModelSizeGB returns maximum model size (N/A for cloud)
-func (b *AnthropicBackend) GetMaxModelSizeGB() int {
+func (b *Backend) GetMaxModelSizeGB() int {
 	return 999
 }
 
 // GetSupportedModelPatterns returns patterns of supported models
-func (b *AnthropicBackend) GetSupportedModelPatterns() []string {
+func (b *Backend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
-		return []string{"claude-*"}
+		return []string{strClaude}
 	}
 	return b.modelCapability.SupportedModelPatterns
 }
 
 // GetPreferredModels returns list of preferred models
-func (b *AnthropicBackend) GetPreferredModels() []string {
+func (b *Backend) GetPreferredModels() []string {
 	if b.modelCapability == nil {
-		return []string{"claude-3-5-sonnet-20241022", "claude-3-opus-20240229"}
+		return []string{strClaude35Sonnet20241022, strClaude3Opus20240229}
 	}
 	return b.modelCapability.PreferredModels
 }
 
 // Generate performs text generation via Anthropic API
-func (b *AnthropicBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+func (b *Backend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	start := time.Now()
 
 	// Build Anthropic API request
 	anthropicReq := map[string]interface{}{
 		"model": req.Model,
 		"messages": []map[string]string{
-			{"role": "user", "content": req.Prompt},
+			{"role": "user", strContent: req.Prompt},
 		},
 		"max_tokens": 4096, // Default
 	}
@@ -275,15 +267,22 @@ func (b *AnthropicBackend) Generate(ctx context.Context, req *backends.GenerateR
 
 	resp, err := b.client.Do(httpReq)
 	if err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.Warn("close response body", zap.Error(err))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Anthropic API error: %d - %s", resp.StatusCode, string(bodyBytes))
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read response body: %w", err)
+		}
+		return nil, fmt.Errorf("anthropic API error: %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var anthropicResp struct {
@@ -297,12 +296,12 @@ func (b *AnthropicBackend) Generate(ctx context.Context, req *backends.GenerateR
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&anthropicResp); err != nil {
-		b.UpdateMetrics(int32(time.Since(start).Milliseconds()), false)
+		b.UpdateMetrics(safeconv.Int32FromInt64(time.Since(start).Milliseconds()), false)
 		return nil, err
 	}
 
 	elapsed := time.Since(start)
-	latencyMs := int32(elapsed.Milliseconds())
+	latencyMs := safeconv.Int32FromInt64(elapsed.Milliseconds())
 
 	b.UpdateMetrics(latencyMs, true)
 
@@ -315,7 +314,7 @@ func (b *AnthropicBackend) Generate(ctx context.Context, req *backends.GenerateR
 		Response: response,
 		Stats: &backends.GenerationStats{
 			TotalTimeMs:     latencyMs,
-			TokensGenerated: int32(anthropicResp.Usage.OutputTokens),
+			TokensGenerated: safeconv.Int32FromInt(anthropicResp.Usage.OutputTokens),
 			TokensPerSecond: float32(anthropicResp.Usage.OutputTokens) / float32(elapsed.Seconds()),
 			EnergyWh:        0, // Cloud service
 		},
@@ -323,18 +322,18 @@ func (b *AnthropicBackend) Generate(ctx context.Context, req *backends.GenerateR
 }
 
 // GenerateStream performs streaming text generation (placeholder)
-func (b *AnthropicBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+func (b *Backend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	// TODO: Implement streaming support
 	return nil, fmt.Errorf("streaming not yet implemented for Anthropic backend")
 }
 
 // Embed generates embeddings (not supported by Anthropic)
-func (b *AnthropicBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+func (b *Backend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return nil, fmt.Errorf("embeddings not supported by Anthropic API")
 }
 
 // UpdateMetrics updates backend metrics
-func (b *AnthropicBackend) UpdateMetrics(latencyMs int32, success bool) {
+func (b *Backend) UpdateMetrics(latencyMs int32, success bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -345,7 +344,7 @@ func (b *AnthropicBackend) UpdateMetrics(latencyMs int32, success bool) {
 		atomic.AddInt64(&b.metrics.TotalLatencyMs, int64(latencyMs))
 
 		if b.metrics.RequestCount > 0 {
-			b.metrics.AvgLatencyMs = int32(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
+			b.metrics.AvgLatencyMs = safeconv.Int32FromInt64(b.metrics.TotalLatencyMs / b.metrics.RequestCount)
 		}
 	} else {
 		atomic.AddInt64(&b.metrics.ErrorCount, 1)
@@ -357,7 +356,7 @@ func (b *AnthropicBackend) UpdateMetrics(latencyMs int32, success bool) {
 }
 
 // GetMetrics returns current metrics
-func (b *AnthropicBackend) GetMetrics() *backends.BackendMetrics {
+func (b *Backend) GetMetrics() *backends.BackendMetrics {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -373,12 +372,12 @@ func (b *AnthropicBackend) GetMetrics() *backends.BackendMetrics {
 }
 
 // Start initializes the backend
-func (b *AnthropicBackend) Start(ctx context.Context) error {
+func (b *Backend) Start(ctx context.Context) error {
 	return b.HealthCheck(ctx)
 }
 
 // Stop shuts down the backend
-func (b *AnthropicBackend) Stop(ctx context.Context) error {
+func (b *Backend) Stop(_ context.Context) error {
 	return nil
 }
 

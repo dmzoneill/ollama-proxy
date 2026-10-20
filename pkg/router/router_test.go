@@ -15,26 +15,53 @@ type MockBackend struct {
 	backendType   string
 	name          string
 	hardware      string
-	healthy       bool
-	powerWatts    float64
-	avgLatencyMs  int32
-	priority      int
 	modelPatterns []string
+	powerWatts    float64
+	priority      int
+	avgLatencyMs  int32
+	healthy       bool
 }
 
-func (m *MockBackend) ID() string                                              { return m.id }
-func (m *MockBackend) Type() string                                            { return m.backendType }
-func (m *MockBackend) Name() string                                            { return m.name }
-func (m *MockBackend) Hardware() string                                        { return m.hardware }
-func (m *MockBackend) IsHealthy() bool                                         { return m.healthy }
-func (m *MockBackend) HealthCheck(ctx context.Context) error                   { return nil }
-func (m *MockBackend) PowerWatts() float64                                     { return m.powerWatts }
-func (m *MockBackend) AvgLatencyMs() int32                                     { return m.avgLatencyMs }
-func (m *MockBackend) Priority() int                                           { return m.priority }
-func (m *MockBackend) SupportsGenerate() bool                                  { return true }
-func (m *MockBackend) SupportsStream() bool                                    { return true }
-func (m *MockBackend) SupportsEmbed() bool                                     { return false }
-func (m *MockBackend) ListModels(ctx context.Context) ([]string, error) { return []string{}, nil }
+// ID is part of the public API.
+func (m *MockBackend) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *MockBackend) Type() string { return m.backendType }
+
+// Name is part of the public API.
+func (m *MockBackend) Name() string { return m.name }
+
+// Hardware is part of the public API.
+func (m *MockBackend) Hardware() string { return m.hardware }
+
+// IsHealthy reports whether the condition holds.
+func (m *MockBackend) IsHealthy() bool { return m.healthy }
+
+// HealthCheck is part of the public API.
+func (m *MockBackend) HealthCheck(_ context.Context) error { return nil }
+
+// PowerWatts is part of the public API.
+func (m *MockBackend) PowerWatts() float64 { return m.powerWatts }
+
+// AvgLatencyMs is part of the public API.
+func (m *MockBackend) AvgLatencyMs() int32 { return m.avgLatencyMs }
+
+// Priority is part of the public API.
+func (m *MockBackend) Priority() int { return m.priority }
+
+// SupportsGenerate is part of the public API.
+func (m *MockBackend) SupportsGenerate() bool { return true }
+
+// SupportsStream is part of the public API.
+func (m *MockBackend) SupportsStream() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *MockBackend) SupportsEmbed() bool { return false }
+
+// ListModels is part of the public API.
+func (m *MockBackend) ListModels(_ context.Context) ([]string, error) { return []string{}, nil }
+
+// SupportsModel is part of the public API.
 func (m *MockBackend) SupportsModel(modelName string) bool {
 	if len(m.modelPatterns) == 0 {
 		return true // Default to supporting all models
@@ -63,52 +90,127 @@ func (m *MockBackend) SupportsModel(modelName string) bool {
 	}
 	return false
 }
+
+// GetMaxModelSizeGB is part of the public API.
 func (m *MockBackend) GetMaxModelSizeGB() int { return 10 }
+
+// GetSupportedModelPatterns is part of the public API.
 func (m *MockBackend) GetSupportedModelPatterns() []string {
 	if len(m.modelPatterns) == 0 {
 		return []string{"*"}
 	}
 	return m.modelPatterns
 }
+
+// GetPreferredModels is part of the public API.
 func (m *MockBackend) GetPreferredModels() []string { return []string{} }
-func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+
+// Generate is part of the public API.
+func (m *MockBackend) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	return &backends.GenerateResponse{}, nil
 }
-func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+
+// GenerateStream is part of the public API.
+func (m *MockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return nil, nil
 }
-func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+
+// Embed is part of the public API.
+func (m *MockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	return nil, nil
 }
-func (m *MockBackend) UpdateMetrics(latencyMs int32, success bool) {}
+
+// UpdateMetrics is part of the public API.
+func (m *MockBackend) UpdateMetrics(_ int32, _ bool) {}
+
+// GetMetrics is part of the public API.
 func (m *MockBackend) GetMetrics() *backends.BackendMetrics {
 	return &backends.BackendMetrics{}
 }
-func (m *MockBackend) Start(ctx context.Context) error { return nil }
-func (m *MockBackend) Stop(ctx context.Context) error  { return nil }
+
+// Start is part of the public API.
+func (m *MockBackend) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *MockBackend) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *MockBackend) SupportsAudioToText() bool { return false }
-func (m *MockBackend) SupportsTextToAudio() bool { return false }
-func (m *MockBackend) SupportsImageToText() bool { return false }
-func (m *MockBackend) SupportsTextToImage() bool { return false }
-func (m *MockBackend) SupportsVideoToText() bool { return false }
-func (m *MockBackend) SupportsTextToVideo() bool { return false }
-func (m *MockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *MockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
 
+// SupportsTextToAudio is part of the public API.
+func (m *MockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *MockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *MockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *MockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *MockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *MockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *MockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *MockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *MockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *MockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *MockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *MockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *MockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *MockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *MockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *MockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TestNewRouter is part of the public API.
 func TestNewRouter(t *testing.T) {
 	cfg := Config{
-		DefaultBackendID: "test-backend",
+		DefaultBackendID: strTestBackend,
 		PowerAware:       true,
 		AutoOptimize:     true,
 	}
@@ -119,7 +221,7 @@ func TestNewRouter(t *testing.T) {
 		t.Fatal("Expected router to be created, got nil")
 	}
 
-	if router.defaultBackendID != "test-backend" {
+	if router.defaultBackendID != strTestBackend {
 		t.Errorf("Expected default backend ID 'test-backend', got '%s'", router.defaultBackendID)
 	}
 
@@ -132,13 +234,14 @@ func TestNewRouter(t *testing.T) {
 	}
 }
 
+// TestRegisterBackend is part of the public API.
 func TestRegisterBackend(t *testing.T) {
 	router := NewRouter(Config{})
 
 	backend := &MockBackend{
-		id:       "backend-1",
-		name:     "Test Backend",
-		hardware: "cpu",
+		id:       strBackend1,
+		name:     strTestBackend2,
+		hardware: strCPU,
 		healthy:  true,
 	}
 
@@ -154,24 +257,25 @@ func TestRegisterBackend(t *testing.T) {
 	}
 }
 
+// TestGetBackend is part of the public API.
 func TestGetBackend(t *testing.T) {
 	router := NewRouter(Config{})
 
 	backend := &MockBackend{
-		id:       "backend-1",
-		name:     "Test Backend",
-		hardware: "cpu",
+		id:       strBackend1,
+		name:     strTestBackend2,
+		hardware: strCPU,
 		healthy:  true,
 	}
 
 	router.RegisterBackend(backend)
 
-	retrieved, exists := router.GetBackend("backend-1")
+	retrieved, exists := router.GetBackend(strBackend1)
 	if !exists {
 		t.Fatal("Expected backend to exist")
 	}
 
-	if retrieved.ID() != "backend-1" {
+	if retrieved.ID() != strBackend1 {
 		t.Errorf("Expected backend ID 'backend-1', got '%s'", retrieved.ID())
 	}
 
@@ -181,11 +285,12 @@ func TestGetBackend(t *testing.T) {
 	}
 }
 
+// TestListBackends is part of the public API.
 func TestListBackends(t *testing.T) {
 	router := NewRouter(Config{})
 
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
-	backend2 := &MockBackend{id: "backend-2", healthy: true}
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
+	backend2 := &MockBackend{id: strBackend22, healthy: true}
 
 	router.RegisterBackend(backend1)
 	router.RegisterBackend(backend2)
@@ -196,13 +301,14 @@ func TestListBackends(t *testing.T) {
 	}
 }
 
+// TestRouteRequest_ExplicitTarget is part of the public API.
 func TestRouteRequest_ExplicitTarget(t *testing.T) {
 	router := NewRouter(Config{})
 
 	backend := &MockBackend{
-		id:           "backend-1",
-		name:         "Test Backend",
-		hardware:     "cpu",
+		id:           strBackend1,
+		name:         strTestBackend2,
+		hardware:     strCPU,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 500,
@@ -211,7 +317,7 @@ func TestRouteRequest_ExplicitTarget(t *testing.T) {
 	router.RegisterBackend(backend)
 
 	annotations := &backends.Annotations{
-		Target: "backend-1",
+		Target: strBackend1,
 	}
 
 	decision, err := router.RouteRequest(context.Background(), annotations)
@@ -225,17 +331,18 @@ func TestRouteRequest_ExplicitTarget(t *testing.T) {
 		t.Fatal("Expected QueueTrackingBackend")
 	}
 
-	if trackingBackend.Backend.ID() != "backend-1" {
-		t.Errorf("Expected backend 'backend-1', got '%s'", trackingBackend.Backend.ID())
+	if trackingBackend.ID() != strBackend1 {
+		t.Errorf("Expected backend 'backend-1', got '%s'", trackingBackend.ID())
 	}
 }
 
+// TestRouteRequest_LatencyCritical is part of the public API.
 func TestRouteRequest_LatencyCritical(t *testing.T) {
 	router := NewRouter(Config{})
 
 	fastBackend := &MockBackend{
-		id:           "fast-backend",
-		hardware:     "gpu",
+		id:           strFastBackend,
+		hardware:     strGpu,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 150,
@@ -244,7 +351,7 @@ func TestRouteRequest_LatencyCritical(t *testing.T) {
 
 	slowBackend := &MockBackend{
 		id:           "slow-backend",
-		hardware:     "cpu",
+		hardware:     strCPU,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 1000,
@@ -264,17 +371,18 @@ func TestRouteRequest_LatencyCritical(t *testing.T) {
 	}
 
 	trackingBackend := decision.Backend.(*QueueTrackingBackend)
-	if trackingBackend.Backend.ID() != "fast-backend" {
-		t.Errorf("Expected fast backend for latency-critical request, got '%s'", trackingBackend.Backend.ID())
+	if trackingBackend.ID() != strFastBackend {
+		t.Errorf("Expected fast backend for latency-critical request, got '%s'", trackingBackend.ID())
 	}
 }
 
+// TestRouteRequest_PowerEfficient is part of the public API.
 func TestRouteRequest_PowerEfficient(t *testing.T) {
 	router := NewRouter(Config{PowerAware: true})
 
 	powerHungry := &MockBackend{
-		id:           "power-hungry",
-		hardware:     "gpu",
+		id:           strPowerHungry,
+		hardware:     strGpu,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 150,
@@ -282,8 +390,8 @@ func TestRouteRequest_PowerEfficient(t *testing.T) {
 	}
 
 	powerEfficient := &MockBackend{
-		id:           "power-efficient",
-		hardware:     "npu",
+		id:           strPowerEfficient,
+		hardware:     strNpu,
 		healthy:      true,
 		powerWatts:   3.0,
 		avgLatencyMs: 500,
@@ -303,17 +411,18 @@ func TestRouteRequest_PowerEfficient(t *testing.T) {
 	}
 
 	trackingBackend := decision.Backend.(*QueueTrackingBackend)
-	if trackingBackend.Backend.ID() != "power-efficient" {
-		t.Errorf("Expected power-efficient backend, got '%s'", trackingBackend.Backend.ID())
+	if trackingBackend.ID() != strPowerEfficient {
+		t.Errorf("Expected power-efficient backend, got '%s'", trackingBackend.ID())
 	}
 }
 
+// TestRouteRequest_MaxLatencyConstraint is part of the public API.
 func TestRouteRequest_MaxLatencyConstraint(t *testing.T) {
 	router := NewRouter(Config{})
 
 	fastBackend := &MockBackend{
-		id:           "fast-backend",
-		hardware:     "gpu",
+		id:           strFastBackend,
+		hardware:     strGpu,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 150,
@@ -321,7 +430,7 @@ func TestRouteRequest_MaxLatencyConstraint(t *testing.T) {
 
 	slowBackend := &MockBackend{
 		id:           "slow-backend",
-		hardware:     "cpu",
+		hardware:     strCPU,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 1000,
@@ -340,8 +449,8 @@ func TestRouteRequest_MaxLatencyConstraint(t *testing.T) {
 	}
 
 	trackingBackend := decision.Backend.(*QueueTrackingBackend)
-	if trackingBackend.Backend.ID() != "fast-backend" {
-		t.Errorf("Expected fast-backend (only one meeting constraint), got '%s'", trackingBackend.Backend.ID())
+	if trackingBackend.ID() != strFastBackend {
+		t.Errorf("Expected fast-backend (only one meeting constraint), got '%s'", trackingBackend.ID())
 	}
 
 	// Test with constraint that filters out all backends
@@ -353,20 +462,21 @@ func TestRouteRequest_MaxLatencyConstraint(t *testing.T) {
 	}
 }
 
+// TestRouteRequest_MaxPowerConstraint is part of the public API.
 func TestRouteRequest_MaxPowerConstraint(t *testing.T) {
 	router := NewRouter(Config{})
 
 	powerHungry := &MockBackend{
-		id:           "power-hungry",
-		hardware:     "gpu",
+		id:           strPowerHungry,
+		hardware:     strGpu,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 150,
 	}
 
 	powerEfficient := &MockBackend{
-		id:           "power-efficient",
-		hardware:     "npu",
+		id:           strPowerEfficient,
+		hardware:     strNpu,
 		healthy:      true,
 		powerWatts:   3.0,
 		avgLatencyMs: 500,
@@ -385,23 +495,24 @@ func TestRouteRequest_MaxPowerConstraint(t *testing.T) {
 	}
 
 	trackingBackend := decision.Backend.(*QueueTrackingBackend)
-	if trackingBackend.Backend.ID() != "power-efficient" {
-		t.Errorf("Expected power-efficient backend (only one meeting constraint), got '%s'", trackingBackend.Backend.ID())
+	if trackingBackend.ID() != strPowerEfficient {
+		t.Errorf("Expected power-efficient backend (only one meeting constraint), got '%s'", trackingBackend.ID())
 	}
 }
 
+// TestRouteRequest_UnhealthyBackend is part of the public API.
 func TestRouteRequest_UnhealthyBackend(t *testing.T) {
 	router := NewRouter(Config{})
 
 	unhealthyBackend := &MockBackend{
-		id:      "unhealthy",
+		id:      strUnhealthy,
 		healthy: false,
 	}
 
 	router.RegisterBackend(unhealthyBackend)
 
 	annotations := &backends.Annotations{
-		Target: "unhealthy",
+		Target: strUnhealthy,
 	}
 
 	_, err := router.RouteRequest(context.Background(), annotations)
@@ -410,6 +521,7 @@ func TestRouteRequest_UnhealthyBackend(t *testing.T) {
 	}
 }
 
+// TestRouteRequest_NoBackends is part of the public API.
 func TestRouteRequest_NoBackends(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -421,11 +533,12 @@ func TestRouteRequest_NoBackends(t *testing.T) {
 	}
 }
 
+// TestRouteRequest_PriorityBoost is part of the public API.
 func TestRouteRequest_PriorityBoost(t *testing.T) {
 	router := NewRouter(Config{})
 
 	backend1 := &MockBackend{
-		id:           "backend-1",
+		id:           strBackend1,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 500,
@@ -433,7 +546,7 @@ func TestRouteRequest_PriorityBoost(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:           "backend-2",
+		id:           strBackend22,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 500,
@@ -458,16 +571,17 @@ func TestRouteRequest_PriorityBoost(t *testing.T) {
 	}
 }
 
+// TestHealthCheckAll is part of the public API.
 func TestHealthCheckAll(t *testing.T) {
 	router := NewRouter(Config{})
 
 	healthy := &MockBackend{
-		id:      "healthy",
+		id:      strHealthy,
 		healthy: true,
 	}
 
 	unhealthy := &MockBackend{
-		id:      "unhealthy",
+		id:      strUnhealthy,
 		healthy: false,
 	}
 
@@ -480,27 +594,28 @@ func TestHealthCheckAll(t *testing.T) {
 		t.Errorf("Expected 2 results, got %d", len(results))
 	}
 
-	if !results["healthy"] {
+	if !results[strHealthy] {
 		t.Error("Expected healthy backend to report healthy")
 	}
 
-	if results["unhealthy"] {
+	if results[strUnhealthy] {
 		t.Error("Expected unhealthy backend to report unhealthy")
 	}
 }
 
+// TestFallbackRequest is part of the public API.
 func TestFallbackRequest(t *testing.T) {
 	router := NewRouter(Config{})
 
 	backend1 := &MockBackend{
-		id:           "backend-1",
+		id:           strBackend1,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 500,
 	}
 
 	backend2 := &MockBackend{
-		id:           "backend-2",
+		id:           strBackend22,
 		healthy:      true,
 		powerWatts:   15.0,
 		avgLatencyMs: 300,
@@ -510,7 +625,7 @@ func TestFallbackRequest(t *testing.T) {
 	router.RegisterBackend(backend2)
 
 	// Exclude backend-1, should get backend-2
-	excludeBackends := []string{"backend-1"}
+	excludeBackends := []string{strBackend1}
 	annotations := &backends.Annotations{}
 
 	decision, err := router.FallbackRequest(context.Background(), excludeBackends, annotations)
@@ -518,28 +633,29 @@ func TestFallbackRequest(t *testing.T) {
 		t.Fatalf("FallbackRequest failed: %v", err)
 	}
 
-	if decision.Backend.ID() != "backend-2" {
+	if decision.Backend.ID() != strBackend22 {
 		t.Errorf("Expected backend-2 as fallback, got '%s'", decision.Backend.ID())
 	}
 
 	// Exclude all backends
-	excludeBackends = []string{"backend-1", "backend-2"}
+	excludeBackends = []string{strBackend1, strBackend22}
 	_, err = router.FallbackRequest(context.Background(), excludeBackends, annotations)
 	if err == nil {
 		t.Error("Expected error when all backends are excluded")
 	}
 }
 
+// TestStats is part of the public API.
 func TestStats(t *testing.T) {
 	router := NewRouter(Config{})
 
 	healthy := &MockBackend{
-		id:      "healthy",
+		id:      strHealthy,
 		healthy: true,
 	}
 
 	unhealthy := &MockBackend{
-		id:      "unhealthy",
+		id:      strUnhealthy,
 		healthy: false,
 	}
 
@@ -559,6 +675,7 @@ func TestStats(t *testing.T) {
 	}
 }
 
+// TestRouter_RouteRequest_NoBackends is part of the public API.
 func TestRouter_RouteRequest_NoBackends(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -571,6 +688,7 @@ func TestRouter_RouteRequest_NoBackends(t *testing.T) {
 	}
 }
 
+// TestRouter_FallbackRequest_NoBackends is part of the public API.
 func TestRouter_FallbackRequest_NoBackends(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -583,6 +701,7 @@ func TestRouter_FallbackRequest_NoBackends(t *testing.T) {
 	}
 }
 
+// TestRouter_GetBackend_NotFound is part of the public API.
 func TestRouter_GetBackend_NotFound(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -595,6 +714,7 @@ func TestRouter_GetBackend_NotFound(t *testing.T) {
 	}
 }
 
+// TestRouter_ListBackends_Empty is part of the public API.
 func TestRouter_ListBackends_Empty(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -604,12 +724,13 @@ func TestRouter_ListBackends_Empty(t *testing.T) {
 	}
 }
 
+// TestRouter_ListBackends_Multiple is part of the public API.
 func TestRouter_ListBackends_Multiple(t *testing.T) {
 	router := NewRouter(Config{})
 
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
-	backend2 := &MockBackend{id: "backend-2", healthy: true}
-	backend3 := &MockBackend{id: "backend-3", healthy: false}
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
+	backend2 := &MockBackend{id: strBackend22, healthy: true}
+	backend3 := &MockBackend{id: strBackend3, healthy: false}
 
 	router.RegisterBackend(backend1)
 	router.RegisterBackend(backend2)
@@ -621,11 +742,12 @@ func TestRouter_ListBackends_Multiple(t *testing.T) {
 	}
 }
 
+// TestRouter_RouteRequest_WithTarget is part of the public API.
 func TestRouter_RouteRequest_WithTarget(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "backend-1"})
+	router := NewRouter(Config{DefaultBackendID: strBackend1})
 
 	backend1 := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 
@@ -633,7 +755,7 @@ func TestRouter_RouteRequest_WithTarget(t *testing.T) {
 
 	ctx := context.Background()
 	annotations := &backends.Annotations{
-		Target: "backend-1",
+		Target: strBackend1,
 	}
 
 	decision, err := router.RouteRequest(ctx, annotations)
@@ -641,17 +763,18 @@ func TestRouter_RouteRequest_WithTarget(t *testing.T) {
 		t.Fatalf("RouteRequest failed: %v", err)
 	}
 
-	if decision.Backend.ID() != "backend-1" {
+	if decision.Backend.ID() != strBackend1 {
 		t.Errorf("Expected backend-1, got %s", decision.Backend.ID())
 	}
 }
 
+// TestRouter_RouteRequest_MultipleBackends is part of the public API.
 func TestRouter_RouteRequest_MultipleBackends(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "backend-2"})
+	router := NewRouter(Config{DefaultBackendID: strBackend22})
 
-	backend1 := &MockBackend{id: "backend-1", healthy: true, hardware: "npu"}
-	backend2 := &MockBackend{id: "backend-2", healthy: true, hardware: "igpu"}
-	backend3 := &MockBackend{id: "backend-3", healthy: true, hardware: "nvidia"}
+	backend1 := &MockBackend{id: strBackend1, healthy: true, hardware: strNpu}
+	backend2 := &MockBackend{id: strBackend22, healthy: true, hardware: strIgpu}
+	backend3 := &MockBackend{id: strBackend3, healthy: true, hardware: strNvidia}
 
 	router.RegisterBackend(backend1)
 	router.RegisterBackend(backend2)
@@ -670,6 +793,7 @@ func TestRouter_RouteRequest_MultipleBackends(t *testing.T) {
 	}
 }
 
+// TestRouter_ScoreCandidates_PowerAware is part of the public API.
 func TestRouter_ScoreCandidates_PowerAware(t *testing.T) {
 	router := NewRouter(Config{PowerAware: true})
 
@@ -693,142 +817,149 @@ func TestRouter_ScoreCandidates_PowerAware(t *testing.T) {
 	}
 }
 
+// TestRouter_GetBackend_Exists is part of the public API.
 func TestRouter_GetBackend_Exists(t *testing.T) {
 	router := NewRouter(Config{})
 
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
 	router.RegisterBackend(backend1)
 
-	backend, found := router.GetBackend("backend-1")
+	backend, found := router.GetBackend(strBackend1)
 	if !found {
 		t.Error("Expected backend to be found")
 	}
-	if backend.ID() != "backend-1" {
+	if backend.ID() != strBackend1 {
 		t.Errorf("Expected backend-1, got %s", backend.ID())
 	}
 }
 
+// TestRouter_RouteRequest_LatencyCritical is part of the public API.
 func TestRouter_RouteRequest_LatencyCritical(t *testing.T) {
 	router := NewRouter(Config{})
-	
-	fastBackend := &MockBackend{id: "fast", healthy: true, avgLatencyMs: 50}
-	slowBackend := &MockBackend{id: "slow", healthy: true, avgLatencyMs: 500}
-	
+
+	fastBackend := &MockBackend{id: strFast, healthy: true, avgLatencyMs: 50}
+	slowBackend := &MockBackend{id: strSlow, healthy: true, avgLatencyMs: 500}
+
 	router.RegisterBackend(fastBackend)
 	router.RegisterBackend(slowBackend)
-	
+
 	ctx := context.Background()
 	annotations := &backends.Annotations{
 		LatencyCritical: true,
 		MaxLatencyMs:    100,
 	}
-	
+
 	decision, err := router.RouteRequest(ctx, annotations)
 	if err != nil {
 		t.Fatalf("RouteRequest failed: %v", err)
 	}
-	
+
 	// Should prefer faster backend for latency-critical requests
 	t.Logf("Selected: %s (latency: %dms)", decision.Backend.ID(), decision.Backend.AvgLatencyMs())
 }
 
+// TestRouter_RouteRequest_PowerEfficiency is part of the public API.
 func TestRouter_RouteRequest_PowerEfficiency(t *testing.T) {
 	router := NewRouter(Config{PowerAware: true})
-	
-	powerHungry := &MockBackend{id: "power-hungry", healthy: true, powerWatts: 100.0}
-	powerEfficient := &MockBackend{id: "efficient", healthy: true, powerWatts: 10.0}
-	
+
+	powerHungry := &MockBackend{id: strPowerHungry, healthy: true, powerWatts: 100.0}
+	powerEfficient := &MockBackend{id: strEfficient, healthy: true, powerWatts: 10.0}
+
 	router.RegisterBackend(powerHungry)
 	router.RegisterBackend(powerEfficient)
-	
+
 	ctx := context.Background()
 	annotations := &backends.Annotations{
 		PreferPowerEfficiency: true,
 		MaxPowerWatts:         50,
 	}
-	
+
 	decision, err := router.RouteRequest(ctx, annotations)
 	if err != nil {
 		t.Fatalf("RouteRequest failed: %v", err)
 	}
-	
+
 	t.Logf("Selected: %s (power: %.1fW)", decision.Backend.ID(), decision.Backend.PowerWatts())
 }
 
+// TestRouter_RouteRequest_Priority is part of the public API.
 func TestRouter_RouteRequest_Priority(t *testing.T) {
 	router := NewRouter(Config{})
-	
+
 	highPriority := &MockBackend{id: "high-pri", healthy: true, priority: 10}
 	lowPriority := &MockBackend{id: "low-pri", healthy: true, priority: 1}
-	
+
 	router.RegisterBackend(highPriority)
 	router.RegisterBackend(lowPriority)
-	
+
 	ctx := context.Background()
 	annotations := &backends.Annotations{
 		Priority: backends.PriorityCritical,
 	}
-	
+
 	decision, err := router.RouteRequest(ctx, annotations)
 	if err != nil {
 		t.Fatalf("RouteRequest failed: %v", err)
 	}
-	
+
 	t.Logf("Selected: %s (priority: %d)", decision.Backend.ID(), decision.Backend.Priority())
 }
 
+// TestRouter_RouteRequest_UnhealthyBackends is part of the public API.
 func TestRouter_RouteRequest_UnhealthyBackends(t *testing.T) {
 	router := NewRouter(Config{})
-	
-	unhealthy := &MockBackend{id: "unhealthy", healthy: false}
-	healthy := &MockBackend{id: "healthy", healthy: true}
-	
+
+	unhealthy := &MockBackend{id: strUnhealthy, healthy: false}
+	healthy := &MockBackend{id: strHealthy, healthy: true}
+
 	router.RegisterBackend(unhealthy)
 	router.RegisterBackend(healthy)
-	
+
 	ctx := context.Background()
 	annotations := &backends.Annotations{}
-	
+
 	decision, err := router.RouteRequest(ctx, annotations)
 	if err != nil {
 		t.Fatalf("RouteRequest failed: %v", err)
 	}
-	
-	if decision.Backend.ID() != "healthy" {
+
+	if decision.Backend.ID() != strHealthy {
 		t.Errorf("Should not select unhealthy backend, got %s", decision.Backend.ID())
 	}
 }
 
+// TestRouter_FallbackRequest_WithExclusions is part of the public API.
 func TestRouter_FallbackRequest_WithExclusions(t *testing.T) {
 	router := NewRouter(Config{})
-	
-	backend1 := &MockBackend{id: "backend-1", healthy: true}
-	backend2 := &MockBackend{id: "backend-2", healthy: true}
-	backend3 := &MockBackend{id: "backend-3", healthy: true}
-	
+
+	backend1 := &MockBackend{id: strBackend1, healthy: true}
+	backend2 := &MockBackend{id: strBackend22, healthy: true}
+	backend3 := &MockBackend{id: strBackend3, healthy: true}
+
 	router.RegisterBackend(backend1)
 	router.RegisterBackend(backend2)
 	router.RegisterBackend(backend3)
-	
+
 	ctx := context.Background()
-	excludeBackends := []string{"backend-1"}
+	excludeBackends := []string{strBackend1}
 	annotations := &backends.Annotations{}
-	
+
 	decision, err := router.FallbackRequest(ctx, excludeBackends, annotations)
 	if err != nil {
 		t.Fatalf("FallbackRequest failed: %v", err)
 	}
-	
-	if decision.Backend.ID() == "backend-1" {
+
+	if decision.Backend.ID() == strBackend1 {
 		t.Error("Should not select excluded backend")
 	}
-	
+
 	t.Logf("Selected fallback: %s", decision.Backend.ID())
 }
 
+// TestRouter_Stats_MultipleBackends is part of the public API.
 func TestRouter_Stats_MultipleBackends(t *testing.T) {
 	router := NewRouter(Config{})
-	
+
 	for i := 0; i < 5; i++ {
 		backend := &MockBackend{
 			id:      fmt.Sprintf("backend-%d", i),
@@ -836,22 +967,23 @@ func TestRouter_Stats_MultipleBackends(t *testing.T) {
 		}
 		router.RegisterBackend(backend)
 	}
-	
+
 	stats := router.Stats()
-	
+
 	totalBackends, ok := stats["total_backends"].(int)
 	if !ok || totalBackends != 5 {
 		t.Errorf("Expected 5 total backends, got %v", stats["total_backends"])
 	}
-	
+
 	healthyBackends, ok := stats["healthy_backends"].(int)
 	if !ok || healthyBackends != 3 {
 		t.Errorf("Expected 3 healthy backends, got %v", stats["healthy_backends"])
 	}
-	
+
 	t.Logf("Stats: total=%d healthy=%d", totalBackends, healthyBackends)
 }
 
+// TestRouter_ListBackends_OrderPreserved is part of the public API.
 func TestRouter_ListBackends_OrderPreserved(t *testing.T) {
 	router := NewRouter(Config{})
 
@@ -882,10 +1014,11 @@ func TestRouter_ListBackends_OrderPreserved(t *testing.T) {
 	}
 }
 
+// TestRouter_RouteRequest_ContextCancellation is part of the public API.
 func TestRouter_RouteRequest_ContextCancellation(t *testing.T) {
 	router := NewRouter(Config{})
 
-	backend := &MockBackend{id: "backend-1", healthy: true}
+	backend := &MockBackend{id: strBackend1, healthy: true}
 	router.RegisterBackend(backend)
 
 	// Create already-canceled context
@@ -903,12 +1036,13 @@ func TestRouter_RouteRequest_ContextCancellation(t *testing.T) {
 	}
 }
 
+// TestRouter_RouteRequest_MediaTypeConstraint is part of the public API.
 func TestRouter_RouteRequest_MediaTypeConstraint(t *testing.T) {
 	router := NewRouter(Config{})
 
 	// Create backend that doesn't support the media type we'll request
 	backend := &MockBackend{
-		id:      "backend-1",
+		id:      strBackend1,
 		healthy: true,
 	}
 	router.RegisterBackend(backend)
@@ -916,9 +1050,9 @@ func TestRouter_RouteRequest_MediaTypeConstraint(t *testing.T) {
 	// Request with media type constraint
 	// Since MockBackend doesn't filter by media type, we need to test error message building
 	annotations := &backends.Annotations{
-		MediaType:      "video",
-		MaxLatencyMs:   100,
-		MaxPowerWatts:  5,
+		MediaType:     "video",
+		MaxLatencyMs:  100,
+		MaxPowerWatts: 5,
 	}
 
 	// This should route successfully with MockBackend, but we're testing constraint tracking
@@ -929,12 +1063,13 @@ func TestRouter_RouteRequest_MediaTypeConstraint(t *testing.T) {
 	}
 }
 
+// TestRouter_RouteRequest_DefaultScoring is part of the public API.
 func TestRouter_RouteRequest_DefaultScoring(t *testing.T) {
 	// Test the default scoring path (no power awareness, no priority boost, empty queue)
 	router := NewRouter(Config{PowerAware: false}) // Disable power-aware scoring
 
 	backend := &MockBackend{
-		id:           "backend-1",
+		id:           strBackend1,
 		healthy:      true,
 		powerWatts:   10.0,
 		avgLatencyMs: 500,
@@ -960,6 +1095,7 @@ func TestRouter_RouteRequest_DefaultScoring(t *testing.T) {
 	t.Logf("Selected backend with default scoring: %s", decision.Backend.ID())
 }
 
+// TestRouter_RouteRequest_ConstraintErrorMessages is part of the public API.
 func TestRouter_RouteRequest_ConstraintErrorMessages(t *testing.T) {
 	config := Config{
 		PowerAware: true,
@@ -972,7 +1108,7 @@ func TestRouter_RouteRequest_ConstraintErrorMessages(t *testing.T) {
 		healthy:      true,
 		powerWatts:   300.0,
 		avgLatencyMs: 1000,
-		hardware:     "nvidia",
+		hardware:     strNvidia,
 	}
 	router.RegisterBackend(backend)
 
@@ -1011,6 +1147,7 @@ func TestRouter_RouteRequest_ConstraintErrorMessages(t *testing.T) {
 	t.Logf("Constraint error message: %s", errorMsg)
 }
 
+// TestRouter_RouteRequest_PriorityScoring is part of the public API.
 func TestRouter_RouteRequest_PriorityScoring(t *testing.T) {
 	config := Config{
 		PowerAware: true,
@@ -1018,7 +1155,7 @@ func TestRouter_RouteRequest_PriorityScoring(t *testing.T) {
 	router := NewRouter(config)
 
 	backend1 := &MockBackend{
-		id:           "backend1",
+		id:           strBackend12,
 		healthy:      true,
 		powerWatts:   100.0,
 		avgLatencyMs: 200,
@@ -1026,7 +1163,7 @@ func TestRouter_RouteRequest_PriorityScoring(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:           "backend2",
+		id:           strBackend2,
 		healthy:      true,
 		powerWatts:   100.0,
 		avgLatencyMs: 200,
@@ -1038,8 +1175,8 @@ func TestRouter_RouteRequest_PriorityScoring(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		priority    backends.Priority
 		description string
+		priority    backends.Priority
 	}{
 		{
 			name:        "Critical priority",
@@ -1087,7 +1224,7 @@ func TestRouter_RouteRequest_QueueDepthPenalty(t *testing.T) {
 
 	// Create two identical backends
 	backend1 := &MockBackend{
-		id:           "backend1",
+		id:           strBackend12,
 		healthy:      true,
 		powerWatts:   100.0,
 		avgLatencyMs: 200,
@@ -1095,7 +1232,7 @@ func TestRouter_RouteRequest_QueueDepthPenalty(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:           "backend2",
+		id:           strBackend2,
 		healthy:      true,
 		powerWatts:   100.0,
 		avgLatencyMs: 200,
@@ -1106,9 +1243,9 @@ func TestRouter_RouteRequest_QueueDepthPenalty(t *testing.T) {
 	router.RegisterBackend(backend2)
 
 	// Add queue depth to backend1 to make it less attractive
-	router.queueMgr.MarkRequestStart("backend1", backends.PriorityNormal)
-	router.queueMgr.MarkRequestStart("backend1", backends.PriorityNormal)
-	router.queueMgr.MarkRequestStart("backend1", backends.PriorityHigh)
+	router.queueMgr.MarkRequestStart(strBackend12, backends.PriorityNormal)
+	router.queueMgr.MarkRequestStart(strBackend12, backends.PriorityNormal)
+	router.queueMgr.MarkRequestStart(strBackend12, backends.PriorityHigh)
 
 	annotations := &backends.Annotations{
 		Priority: backends.PriorityNormal,
@@ -1126,7 +1263,7 @@ func TestRouter_RouteRequest_QueueDepthPenalty(t *testing.T) {
 			t.Fatal("Expected backend to be selected")
 		}
 
-		if decision.Backend.ID() == "backend2" {
+		if decision.Backend.ID() == strBackend2 {
 			backend2Count++
 		}
 
@@ -1149,6 +1286,7 @@ func TestRouter_RouteRequest_QueueDepthPenalty(t *testing.T) {
 	}
 }
 
+// TestRouter_ScoreCandidates_DefaultScoring is part of the public API.
 func TestRouter_ScoreCandidates_DefaultScoring(t *testing.T) {
 	// Test the default scoring path when no specific preferences are set
 	config := Config{
@@ -1158,7 +1296,7 @@ func TestRouter_ScoreCandidates_DefaultScoring(t *testing.T) {
 	router := NewRouter(config)
 
 	backend1 := &MockBackend{
-		id:           "backend1",
+		id:           strBackend12,
 		healthy:      true,
 		powerWatts:   50.0,
 		avgLatencyMs: 150,
@@ -1166,7 +1304,7 @@ func TestRouter_ScoreCandidates_DefaultScoring(t *testing.T) {
 	}
 
 	backend2 := &MockBackend{
-		id:           "backend2",
+		id:           strBackend2,
 		healthy:      true,
 		powerWatts:   100.0,
 		avgLatencyMs: 200,
@@ -1192,7 +1330,7 @@ func TestRouter_ScoreCandidates_DefaultScoring(t *testing.T) {
 
 	// With default scoring (balanced), backend1 should win due to higher priority,
 	// better latency, and better power efficiency
-	if decision.Backend.ID() != "backend1" {
+	if decision.Backend.ID() != strBackend12 {
 		t.Errorf("Expected backend1 to be selected with default scoring, got %s", decision.Backend.ID())
 	}
 

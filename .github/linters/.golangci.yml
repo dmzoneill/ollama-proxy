@@ -1,0 +1,112 @@
+---
+# Mirrors /.golangci.yml so Super-linter loads the repository
+# golangci-lint config (LINTER_RULES_PATH=.github/linters,
+# GO_CONFIG_FILE=.golangci.yml). Keep this file the same as
+# /.golangci.yml aside from this header.
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  # Super-linter lints each changed Go file in its own process. Without this,
+  # those processes exit with "parallel golangci-lint is running".
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - goconst
+    - gocyclo
+    - revive
+    - gosec
+    - bodyclose
+    - nilerr
+    - nolintlint
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - unparam
+    - wastedassign
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+
+    gocyclo:
+      min-complexity: 15
+
+    misspell:
+      locale: US
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+
+    gosec:
+      excludes:
+        - G404
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - gosec
+          - unparam
+
+      - text: "G304: Potential file inclusion"
+        linters:
+          - gosec
+
+      - text: 'shadow: declaration of "err"'
+        linters:
+          - govet
+
+    paths:
+      - vendor
+      - api/gen
+
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+output:
+  formats:
+    text:
+      path: stdout

@@ -9,6 +9,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 	"github.com/daoneill/ollama-proxy/pkg/router"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
@@ -22,21 +23,20 @@ const (
 
 // RoutingService exposes routing statistics via D-Bus
 type RoutingService struct {
-	conn   *dbus.Conn
-	router *router.Router
-	props  *prop.Properties
-
-	mu               sync.RWMutex
-	totalRequests    int64
-	recentDecisions  []RoutingDecisionInfo
+	conn               *dbus.Conn
+	router             *router.Router
+	props              *prop.Properties
+	recentDecisions    []RoutingDecisionInfo
+	totalRequests      int64
 	maxRecentDecisions int
+	mu                 sync.RWMutex
 }
 
 // RoutingDecisionInfo represents a routing decision for D-Bus
 type RoutingDecisionInfo struct {
-	Timestamp        int64
 	Backend          string
 	Reason           string
+	Timestamp        int64
 	EstimatedPowerW  float64
 	EstimatedLatency int32
 }
@@ -91,28 +91,28 @@ func (rs *RoutingService) Start() error {
 					{
 						Name: "GetRoutingStats",
 						Args: []introspect.Arg{
-							{Name: "stats", Type: "a{sv}", Direction: "out"},
+							{Name: "stats", Type: strASv, Direction: strOut},
 						},
 					},
 					{
 						Name: "GetLastDecisions",
 						Args: []introspect.Arg{
 							{Name: "limit", Type: "u", Direction: "in"},
-							{Name: "decisions", Type: "a(xssdi)", Direction: "out"},
+							{Name: "decisions", Type: "a(xssdi)", Direction: strOut},
 						},
 					},
 					{
 						Name: "GetBackendDistribution",
 						Args: []introspect.Arg{
-							{Name: "distribution", Type: "a{sd}", Direction: "out"},
+							{Name: "distribution", Type: "a{sd}", Direction: strOut},
 						},
 					},
 					{
 						Name: "SimulateRouting",
 						Args: []introspect.Arg{
-							{Name: "annotations", Type: "a{sv}", Direction: "in"},
-							{Name: "backend", Type: "s", Direction: "out"},
-							{Name: "reason", Type: "s", Direction: "out"},
+							{Name: "annotations", Type: strASv, Direction: "in"},
+							{Name: "backend", Type: "s", Direction: strOut},
+							{Name: "reason", Type: "s", Direction: strOut},
 						},
 					},
 				},
@@ -120,7 +120,7 @@ func (rs *RoutingService) Start() error {
 					{
 						Name:   "TotalRequests",
 						Type:   "x",
-						Access: "read",
+						Access: strRead,
 					},
 				},
 				Signals: []introspect.Signal{
@@ -142,8 +142,11 @@ func (rs *RoutingService) Start() error {
 		return fmt.Errorf("failed to export introspection: %w", err)
 	}
 
-	// Setup properties
-	rs.props, _ = prop.Export(rs.conn, routingPath, rs.makePropertyMap())
+	props, err := prop.Export(rs.conn, routingPath, rs.makePropertyMap())
+	if err != nil {
+		return fmt.Errorf("failed to export properties: %w", err)
+	}
+	rs.props = props
 
 	logging.Logger.Info("D-Bus Routing service started",
 		zap.String("interface", routingInterface),
@@ -180,7 +183,7 @@ func (rs *RoutingService) GetRoutingStats() (map[string]dbus.Variant, *dbus.Erro
 		"total_success":  dbus.MakeVariant(totalSuccess),
 		"total_errors":   dbus.MakeVariant(totalErrors),
 		"success_rate":   dbus.MakeVariant(successRate),
-		"backend_count":  dbus.MakeVariant(int32(len(backends))),
+		"backend_count":  dbus.MakeVariant(safeconv.Int32FromInt(len(backends))),
 	}
 
 	return stats, nil
@@ -334,7 +337,5 @@ func (rs *RoutingService) makePropertyMap() map[string]map[string]*prop.Prop {
 
 // Stop stops the D-Bus service
 func (rs *RoutingService) Stop() {
-	if rs.conn != nil {
-		rs.conn.Close()
-	}
+	closeConn(rs.conn)
 }

@@ -12,33 +12,34 @@ import (
 
 // MockBackend implements the backends.Backend interface for testing
 type MockBackend struct {
-	id                string
-	backendType       string
-	name              string
-	hardware          string
-	healthy           bool
-	powerWatts        float64
-	avgLatencyMs      int32
-	priority          int
-	supportsGenerate  bool
-	supportsStream    bool
-	supportsEmbed     bool
-	supportedModels   map[string]bool
-	maxModelSizeGB    int
-	supportedPatterns []string
-	preferredModels   []string
-	metrics           *backends.BackendMetrics
+	healthErr         error
 	generateErr       error
 	embedErr          error
-	healthErr         error
+	supportedModels   map[string]bool
+	metrics           *backends.BackendMetrics
+	hardware          string
+	id                string
+	name              string
+	backendType       string
+	supportedPatterns []string
+	preferredModels   []string
+	priority          int
+	powerWatts        float64
+	maxModelSizeGB    int
+	avgLatencyMs      int32
+	healthy           bool
+	supportsEmbed     bool
+	supportsStream    bool
+	supportsGenerate  bool
 }
 
+// NewMockBackend constructs a mockBackend.
 func NewMockBackend(id string) *MockBackend {
 	return &MockBackend{
 		id:               id,
 		backendType:      "mock",
 		name:             fmt.Sprintf("Mock Backend %s", id),
-		hardware:         "cpu",
+		hardware:         strCPU,
 		healthy:          true,
 		powerWatts:       5.0,
 		avgLatencyMs:     100,
@@ -47,14 +48,14 @@ func NewMockBackend(id string) *MockBackend {
 		supportsStream:   true,
 		supportsEmbed:    true,
 		supportedModels: map[string]bool{
-			"llama3:7b":           true,
-			"qwen2.5:0.5b":        true,
-			"nomic-embed-text":    true,
-			"test-model":          true,
+			strLlama37b:       true,
+			strQwen2505b:      true,
+			strNomicEmbedText: true,
+			strTestModel:      true,
 		},
 		maxModelSizeGB:    70,
 		supportedPatterns: []string{"*:*"},
-		preferredModels:   []string{"llama3:7b"},
+		preferredModels:   []string{strLlama37b},
 		metrics: &backends.BackendMetrics{
 			RequestCount: 0,
 			SuccessCount: 0,
@@ -63,55 +64,68 @@ func NewMockBackend(id string) *MockBackend {
 	}
 }
 
+// ID is part of the public API.
 func (m *MockBackend) ID() string {
 	return m.id
 }
 
+// Type is part of the public API.
 func (m *MockBackend) Type() string {
 	return m.backendType
 }
 
+// Name is part of the public API.
 func (m *MockBackend) Name() string {
 	return m.name
 }
 
+// Hardware is part of the public API.
 func (m *MockBackend) Hardware() string {
 	return m.hardware
 }
 
+// IsHealthy reports whether the condition holds.
 func (m *MockBackend) IsHealthy() bool {
 	return m.healthy
 }
 
-func (m *MockBackend) HealthCheck(ctx context.Context) error {
+// HealthCheck is part of the public API.
+func (m *MockBackend) HealthCheck(_ context.Context) error {
 	return m.healthErr
 }
 
+// PowerWatts is part of the public API.
 func (m *MockBackend) PowerWatts() float64 {
 	return m.powerWatts
 }
 
+// AvgLatencyMs is part of the public API.
 func (m *MockBackend) AvgLatencyMs() int32 {
 	return m.avgLatencyMs
 }
 
+// Priority is part of the public API.
 func (m *MockBackend) Priority() int {
 	return m.priority
 }
 
+// SupportsGenerate is part of the public API.
 func (m *MockBackend) SupportsGenerate() bool {
 	return m.supportsGenerate
 }
 
+// SupportsStream is part of the public API.
 func (m *MockBackend) SupportsStream() bool {
 	return m.supportsStream
 }
 
+// SupportsEmbed is part of the public API.
 func (m *MockBackend) SupportsEmbed() bool {
 	return m.supportsEmbed
 }
 
-func (m *MockBackend) ListModels(ctx context.Context) ([]string, error) {
+// ListModels is part of the public API.
+func (m *MockBackend) ListModels(_ context.Context) ([]string, error) {
 	models := make([]string, 0, len(m.supportedModels))
 	for model := range m.supportedModels {
 		models = append(models, model)
@@ -119,23 +133,28 @@ func (m *MockBackend) ListModels(ctx context.Context) ([]string, error) {
 	return models, nil
 }
 
+// SupportsModel is part of the public API.
 func (m *MockBackend) SupportsModel(modelName string) bool {
 	return m.supportedModels[modelName]
 }
 
+// GetMaxModelSizeGB is part of the public API.
 func (m *MockBackend) GetMaxModelSizeGB() int {
 	return m.maxModelSizeGB
 }
 
+// GetSupportedModelPatterns is part of the public API.
 func (m *MockBackend) GetSupportedModelPatterns() []string {
 	return m.supportedPatterns
 }
 
+// GetPreferredModels is part of the public API.
 func (m *MockBackend) GetPreferredModels() []string {
 	return m.preferredModels
 }
 
-func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+// Generate is part of the public API.
+func (m *MockBackend) Generate(_ context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	if m.generateErr != nil {
 		return nil, m.generateErr
 	}
@@ -151,11 +170,13 @@ func (m *MockBackend) Generate(ctx context.Context, req *backends.GenerateReques
 	}, nil
 }
 
-func (m *MockBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *MockBackend) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+// Embed is part of the public API.
+func (m *MockBackend) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
 	if m.embedErr != nil {
 		return nil, m.embedErr
 	}
@@ -171,6 +192,7 @@ func (m *MockBackend) Embed(ctx context.Context, req *backends.EmbedRequest) (*b
 	}, nil
 }
 
+// UpdateMetrics is part of the public API.
 func (m *MockBackend) UpdateMetrics(latencyMs int32, success bool) {
 	m.metrics.RequestCount++
 	if success {
@@ -184,75 +206,100 @@ func (m *MockBackend) UpdateMetrics(latencyMs int32, success bool) {
 	}
 }
 
+// GetMetrics is part of the public API.
 func (m *MockBackend) GetMetrics() *backends.BackendMetrics {
 	return m.metrics
 }
 
-func (m *MockBackend) Start(ctx context.Context) error {
+// Start is part of the public API.
+func (m *MockBackend) Start(_ context.Context) error {
 	return nil
 }
 
-func (m *MockBackend) Stop(ctx context.Context) error {
+// Stop is part of the public API.
+func (m *MockBackend) Stop(_ context.Context) error {
 	return nil
 }
 
 // Multimedia capability methods
-func (m *MockBackend) SupportsAudioToText() bool                    { return false }
-func (m *MockBackend) SupportsTextToAudio() bool                    { return false }
-func (m *MockBackend) SupportsImageToText() bool                    { return false }
-func (m *MockBackend) SupportsTextToImage() bool                    { return false }
-func (m *MockBackend) SupportsVideoToText() bool                    { return false }
-func (m *MockBackend) SupportsTextToVideo() bool                    { return false }
+func (m *MockBackend) SupportsAudioToText() bool { return false }
 
-func (m *MockBackend) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+// SupportsTextToAudio is part of the public API.
+func (m *MockBackend) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
+func (m *MockBackend) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
+func (m *MockBackend) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
+func (m *MockBackend) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
+func (m *MockBackend) SupportsTextToVideo() bool { return false }
+
+// TranscribeAudio is part of the public API.
+func (m *MockBackend) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+// TranscribeAudioStream is part of the public API.
+func (m *MockBackend) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+// SynthesizeSpeech is part of the public API.
+func (m *MockBackend) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+// SynthesizeSpeechStream is part of the public API.
+func (m *MockBackend) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+// AnalyzeImage is part of the public API.
+func (m *MockBackend) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+// GenerateImage is part of the public API.
+func (m *MockBackend) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+// GenerateImageStream is part of the public API.
+func (m *MockBackend) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+// AnalyzeVideo is part of the public API.
+func (m *MockBackend) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+// AnalyzeVideoStream is part of the public API.
+func (m *MockBackend) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+// GenerateVideo is part of the public API.
+func (m *MockBackend) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockBackend) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+// GenerateVideoStream is part of the public API.
+func (m *MockBackend) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-// Tests for PipelineExecutor
+// Tests for Executor
 
+// TestNewPipelineExecutor is part of the public API.
 func TestNewPipelineExecutor(t *testing.T) {
-	backend1 := NewMockBackend("backend1")
-	backend2 := NewMockBackend("backend2")
+	backend1 := NewMockBackend(strBackend1)
+	backend2 := NewMockBackend(strBackend2)
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
@@ -264,14 +311,15 @@ func TestNewPipelineExecutor(t *testing.T) {
 		t.Errorf("Expected 2 backends in registry, got %d", len(executor.backendRegistry))
 	}
 
-	if _, exists := executor.backendRegistry["backend1"]; !exists {
+	if _, exists := executor.backendRegistry[strBackend1]; !exists {
 		t.Error("Expected backend1 to be registered")
 	}
-	if _, exists := executor.backendRegistry["backend2"]; !exists {
+	if _, exists := executor.backendRegistry[strBackend2]; !exists {
 		t.Error("Expected backend2 to be registered")
 	}
 }
 
+// TestNewPipelineExecutorEmptyList is part of the public API.
 func TestNewPipelineExecutorEmptyList(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{})
 
@@ -284,6 +332,7 @@ func TestNewPipelineExecutorEmptyList(t *testing.T) {
 	}
 }
 
+// TestSelectBackendPreferred is part of the public API.
 func TestSelectBackendPreferred(t *testing.T) {
 	backend1 := NewMockBackend("preferred-backend")
 	backend2 := NewMockBackend("other-backend")
@@ -291,10 +340,10 @@ func TestSelectBackendPreferred(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
 	stage := &Stage{
-		ID:               "test-stage",
+		ID:               strTestStage,
 		Type:             StageTypeTextGen,
 		PreferredBackend: "preferred-backend",
-		Model:            "test-model",
+		Model:            strTestModel,
 	}
 
 	backend, err := executor.selectBackend(stage)
@@ -307,20 +356,21 @@ func TestSelectBackendPreferred(t *testing.T) {
 	}
 }
 
+// TestSelectBackendByHardware is part of the public API.
 func TestSelectBackendByHardware(t *testing.T) {
 	backend1 := NewMockBackend("npu-backend")
-	backend1.hardware = "npu"
+	backend1.hardware = strNpu
 
 	backend2 := NewMockBackend("gpu-backend")
-	backend2.hardware = "nvidia"
+	backend2.hardware = strNvidia
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
 	stage := &Stage{
-		ID:               "test-stage",
-		Type:             StageTypeTextGen,
-		PreferredHardware: "npu",
-		Model:            "test-model",
+		ID:                strTestStage,
+		Type:              StageTypeTextGen,
+		PreferredHardware: strNpu,
+		Model:             strTestModel,
 	}
 
 	backend, err := executor.selectBackend(stage)
@@ -328,21 +378,22 @@ func TestSelectBackendByHardware(t *testing.T) {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if backend.Hardware() != "npu" {
+	if backend.Hardware() != strNpu {
 		t.Errorf("Expected hardware 'npu', got %s", backend.Hardware())
 	}
 }
 
+// TestSelectBackendDefault is part of the public API.
 func TestSelectBackendDefault(t *testing.T) {
-	backend1 := NewMockBackend("backend1")
-	backend2 := NewMockBackend("backend2")
+	backend1 := NewMockBackend(strBackend1)
+	backend2 := NewMockBackend(strBackend2)
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "test-model",
+		Model: strTestModel,
 	}
 
 	backend, err := executor.selectBackend(stage)
@@ -355,15 +406,16 @@ func TestSelectBackendDefault(t *testing.T) {
 	}
 }
 
+// TestSelectBackendNotFound is part of the public API.
 func TestSelectBackendNotFound(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:               "test-stage",
+		ID:               strTestStage,
 		Type:             StageTypeTextGen,
 		PreferredBackend: "nonexistent",
-		Model:            "test-model",
+		Model:            strTestModel,
 	}
 
 	_, err := executor.selectBackend(stage)
@@ -372,17 +424,18 @@ func TestSelectBackendNotFound(t *testing.T) {
 	}
 }
 
+// TestSelectBackendHardwareNotFound is part of the public API.
 func TestSelectBackendHardwareNotFound(t *testing.T) {
-	backend := NewMockBackend("backend1")
-	backend.hardware = "cpu"
+	backend := NewMockBackend(strBackend1)
+	backend.hardware = strCPU
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:               "test-stage",
-		Type:             StageTypeTextGen,
-		PreferredHardware: "nvidia",
-		Model:            "test-model",
+		ID:                strTestStage,
+		Type:              StageTypeTextGen,
+		PreferredHardware: strNvidia,
+		Model:             strTestModel,
 	}
 
 	_, err := executor.selectBackend(stage)
@@ -391,13 +444,14 @@ func TestSelectBackendHardwareNotFound(t *testing.T) {
 	}
 }
 
+// TestSelectBackendNoBackends is part of the public API.
 func TestSelectBackendNoBackends(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "test-model",
+		Model: strTestModel,
 	}
 
 	_, err := executor.selectBackend(stage)
@@ -406,22 +460,24 @@ func TestSelectBackendNoBackends(t *testing.T) {
 	}
 }
 
+// TestGetBackendByID is part of the public API.
 func TestGetBackendByID(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
-	retrieved, err := executor.getBackendByID("test-backend")
+	retrieved, err := executor.getBackendByID(strTestBackend)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if retrieved.ID() != "test-backend" {
+	if retrieved.ID() != strTestBackend {
 		t.Errorf("Expected backend 'test-backend', got %s", retrieved.ID())
 	}
 }
 
+// TestGetBackendByIDNotFound is part of the public API.
 func TestGetBackendByIDNotFound(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	_, err := executor.getBackendByID("nonexistent")
@@ -430,6 +486,7 @@ func TestGetBackendByIDNotFound(t *testing.T) {
 	}
 }
 
+// TestEstimateConfidence is part of the public API.
 func TestEstimateConfidence(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{})
 
@@ -444,14 +501,15 @@ func TestEstimateConfidence(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendTextGen is part of the public API.
 func TestExecuteOnBackendTextGen(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	output, err := executor.executeOnBackend(context.Background(), backend, stage, "test prompt")
@@ -470,14 +528,15 @@ func TestExecuteOnBackendTextGen(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendEmbed is part of the public API.
 func TestExecuteOnBackendEmbed(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeEmbed,
-		Model: "nomic-embed-text",
+		Model: strNomicEmbedText,
 	}
 
 	output, err := executor.executeOnBackend(context.Background(), backend, stage, "test text")
@@ -496,14 +555,15 @@ func TestExecuteOnBackendEmbed(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendInvalidInput is part of the public API.
 func TestExecuteOnBackendInvalidInput(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, 12345)
@@ -512,14 +572,15 @@ func TestExecuteOnBackendInvalidInput(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendEmbedInvalidInput is part of the public API.
 func TestExecuteOnBackendEmbedInvalidInput(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeEmbed,
-		Model: "nomic-embed-text",
+		Model: strNomicEmbedText,
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, 12345)
@@ -528,12 +589,13 @@ func TestExecuteOnBackendEmbedInvalidInput(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendAudioToText is part of the public API.
 func TestExecuteOnBackendAudioToText(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeAudioToText,
 		Model: "whisper",
 	}
@@ -544,14 +606,15 @@ func TestExecuteOnBackendAudioToText(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendTextToAudio is part of the public API.
 func TestExecuteOnBackendTextToAudio(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextToAudio,
-		Model: "tts",
+		Model: strTts,
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, "text to convert")
@@ -560,14 +623,15 @@ func TestExecuteOnBackendTextToAudio(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendUnsupportedType is part of the public API.
 func TestExecuteOnBackendUnsupportedType(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeCustom,
-		Model: "custom",
+		Model: string(StageTypeCustom),
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, "input")
@@ -576,16 +640,17 @@ func TestExecuteOnBackendUnsupportedType(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendGenerateError is part of the public API.
 func TestExecuteOnBackendGenerateError(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	backend.generateErr = errors.New("generate failed")
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, "test prompt")
@@ -594,16 +659,17 @@ func TestExecuteOnBackendGenerateError(t *testing.T) {
 	}
 }
 
+// TestExecuteOnBackendEmbedError is part of the public API.
 func TestExecuteOnBackendEmbedError(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	backend.embedErr = errors.New("embed failed")
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeEmbed,
-		Model: "nomic-embed-text",
+		Model: strNomicEmbedText,
 	}
 
 	_, err := executor.executeOnBackend(context.Background(), backend, stage, "test text")
@@ -612,14 +678,15 @@ func TestExecuteOnBackendEmbedError(t *testing.T) {
 	}
 }
 
+// TestExecuteStageBasic is part of the public API.
 func TestExecuteStageBasic(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	result, err := executor.executeStage(context.Background(), stage, "test prompt")
@@ -631,11 +698,11 @@ func TestExecuteStageBasic(t *testing.T) {
 		t.Error("Expected successful stage execution")
 	}
 
-	if result.StageID != "test-stage" {
+	if result.StageID != strTestStage {
 		t.Errorf("Expected StageID 'test-stage', got %s", result.StageID)
 	}
 
-	if result.Backend != "test-backend" {
+	if result.Backend != strTestBackend {
 		t.Errorf("Expected backend 'test-backend', got %s", result.Backend)
 	}
 
@@ -648,14 +715,15 @@ func TestExecuteStageBasic(t *testing.T) {
 	}
 }
 
+// TestExecuteStageInputTransform is part of the public API.
 func TestExecuteStageInputTransform(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 		InputTransform: func(input interface{}) (interface{}, error) {
 			return "transformed: " + input.(string), nil
 		},
@@ -677,15 +745,16 @@ func TestExecuteStageInputTransform(t *testing.T) {
 	}
 }
 
+// TestExecuteStageInputTransformError is part of the public API.
 func TestExecuteStageInputTransformError(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
-		InputTransform: func(input interface{}) (interface{}, error) {
+		Model: strLlama37b,
+		InputTransform: func(_ interface{}) (interface{}, error) {
 			return nil, errors.New("transform failed")
 		},
 	}
@@ -700,14 +769,15 @@ func TestExecuteStageInputTransformError(t *testing.T) {
 	}
 }
 
+// TestExecuteStageOutputTransform is part of the public API.
 func TestExecuteStageOutputTransform(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 		OutputTransform: func(output interface{}) (interface{}, error) {
 			return "transformed: " + output.(string), nil
 		},
@@ -729,15 +799,16 @@ func TestExecuteStageOutputTransform(t *testing.T) {
 	}
 }
 
+// TestExecuteStageOutputTransformError is part of the public API.
 func TestExecuteStageOutputTransformError(t *testing.T) {
-	backend := NewMockBackend("test-backend")
+	backend := NewMockBackend(strTestBackend)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
-		OutputTransform: func(output interface{}) (interface{}, error) {
+		Model: strLlama37b,
+		OutputTransform: func(_ interface{}) (interface{}, error) {
 			return nil, errors.New("transform failed")
 		},
 	}
@@ -752,13 +823,14 @@ func TestExecuteStageOutputTransformError(t *testing.T) {
 	}
 }
 
+// TestExecuteStageBackendSelectionError is part of the public API.
 func TestExecuteStageBackendSelectionError(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	result, err := executor.executeStage(context.Background(), stage, "input")
@@ -771,29 +843,30 @@ func TestExecuteStageBackendSelectionError(t *testing.T) {
 	}
 }
 
+// TestExecuteWithForwarding is part of the public API.
 func TestExecuteWithForwarding(t *testing.T) {
-	backend1 := NewMockBackend("backend1")
-	backend2 := NewMockBackend("backend2")
+	backend1 := NewMockBackend(strBackend1)
+	backend2 := NewMockBackend(strBackend2)
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
 	policy := &ForwardingPolicy{
 		EnableConfidenceCheck: true,
 		MinConfidence:         0.9,
-		MaxRetries:           2,
-		EscalationPath:        []string{"backend1", "backend2"},
+		MaxRetries:            2,
+		EscalationPath:        []string{strBackend1, strBackend2},
 	}
 
 	stage := &Stage{
-		ID:               "test-stage",
+		ID:               strTestStage,
 		Type:             StageTypeTextGen,
-		Model:            "llama3:7b",
+		Model:            strLlama37b,
 		ForwardingPolicy: policy,
 	}
 
 	metadata := &StageMetadata{
 		StartTime: time.Now(),
-		Backend:   "backend1",
+		Backend:   strBackend1,
 	}
 
 	output, result, err := executor.executeWithForwarding(context.Background(), stage, backend1, "test input", metadata)
@@ -810,11 +883,12 @@ func TestExecuteWithForwarding(t *testing.T) {
 	}
 }
 
+// TestExecuteWithForwardingAllRetriesFail is part of the public API.
 func TestExecuteWithForwardingAllRetriesFail(t *testing.T) {
-	backend1 := NewMockBackend("backend1")
+	backend1 := NewMockBackend(strBackend1)
 	backend1.generateErr = errors.New("backend1 failed")
 
-	backend2 := NewMockBackend("backend2")
+	backend2 := NewMockBackend(strBackend2)
 	backend2.generateErr = errors.New("backend2 failed")
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
@@ -822,20 +896,20 @@ func TestExecuteWithForwardingAllRetriesFail(t *testing.T) {
 	policy := &ForwardingPolicy{
 		EnableConfidenceCheck: true,
 		MinConfidence:         0.9,
-		MaxRetries:           2,
-		EscalationPath:        []string{"backend1", "backend2"},
+		MaxRetries:            2,
+		EscalationPath:        []string{strBackend1, strBackend2},
 	}
 
 	stage := &Stage{
-		ID:               "test-stage",
+		ID:               strTestStage,
 		Type:             StageTypeTextGen,
-		Model:            "llama3:7b",
+		Model:            strLlama37b,
 		ForwardingPolicy: policy,
 	}
 
 	metadata := &StageMetadata{
 		StartTime: time.Now(),
-		Backend:   "backend1",
+		Backend:   strBackend1,
 	}
 
 	_, result, err := executor.executeWithForwarding(context.Background(), stage, backend1, "test input", metadata)
@@ -848,29 +922,30 @@ func TestExecuteWithForwardingAllRetriesFail(t *testing.T) {
 	}
 }
 
+// TestExecuteWithForwardingLowConfidence is part of the public API.
 func TestExecuteWithForwardingLowConfidence(t *testing.T) {
-	backend1 := NewMockBackend("backend1")
-	backend2 := NewMockBackend("backend2")
+	backend1 := NewMockBackend(strBackend1)
+	backend2 := NewMockBackend(strBackend2)
 
 	executor := NewPipelineExecutor([]backends.Backend{backend1, backend2})
 
 	policy := &ForwardingPolicy{
 		EnableConfidenceCheck: true,
 		MinConfidence:         0.99, // Very high confidence requirement
-		MaxRetries:           2,
-		EscalationPath:        []string{"backend1", "backend2"},
+		MaxRetries:            2,
+		EscalationPath:        []string{strBackend1, strBackend2},
 	}
 
 	stage := &Stage{
-		ID:               "test-stage",
+		ID:               strTestStage,
 		Type:             StageTypeTextGen,
-		Model:            "llama3:7b",
+		Model:            strLlama37b,
 		ForwardingPolicy: policy,
 	}
 
 	metadata := &StageMetadata{
 		StartTime: time.Now(),
-		Backend:   "backend1",
+		Backend:   strBackend1,
 	}
 
 	output, result, err := executor.executeWithForwarding(context.Background(), stage, backend1, "test input", metadata)
@@ -888,21 +963,22 @@ func TestExecuteWithForwardingLowConfidence(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineSimple is part of the public API.
 func TestExecutePipelineSimple(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "test-pipeline",
-		Name: "Test Pipeline",
+		ID:   strTestPipeline,
+		Name: strTestPipeline2,
 		Stages: []*Stage{
 			{
-				ID:    "stage1",
+				ID:    strStage1,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
+				Model: strLlama37b,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}
@@ -916,7 +992,7 @@ func TestExecutePipelineSimple(t *testing.T) {
 		t.Error("Expected successful pipeline execution")
 	}
 
-	if result.PipelineID != "test-pipeline" {
+	if result.PipelineID != strTestPipeline {
 		t.Errorf("Expected PipelineID 'test-pipeline', got %s", result.PipelineID)
 	}
 
@@ -933,29 +1009,30 @@ func TestExecutePipelineSimple(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineMultipleStages is part of the public API.
 func TestExecutePipelineMultipleStages(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "test-pipeline",
+		ID:   strTestPipeline,
 		Name: "Multi-Stage Pipeline",
 		Stages: []*Stage{
 			{
-				ID:    "stage1",
+				ID:    strStage1,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
+				Model: strLlama37b,
 			},
 			{
-				ID:    "stage2",
+				ID:    strStage2,
 				Type:  StageTypeEmbed,
-				Model: "nomic-embed-text",
+				Model: strNomicEmbedText,
 				InputTransform: func(input interface{}) (interface{}, error) {
 					return input.(string), nil
 				},
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}
@@ -984,23 +1061,24 @@ func TestExecutePipelineMultipleStages(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineStageFailure is part of the public API.
 func TestExecutePipelineStageFailure(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	backend.generateErr = errors.New("generation failed")
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "test-pipeline",
-		Name: "Test Pipeline",
+		ID:   strTestPipeline,
+		Name: strTestPipeline2,
 		Stages: []*Stage{
 			{
-				ID:    "stage1",
+				ID:    strStage1,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
+				Model: strLlama37b,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}
@@ -1019,30 +1097,31 @@ func TestExecutePipelineStageFailure(t *testing.T) {
 	}
 }
 
+// TestExecutePipelineContinueOnError is part of the public API.
 func TestExecutePipelineContinueOnError(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "test-pipeline",
-		Name: "Test Pipeline",
+		ID:   strTestPipeline,
+		Name: strTestPipeline2,
 		Stages: []*Stage{
 			{
-				ID:    "stage1",
+				ID:    strStage1,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
-				InputTransform: func(input interface{}) (interface{}, error) {
+				Model: strLlama37b,
+				InputTransform: func(_ interface{}) (interface{}, error) {
 					return nil, errors.New("stage1 failed")
 				},
 			},
 			{
-				ID:    "stage2",
+				ID:    strStage2,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
+				Model: strLlama37b,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: true,
 		},
 	}
@@ -1063,35 +1142,36 @@ func TestExecutePipelineContinueOnError(t *testing.T) {
 	}
 
 	// Second stage should have succeeded or failed independently
-	if result.StageResults[1].StageID != "stage2" {
+	if result.StageResults[1].StageID != strStage2 {
 		t.Error("Expected second stage to be executed")
 	}
 }
 
+// TestExecutePipelineDataFlow is part of the public API.
 func TestExecutePipelineDataFlow(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "test-pipeline",
+		ID:   strTestPipeline,
 		Name: "Data Flow Pipeline",
 		Stages: []*Stage{
 			{
-				ID:    "stage1",
+				ID:    strStage1,
 				Type:  StageTypeTextGen,
-				Model: "llama3:7b",
+				Model: strLlama37b,
 				OutputTransform: func(output interface{}) (interface{}, error) {
 					// Pass through with metadata
 					return output.(string) + " [processed]", nil
 				},
 			},
 			{
-				ID:    "stage2",
+				ID:    strStage2,
 				Type:  StageTypeEmbed,
-				Model: "nomic-embed-text",
+				Model: strNomicEmbedText,
 			},
 		},
-		Options: &PipelineOptions{
+		Options: &Options{
 			ContinueOnError: false,
 		},
 	}
@@ -1111,17 +1191,18 @@ func TestExecutePipelineDataFlow(t *testing.T) {
 	}
 }
 
+// TestStageTypes is part of the public API.
 func TestStageTypes(t *testing.T) {
 	tests := []struct {
 		name      string
 		stageType StageType
 		expected  string
 	}{
-		{"AudioToText", StageTypeAudioToText, "audio_to_text"},
-		{"TextGen", StageTypeTextGen, "text_generation"},
-		{"TextToAudio", StageTypeTextToAudio, "text_to_audio"},
-		{"Embed", StageTypeEmbed, "embedding"},
-		{"Custom", StageTypeCustom, "custom"},
+		{name: "AudioToText", stageType: StageTypeAudioToText, expected: "audio_to_text"},
+		{name: "TextGen", stageType: StageTypeTextGen, expected: string(StageTypeTextGen)},
+		{name: "TextToAudio", stageType: StageTypeTextToAudio, expected: "text_to_audio"},
+		{name: "Embed", stageType: StageTypeEmbed, expected: string(StageTypeEmbed)},
+		{name: "Custom", stageType: StageTypeCustom, expected: string(StageTypeCustom)},
 	}
 
 	for _, tt := range tests {
@@ -1131,12 +1212,13 @@ func TestStageTypes(t *testing.T) {
 	}
 }
 
+// TestForwardingPolicyDefaults is part of the public API.
 func TestForwardingPolicyDefaults(t *testing.T) {
 	policy := &ForwardingPolicy{
 		EnableConfidenceCheck: true,
 		MinConfidence:         0.75,
-		MaxRetries:           3,
-		EscalationPath:        []string{"backend1", "backend2", "backend3"},
+		MaxRetries:            3,
+		EscalationPath:        []string{strBackend1, strBackend2, "backend3"},
 	}
 
 	if !policy.EnableConfidenceCheck {
@@ -1156,13 +1238,14 @@ func TestForwardingPolicyDefaults(t *testing.T) {
 	}
 }
 
+// TestPipelineOptionsDefaults is part of the public API.
 func TestPipelineOptionsDefaults(t *testing.T) {
-	options := &PipelineOptions{
-		EnableStreaming:  true,
-		PreserveContext:  true,
-		ContinueOnError:  false,
-		CollectMetrics:   true,
-		ParallelStages:   false,
+	options := &Options{
+		EnableStreaming: true,
+		PreserveContext: true,
+		ContinueOnError: false,
+		CollectMetrics:  true,
+		ParallelStages:  false,
 	}
 
 	if !options.EnableStreaming {
@@ -1186,17 +1269,18 @@ func TestPipelineOptionsDefaults(t *testing.T) {
 	}
 }
 
+// TestPipelineResultStructure is part of the public API.
 func TestPipelineResultStructure(t *testing.T) {
-	result := &PipelineResult{
-		PipelineID:   "test",
-		Success:      true,
-		StageResults: make([]*StageResult, 0),
-		FinalOutput:  "output",
-		TotalTimeMs:  100,
+	result := &Result{
+		PipelineID:    strTest,
+		Success:       true,
+		StageResults:  make([]*StageResult, 0),
+		FinalOutput:   "output",
+		TotalTimeMs:   100,
 		TotalEnergyWh: 0.5,
 	}
 
-	if result.PipelineID != "test" {
+	if result.PipelineID != strTest {
 		t.Error("Expected PipelineID to be test")
 	}
 
@@ -1207,16 +1291,26 @@ func TestPipelineResultStructure(t *testing.T) {
 	if result.TotalTimeMs != 100 {
 		t.Errorf("Expected TotalTimeMs 100, got %d", result.TotalTimeMs)
 	}
+	if result.StageResults == nil {
+		t.Error("Expected StageResults to be non-nil")
+	}
+	if result.FinalOutput != "output" {
+		t.Errorf("Expected FinalOutput output, got %v", result.FinalOutput)
+	}
+	if result.TotalEnergyWh != 0.5 {
+		t.Errorf("Expected TotalEnergyWh 0.5, got %v", result.TotalEnergyWh)
+	}
 }
 
+// TestStageMetadataTracking is part of the public API.
 func TestStageMetadataTracking(t *testing.T) {
-	backend := NewMockBackend("backend1")
+	backend := NewMockBackend(strBackend1)
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	stage := &Stage{
-		ID:    "test-stage",
+		ID:    strTestStage,
 		Type:  StageTypeTextGen,
-		Model: "llama3:7b",
+		Model: strLlama37b,
 	}
 
 	result, err := executor.executeStage(context.Background(), stage, "test input")
@@ -1245,7 +1339,7 @@ func TestStageMetadataTracking(t *testing.T) {
 		t.Error("Expected backend to be set")
 	}
 
-	if metadata.Model != "llama3:7b" {
+	if metadata.Model != strLlama37b {
 		t.Error("Expected model to be set")
 	}
 }
