@@ -3,17 +3,18 @@ package virtual
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/daoneill/ollama-proxy/pkg/cmdexec"
 )
 
 // PulseAudioSystem implements AudioSystem for PulseAudio
 type PulseAudioSystem struct {
-	pactlPath string
 	logger    *zap.Logger
-	modules   map[string]string // module ID -> device name mapping
+	modules   map[string]string
+	pactlPath string
 }
 
 // NewPulseAudioSystem creates a new PulseAudio system manager
@@ -36,16 +37,19 @@ func (pa *PulseAudioSystem) CreateVirtualSource(name, description string, sample
 	// Use module-null-source to create a virtual microphone
 	// This creates a source (input device) that applications can read from
 	args := []string{
-		"load-module",
+		strLoadModule,
 		"module-null-source",
 		fmt.Sprintf("source_name=%s", name),
 		fmt.Sprintf("source_properties=device.description='%s'", description),
 		fmt.Sprintf("channels=%d", channels),
 		fmt.Sprintf("rate=%d", sampleRate),
-		"format=s16le", // 16-bit signed little-endian PCM
+		strFormatS16le, // 16-bit signed little-endian PCM
 	}
 
-	cmd := exec.Command(pa.pactlPath, args...)
+	cmd, err := cmdexec.Command(pa.pactlPath, args...)
+	if err != nil {
+		return "", fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to load module-null-source: %w (output: %s)", err, string(output))
@@ -70,16 +74,19 @@ func (pa *PulseAudioSystem) CreateVirtualSink(name, description string, sampleRa
 	// Use module-null-sink to create a virtual speaker
 	// This creates a sink (output device) that applications can write to
 	args := []string{
-		"load-module",
-		"module-null-sink",
+		strLoadModule,
+		strModuleNullSink,
 		fmt.Sprintf("sink_name=%s", name),
 		fmt.Sprintf("sink_properties=device.description='%s'", description),
 		fmt.Sprintf("channels=%d", channels),
 		fmt.Sprintf("rate=%d", sampleRate),
-		"format=s16le",
+		strFormatS16le,
 	}
 
-	cmd := exec.Command(pa.pactlPath, args...)
+	cmd, err := cmdexec.Command(pa.pactlPath, args...)
+	if err != nil {
+		return "", fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to load module-null-sink: %w (output: %s)", err, string(output))
@@ -105,7 +112,10 @@ func (pa *PulseAudioSystem) DestroyDevice(moduleID string) error {
 		return fmt.Errorf("unknown module ID: %s", moduleID)
 	}
 
-	cmd := exec.Command(pa.pactlPath, "unload-module", moduleID)
+	cmd, err := cmdexec.Command(pa.pactlPath, "unload-module", moduleID)
+	if err != nil {
+		return fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to unload module %s: %w (output: %s)", moduleID, err, string(output))
@@ -124,11 +134,17 @@ func (pa *PulseAudioSystem) DestroyDevice(moduleID string) error {
 // SetProperty sets a property on a PulseAudio device
 func (pa *PulseAudioSystem) SetProperty(deviceName, key, value string) error {
 	// Determine if it's a source or sink by checking if it exists
-	cmd := exec.Command(pa.pactlPath, "list", "sources", "short")
+	cmd, err := cmdexec.Command(pa.pactlPath, "list", "sources", "short")
+	if err != nil {
+		return fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err == nil && strings.Contains(string(output), deviceName) {
 		// It's a source
-		cmd = exec.Command(pa.pactlPath, "set-source-", deviceName, key, value)
+		cmd, err = cmdexec.Command(pa.pactlPath, "set-source-", deviceName, key, value)
+		if err != nil {
+			return fmt.Errorf("failed to create pactl command: %w", err)
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to set source property: %w", err)
 		}
@@ -136,10 +152,16 @@ func (pa *PulseAudioSystem) SetProperty(deviceName, key, value string) error {
 	}
 
 	// Try sink
-	cmd = exec.Command(pa.pactlPath, "list", "sinks", "short")
+	cmd, err = cmdexec.Command(pa.pactlPath, "list", "sinks", "short")
+	if err != nil {
+		return fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err = cmd.Output()
 	if err == nil && strings.Contains(string(output), deviceName) {
-		cmd = exec.Command(pa.pactlPath, "set-sink-property", deviceName, key, value)
+		cmd, err = cmdexec.Command(pa.pactlPath, "set-sink-property", deviceName, key, value)
+		if err != nil {
+			return fmt.Errorf("failed to create pactl command: %w", err)
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to set sink property: %w", err)
 		}
@@ -151,11 +173,11 @@ func (pa *PulseAudioSystem) SetProperty(deviceName, key, value string) error {
 
 // IsRunning checks if PulseAudio is running
 func (pa *PulseAudioSystem) IsRunning() bool {
-	cmd := exec.Command(pa.pactlPath, "info")
-	if err := cmd.Run(); err != nil {
+	cmd, err := cmdexec.Command(pa.pactlPath, "info")
+	if err != nil {
 		return false
 	}
-	return true
+	return cmd.Run() == nil
 }
 
 // GetType returns "pulseaudio"
@@ -165,7 +187,10 @@ func (pa *PulseAudioSystem) GetType() string {
 
 // ListSources lists all PulseAudio sources (for debugging)
 func (pa *PulseAudioSystem) ListSources() ([]string, error) {
-	cmd := exec.Command(pa.pactlPath, "list", "sources", "short")
+	cmd, err := cmdexec.Command(pa.pactlPath, "list", "sources", "short")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -185,7 +210,10 @@ func (pa *PulseAudioSystem) ListSources() ([]string, error) {
 
 // ListSinks lists all PulseAudio sinks (for debugging)
 func (pa *PulseAudioSystem) ListSinks() ([]string, error) {
-	cmd := exec.Command(pa.pactlPath, "list", "sinks", "short")
+	cmd, err := cmdexec.Command(pa.pactlPath, "list", "sinks", "short")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pactl command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -211,10 +239,4 @@ func (pa *PulseAudioSystem) GetModuleID(deviceName string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// parseModuleID extracts module ID from pactl output
-func parseModuleID(output string) (int, error) {
-	trimmed := strings.TrimSpace(output)
-	return strconv.Atoi(trimmed)
 }

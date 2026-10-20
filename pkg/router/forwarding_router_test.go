@@ -5,124 +5,231 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 	"github.com/daoneill/ollama-proxy/pkg/thermal"
 )
 
 // mockBackendForRouter implements backends.Backend for testing
 type mockBackendForRouter struct {
-	id       string
-	hardware string
-	healthy  bool
 	supportsModelFunc func(string) bool
+	id                string
+	hardware          string
+	healthy           bool
 }
 
-func (m *mockBackendForRouter) ID() string                                                            { return m.id }
-func (m *mockBackendForRouter) Type() string                                                          { return "mock" }
-func (m *mockBackendForRouter) Name() string                                                          { return m.id }
-func (m *mockBackendForRouter) Hardware() string                                                      { return m.hardware }
-func (m *mockBackendForRouter) Endpoint() string                                                      { return "http://mock" }
-func (m *mockBackendForRouter) IsHealthy() bool                                                       {
-	if m.healthy {
-		return true
-	}
-	return false
+// ID is part of the public API.
+func (m *mockBackendForRouter) ID() string { return m.id }
+
+// Type is part of the public API.
+func (m *mockBackendForRouter) Type() string { return "mock" }
+
+// Name is part of the public API.
+func (m *mockBackendForRouter) Name() string { return m.id }
+
+// Hardware is part of the public API.
+func (m *mockBackendForRouter) Hardware() string { return m.hardware }
+
+// Endpoint is part of the public API.
+func (m *mockBackendForRouter) Endpoint() string { return "http://mock" }
+
+// IsHealthy reports whether the condition holds.
+func (m *mockBackendForRouter) IsHealthy() bool {
+	return m.healthy
 }
-func (m *mockBackendForRouter) PowerWatts() float64                                                   { return 10.0 }
-func (m *mockBackendForRouter) AvgLatencyMs() int32                                                   { return 100 }
-func (m *mockBackendForRouter) Priority() int                                                         { return 1 }
-func (m *mockBackendForRouter) SupportsGenerate() bool                                                { return true }
-func (m *mockBackendForRouter) SupportsEmbed() bool                                                   { return true }
-func (m *mockBackendForRouter) SupportsStream() bool                                                  { return true }
-func (m *mockBackendForRouter) SupportsModel(model string) bool                                       {
+
+// PowerWatts is part of the public API.
+func (m *mockBackendForRouter) PowerWatts() float64 { return 10.0 }
+
+// AvgLatencyMs is part of the public API.
+func (m *mockBackendForRouter) AvgLatencyMs() int32 { return 100 }
+
+// Priority is part of the public API.
+func (m *mockBackendForRouter) Priority() int { return 1 }
+
+// SupportsGenerate is part of the public API.
+func (m *mockBackendForRouter) SupportsGenerate() bool { return true }
+
+// SupportsEmbed is part of the public API.
+func (m *mockBackendForRouter) SupportsEmbed() bool { return true }
+
+// SupportsStream is part of the public API.
+func (m *mockBackendForRouter) SupportsStream() bool { return true }
+
+// SupportsModel is part of the public API.
+func (m *mockBackendForRouter) SupportsModel(model string) bool {
 	if m.supportsModelFunc != nil {
 		return m.supportsModelFunc(model)
 	}
 	return true
 }
-func (m *mockBackendForRouter) Start(ctx context.Context) error                                       { return nil }
-func (m *mockBackendForRouter) Stop(ctx context.Context) error                                        { return nil }
+
+// Start is part of the public API.
+func (m *mockBackendForRouter) Start(_ context.Context) error { return nil }
+
+// Stop is part of the public API.
+func (m *mockBackendForRouter) Stop(_ context.Context) error { return nil }
 
 // Multimedia capability methods
 func (m *mockBackendForRouter) SupportsAudioToText() bool { return false }
+
+// SupportsTextToAudio is part of the public API.
 func (m *mockBackendForRouter) SupportsTextToAudio() bool { return false }
+
+// SupportsImageToText is part of the public API.
 func (m *mockBackendForRouter) SupportsImageToText() bool { return false }
+
+// SupportsTextToImage is part of the public API.
 func (m *mockBackendForRouter) SupportsTextToImage() bool { return false }
+
+// SupportsVideoToText is part of the public API.
 func (m *mockBackendForRouter) SupportsVideoToText() bool { return false }
+
+// SupportsTextToVideo is part of the public API.
 func (m *mockBackendForRouter) SupportsTextToVideo() bool { return false }
-func (m *mockBackendForRouter) TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) TranscribeAudioStream(ctx context.Context, req *backends.TranscribeRequest) (backends.AudioStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) SynthesizeSpeechStream(ctx context.Context, req *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) AnalyzeImage(ctx context.Context, req *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) GenerateImage(ctx context.Context, req *backends.ImageGenRequest) (*backends.ImageGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) GenerateImageStream(ctx context.Context, req *backends.ImageGenRequest) (backends.ImageStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) AnalyzeVideo(ctx context.Context, req *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) AnalyzeVideoStream(ctx context.Context, req *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) GenerateVideo(ctx context.Context, req *backends.VideoGenRequest) (*backends.VideoGenResponse, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) GenerateVideoStream(ctx context.Context, req *backends.VideoGenRequest) (backends.VideoStreamReader, error) { return nil, fmt.Errorf("not implemented") }
-func (m *mockBackendForRouter) HealthCheck(ctx context.Context) error                                 { return nil }
-func (m *mockBackendForRouter) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
+
+// TranscribeAudio is part of the public API.
+func (m *mockBackendForRouter) TranscribeAudio(_ context.Context, _ *backends.TranscribeRequest) (*backends.TranscribeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// TranscribeAudioStream is part of the public API.
+func (m *mockBackendForRouter) TranscribeAudioStream(_ context.Context, _ *backends.TranscribeRequest) (backends.AudioStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeech is part of the public API.
+func (m *mockBackendForRouter) SynthesizeSpeech(_ context.Context, _ *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SynthesizeSpeechStream is part of the public API.
+func (m *mockBackendForRouter) SynthesizeSpeechStream(_ context.Context, _ *backends.SynthesizeRequest) (backends.AudioStreamWriter, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeImage is part of the public API.
+func (m *mockBackendForRouter) AnalyzeImage(_ context.Context, _ *backends.ImageAnalysisRequest) (*backends.ImageAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImage is part of the public API.
+func (m *mockBackendForRouter) GenerateImage(_ context.Context, _ *backends.ImageGenRequest) (*backends.ImageGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateImageStream is part of the public API.
+func (m *mockBackendForRouter) GenerateImageStream(_ context.Context, _ *backends.ImageGenRequest) (backends.ImageStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideo is part of the public API.
+func (m *mockBackendForRouter) AnalyzeVideo(_ context.Context, _ *backends.VideoAnalysisRequest) (*backends.VideoAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// AnalyzeVideoStream is part of the public API.
+func (m *mockBackendForRouter) AnalyzeVideoStream(_ context.Context, _ *backends.VideoAnalysisRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideo is part of the public API.
+func (m *mockBackendForRouter) GenerateVideo(_ context.Context, _ *backends.VideoGenRequest) (*backends.VideoGenResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GenerateVideoStream is part of the public API.
+func (m *mockBackendForRouter) GenerateVideoStream(_ context.Context, _ *backends.VideoGenRequest) (backends.VideoStreamReader, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// HealthCheck is part of the public API.
+func (m *mockBackendForRouter) HealthCheck(_ context.Context) error { return nil }
+
+// Generate is part of the public API.
+func (m *mockBackendForRouter) Generate(_ context.Context, _ *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	// Return a basic response for testing
 	return &backends.GenerateResponse{
 		Response: "Test response from " + m.id,
 		Stats: &backends.GenerationStats{
-			TotalTimeMs:        100,
-			TokensGenerated:    20,
-			TokensPerSecond:    10,
+			TotalTimeMs:     100,
+			TokensGenerated: 20,
+			TokensPerSecond: 10,
 		},
 	}, nil
 }
-func (m *mockBackendForRouter) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
-	return nil, nil
-}
-func (m *mockBackendForRouter) Embed(ctx context.Context, req *backends.EmbedRequest) (*backends.EmbedResponse, error) {
-	return nil, nil
-}
-func (m *mockBackendForRouter) ListModels(ctx context.Context) ([]string, error) { return nil, nil }
-func (m *mockBackendForRouter) GetMetrics() *backends.BackendMetrics            { return &backends.BackendMetrics{} }
-func (m *mockBackendForRouter) GetMaxModelSizeGB() int                          { return 16 }
-func (m *mockBackendForRouter) GetSupportedModelPatterns() []string             { return nil }
-func (m *mockBackendForRouter) GetPreferredModels() []string                    { return nil }
-func (m *mockBackendForRouter) UpdateMetrics(latencyMs int32, success bool)     {}
-func (m *mockBackendForRouter) Recv() (*backends.StreamChunk, error)            { return nil, nil }
 
+// GenerateStream is part of the public API.
+func (m *mockBackendForRouter) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
+	return nil, nil
+}
+
+// Embed is part of the public API.
+func (m *mockBackendForRouter) Embed(_ context.Context, _ *backends.EmbedRequest) (*backends.EmbedResponse, error) {
+	return nil, nil
+}
+
+// ListModels is part of the public API.
+func (m *mockBackendForRouter) ListModels(_ context.Context) ([]string, error) { return nil, nil }
+
+// GetMetrics is part of the public API.
+func (m *mockBackendForRouter) GetMetrics() *backends.BackendMetrics {
+	return &backends.BackendMetrics{}
+}
+
+// GetMaxModelSizeGB is part of the public API.
+func (m *mockBackendForRouter) GetMaxModelSizeGB() int { return 16 }
+
+// GetSupportedModelPatterns is part of the public API.
+func (m *mockBackendForRouter) GetSupportedModelPatterns() []string { return nil }
+
+// GetPreferredModels is part of the public API.
+func (m *mockBackendForRouter) GetPreferredModels() []string { return nil }
+
+// UpdateMetrics is part of the public API.
+func (m *mockBackendForRouter) UpdateMetrics(_ int32, _ bool) {}
+
+// Recv is part of the public API.
+func (m *mockBackendForRouter) Recv() (*backends.StreamChunk, error) { return nil, nil }
+
+// TestForwardingRouter_BasicForwarding is part of the public API.
 func TestForwardingRouter_BasicForwarding(t *testing.T) {
 	// Create mock backends
 	npuBackend := &mockBackendForRouter{
-		id:       "ollama-npu",
-		hardware: "npu",
+		id:       strOllamaNpu,
+		hardware: strNpu,
 		healthy:  true,
 	}
 
 	intelBackend := &mockBackendForRouter{
-		id:       "ollama-intel",
-		hardware: "igpu",
+		id:       strOllamaIntel,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 
 	nvidiaBackend := &mockBackendForRouter{
-		id:       "ollama-nvidia",
-		hardware: "nvidia",
+		id:       strOllamaNvidia,
+		hardware: strNvidia,
 		healthy:  true,
 	}
 
 	// Create base router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
-	baseRouter.RegisterBackend(nvidiaBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	// Create forwarding router
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel", "ollama-nvidia"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel, strOllamaNvidia},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -162,33 +269,34 @@ func TestForwardingRouter_BasicForwarding(t *testing.T) {
 		result.TotalAttempts, result.FinalBackend.ID(), result.Forwarded)
 }
 
+// TestForwardingRouter_ModelCompatibility is part of the public API.
 func TestForwardingRouter_ModelCompatibility(t *testing.T) {
 	// Create backends with different model support
 	npuBackend := &mockBackendForRouter{
-		id:       "ollama-npu",
-		hardware: "npu",
+		id:       strOllamaNpu,
+		hardware: strNpu,
 		healthy:  true,
 		supportsModelFunc: func(model string) bool {
 			// NPU only supports small models
-			return model == "qwen2.5:0.5b"
+			return model == strQwen2505b
 		},
 	}
 
 	intelBackend := &mockBackendForRouter{
-		id:       "ollama-intel",
-		hardware: "igpu",
+		id:       strOllamaIntel,
+		hardware: strIgpu,
 		healthy:  true,
 		supportsModelFunc: func(model string) bool {
 			// Intel supports small and medium models
-			return model == "qwen2.5:0.5b" || model == "llama3:7b"
+			return model == strQwen2505b || model == strLlama37b
 		},
 	}
 
 	nvidiaBackend := &mockBackendForRouter{
-		id:       "ollama-nvidia",
-		hardware: "nvidia",
+		id:       strOllamaNvidia,
+		hardware: strNvidia,
 		healthy:  true,
-		supportsModelFunc: func(model string) bool {
+		supportsModelFunc: func(_ string) bool {
 			// NVIDIA supports all models
 			return true
 		},
@@ -196,19 +304,19 @@ func TestForwardingRouter_ModelCompatibility(t *testing.T) {
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
-	baseRouter.RegisterBackend(nvidiaBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel", "ollama-nvidia"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel, strOllamaNvidia},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -223,20 +331,20 @@ func TestForwardingRouter_ModelCompatibility(t *testing.T) {
 	}{
 		{
 			name:            "Small model stays on NPU",
-			model:           "qwen2.5:0.5b",
-			expectedBackend: "ollama-npu",
+			model:           strQwen2505b,
+			expectedBackend: strOllamaNpu,
 			description:     "qwen2.5:0.5b supported by NPU, shouldn't forward",
 		},
 		{
 			name:            "Medium model forwards to Intel",
-			model:           "llama3:7b",
-			expectedBackend: "ollama-intel",
+			model:           strLlama37b,
+			expectedBackend: strOllamaIntel,
 			description:     "llama3:7b not supported by NPU, should forward to Intel",
 		},
 		{
 			name:            "Large model forwards to NVIDIA",
-			model:           "llama3:70b",
-			expectedBackend: "ollama-nvidia",
+			model:           strLlama370b,
+			expectedBackend: strOllamaNvidia,
 			description:     "llama3:70b only supported by NVIDIA, should forward there",
 		},
 	}
@@ -271,34 +379,35 @@ func TestForwardingRouter_ModelCompatibility(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_ThermalRespect is part of the public API.
 func TestForwardingRouter_ThermalRespect(t *testing.T) {
 	// Create backends
 	npuBackend := &mockBackendForRouter{
-		id:       "ollama-npu",
-		hardware: "npu",
+		id:       strOllamaNpu,
+		hardware: strNpu,
 		healthy:  false, // Mark as unhealthy (thermal issues)
 	}
 
 	intelBackend := &mockBackendForRouter{
-		id:       "ollama-intel",
-		hardware: "igpu",
+		id:       strOllamaIntel,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           2,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel},
 		RespectThermalLimits: true, // Enable thermal checking
 		ReturnBestAttempt:    true,
 	}
@@ -322,7 +431,7 @@ func TestForwardingRouter_ThermalRespect(t *testing.T) {
 		t.Fatal("FinalBackend is nil")
 	}
 
-	if result.FinalBackend.ID() != "ollama-intel" {
+	if result.FinalBackend.ID() != strOllamaIntel {
 		t.Errorf("Expected to use ollama-intel (NPU is unhealthy), got %s",
 			result.FinalBackend.ID())
 	}
@@ -334,7 +443,7 @@ func TestForwardingRouter_ThermalRespect(t *testing.T) {
 
 	npuSkipped := false
 	for _, attempt := range result.Attempts {
-		if attempt.BackendID == "ollama-npu" && !attempt.Success {
+		if attempt.BackendID == strOllamaNpu && !attempt.Success {
 			npuSkipped = true
 			t.Logf("NPU skipped: %s", attempt.SkipReason)
 		}
@@ -345,28 +454,29 @@ func TestForwardingRouter_ThermalRespect(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_EscalationPath is part of the public API.
 func TestForwardingRouter_EscalationPath(t *testing.T) {
 	// Create backends
 	mockBackends := []*mockBackendForRouter{
-		{id: "backend-1", hardware: "npu", healthy: true},
-		{id: "backend-2", hardware: "igpu", healthy: true},
-		{id: "backend-3", hardware: "nvidia", healthy: true},
+		{id: strBackend1, hardware: strNpu, healthy: true},
+		{id: strBackend22, hardware: strIgpu, healthy: true},
+		{id: strBackend3, hardware: strNvidia, healthy: true},
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		baseRouter.RegisterBackend(b)
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"backend-1", "backend-2", "backend-3"},
+		EscalationPath:       []string{strBackend1, strBackend22, strBackend3},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -406,24 +516,25 @@ func TestForwardingRouter_EscalationPath(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_MaxRetries is part of the public API.
 func TestForwardingRouter_MaxRetries(t *testing.T) {
 	// Create backends
-	backend1 := &mockBackendForRouter{id: "backend-1", hardware: "npu", healthy: true}
-	backend2 := &mockBackendForRouter{id: "backend-2", hardware: "igpu", healthy: true}
+	backend1 := &mockBackendForRouter{id: strBackend1, hardware: strNpu, healthy: true}
+	backend2 := &mockBackendForRouter{id: strBackend22, hardware: strIgpu, healthy: true}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           1, // Only 1 retry
-		EscalationPath:       []string{"backend-1", "backend-2"},
+		EscalationPath:       []string{strBackend1, strBackend22},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -451,19 +562,20 @@ func TestForwardingRouter_MaxRetries(t *testing.T) {
 	t.Logf("Attempts: %d (max: %d)", result.TotalAttempts, forwardingCfg.MaxRetries)
 }
 
+// TestIsSmallModel is part of the public API.
 func TestIsSmallModel(t *testing.T) {
 	tests := []struct {
 		name     string
 		model    string
 		expected bool
 	}{
-		{"0.5b model", "qwen2.5:0.5b", true},
-		{"1.5b model", "llama:1.5b", true},
-		{"tiny model", "tiny-llama", true},
-		{"mini model", "mini-gpt", true},
-		{"7b model", "llama3:7b", false},
-		{"70b model", "llama3:70b", false},
-		{"regular model", "gpt-4", false},
+		{name: "0.5b model", model: strQwen2505b, expected: true},
+		{name: "1.5b model", model: "llama:1.5b", expected: true},
+		{name: "tiny model", model: "tiny-llama", expected: true},
+		{name: "mini model", model: "mini-gpt", expected: true},
+		{name: "7b model", model: strLlama37b, expected: false},
+		{name: "70b model", model: strLlama370b, expected: false},
+		{name: "regular model", model: "gpt-4", expected: false},
 	}
 
 	for _, tt := range tests {
@@ -476,6 +588,7 @@ func TestIsSmallModel(t *testing.T) {
 	}
 }
 
+// TestContains is part of the public API.
 func TestContains(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -483,13 +596,13 @@ func TestContains(t *testing.T) {
 		substr   string
 		expected bool
 	}{
-		{"exact match", "test", "test", true},
-		{"prefix", "testing", "test", true},
-		{"suffix", "contest", "test", true},
-		{"middle", "attested", "test", true},
-		{"not found", "example", "test", false},
-		{"empty substring", "test", "", false}, // Implementation requires len(substr) > 0
-		{"empty string", "", "test", false},
+		{name: "exact match", s: strTest, substr: strTest, expected: true},
+		{name: "prefix", s: "testing", substr: strTest, expected: true},
+		{name: "suffix", s: "contest", substr: strTest, expected: true},
+		{name: "middle", s: "attested", substr: strTest, expected: true},
+		{name: "not found", s: "example", substr: strTest, expected: false},
+		{name: "empty substring", s: strTest, substr: "", expected: false}, // Implementation requires len(substr) > 0
+		{name: "empty string", s: "", substr: strTest, expected: false},
 	}
 
 	for _, tt := range tests {
@@ -502,6 +615,7 @@ func TestContains(t *testing.T) {
 	}
 }
 
+// TestFindInString is part of the public API.
 func TestFindInString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -509,12 +623,12 @@ func TestFindInString(t *testing.T) {
 		substr   string
 		expected bool
 	}{
-		{"found at start", "hello world", "hello", true},
-		{"found at end", "hello world", "world", true},
-		{"found in middle", "hello world", "lo wo", true},
-		{"not found", "hello world", "xyz", false},
-		{"single char found", "abcdef", "c", true},
-		{"single char not found", "abcdef", "z", false},
+		{name: "found at start", s: strHelloWorld, substr: "hello", expected: true},
+		{name: "found at end", s: strHelloWorld, substr: "world", expected: true},
+		{name: "found in middle", s: strHelloWorld, substr: "lo wo", expected: true},
+		{name: "not found", s: strHelloWorld, substr: "xyz", expected: false},
+		{name: "single char found", s: "abcdef", substr: "c", expected: true},
+		{name: "single char not found", s: "abcdef", substr: "z", expected: false},
 	}
 
 	for _, tt := range tests {
@@ -527,6 +641,7 @@ func TestFindInString(t *testing.T) {
 	}
 }
 
+// TestDefaultForwardingConfig is part of the public API.
 func TestDefaultForwardingConfig(t *testing.T) {
 	config := DefaultForwardingConfig()
 
@@ -556,60 +671,63 @@ func TestDefaultForwardingConfig(t *testing.T) {
 	}
 }
 
+// TestSetEscalationPath is part of the public API.
 func TestSetEscalationPath(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "test"})
+	router := NewRouter(Config{DefaultBackendID: strTest})
 	forwardingRouter := NewForwardingRouter(router, nil, DefaultForwardingConfig())
-	
-	newPath := []string{"backend1", "backend2", "backend3"}
+
+	newPath := []string{strBackend12, strBackend2, "backend3"}
 	forwardingRouter.SetEscalationPath(newPath)
-	
+
 	// Verify path was set (indirect verification through config)
 	if forwardingRouter.config.EscalationPath == nil {
 		t.Error("SetEscalationPath should update the escalation path")
 	}
 }
 
+// TestSetMinConfidence is part of the public API.
 func TestSetMinConfidence(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "test"})
+	router := NewRouter(Config{DefaultBackendID: strTest})
 	forwardingRouter := NewForwardingRouter(router, nil, DefaultForwardingConfig())
-	
+
 	newConfidence := 0.85
 	forwardingRouter.SetMinConfidence(newConfidence)
-	
+
 	if forwardingRouter.config.MinConfidence != newConfidence {
 		t.Errorf("SetMinConfidence should set to %f, got %f", newConfidence, forwardingRouter.config.MinConfidence)
 	}
 }
 
+// TestForwardingRouter_BuildEscalationPath is part of the public API.
 func TestForwardingRouter_BuildEscalationPath(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "test"})
+	router := NewRouter(Config{DefaultBackendID: strTest})
 	fr := NewForwardingRouter(router, nil, DefaultForwardingConfig())
 
 	// Test via GenerateWithForwarding which calls buildEscalationPath
 	npuBackend := &mockBackendForRouter{
-		id:       "ollama-npu",
-		hardware: "npu",
+		id:       strOllamaNpu,
+		hardware: strNpu,
 		healthy:  true,
 	}
 	intelBackend := &mockBackendForRouter{
-		id:       "ollama-intel",
-		hardware: "igpu",
+		id:       strOllamaIntel,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 	nvidiaBackend := &mockBackendForRouter{
-		id:       "ollama-nvidia",
-		hardware: "nvidia",
+		id:       strOllamaNvidia,
+		hardware: strNvidia,
 		healthy:  true,
 	}
 
-	router.RegisterBackend(npuBackend)
-	router.RegisterBackend(intelBackend)
-	router.RegisterBackend(nvidiaBackend)
+	testutil.Check(t, router.RegisterBackend(npuBackend))
+	testutil.Check(t, router.RegisterBackend(intelBackend))
+	testutil.Check(t, router.RegisterBackend(nvidiaBackend))
 
 	ctx := context.Background()
 
 	// Test with small model - should try NPU first
-	result, err := fr.GenerateWithForwarding(ctx, "test", "qwen2.5:0.5b", &backends.Annotations{})
+	result, err := fr.GenerateWithForwarding(ctx, strTest, strQwen2505b, &backends.Annotations{})
 	if err != nil {
 		t.Fatalf("GenerateWithForwarding failed: %v", err)
 	}
@@ -618,7 +736,7 @@ func TestForwardingRouter_BuildEscalationPath(t *testing.T) {
 	}
 
 	// Test with large model
-	result2, err := fr.GenerateWithForwarding(ctx, "test", "llama3:70b", &backends.Annotations{})
+	result2, err := fr.GenerateWithForwarding(ctx, strTest, strLlama370b, &backends.Annotations{})
 	if err != nil {
 		t.Fatalf("GenerateWithForwarding with large model failed: %v", err)
 	}
@@ -627,36 +745,38 @@ func TestForwardingRouter_BuildEscalationPath(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_FindBackend is part of the public API.
 func TestForwardingRouter_FindBackend(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "test"})
+	router := NewRouter(Config{DefaultBackendID: strTest})
 
 	backend1 := &mockBackendForRouter{
-		id:       "backend-1",
-		hardware: "npu",
+		id:       strBackend1,
+		hardware: strNpu,
 		healthy:  true,
 	}
 
-	router.RegisterBackend(backend1)
+	testutil.Check(t, router.RegisterBackend(backend1))
 
 	fr := NewForwardingRouter(router, nil, DefaultForwardingConfig())
 
 	// Test finding via GenerateWithForwarding with specific escalation path
-	fr.SetEscalationPath([]string{"backend-1"})
+	fr.SetEscalationPath([]string{strBackend1})
 
 	ctx := context.Background()
-	result, err := fr.GenerateWithForwarding(ctx, "test", "test-model", &backends.Annotations{})
+	result, err := fr.GenerateWithForwarding(ctx, strTest, "test-model", &backends.Annotations{})
 
 	if err != nil {
 		t.Fatalf("GenerateWithForwarding failed: %v", err)
 	}
 
-	if result.FinalBackend.ID() != "backend-1" {
+	if result.FinalBackend.ID() != strBackend1 {
 		t.Errorf("Expected backend-1, got %s", result.FinalBackend.ID())
 	}
 }
 
+// TestNewForwardingRouter_NilConfig is part of the public API.
 func TestNewForwardingRouter_NilConfig(t *testing.T) {
-	router := NewRouter(Config{DefaultBackendID: "test"})
+	router := NewRouter(Config{DefaultBackendID: strTest})
 
 	// Pass nil config - should use defaults
 	fr := NewForwardingRouter(router, nil, nil)
@@ -682,19 +802,20 @@ func TestNewForwardingRouter_NilConfig(t *testing.T) {
 		fr.config.MinConfidence, fr.config.MaxRetries)
 }
 
+// TestForwardingRouter_FindBackend_WithThermalRouter is part of the public API.
 func TestForwardingRouter_FindBackend_WithThermalRouter(t *testing.T) {
 	// Create base router
-	baseRouter := NewRouter(Config{DefaultBackendID: "base-backend"})
+	baseRouter := NewRouter(Config{DefaultBackendID: strBaseBackend})
 
 	baseBackend := &mockBackendForRouter{
-		id:       "base-backend",
-		hardware: "cpu",
+		id:       strBaseBackend,
+		hardware: strCPU,
 		healthy:  true,
 	}
-	baseRouter.RegisterBackend(baseBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(baseBackend))
 
 	// Create thermal router with different backend
-	thermalConfig := &thermal.ThermalConfig{
+	thermalConfig := &thermal.Config{
 		TempWarning:  70.0,
 		TempCritical: 85.0,
 		FanQuiet:     30,
@@ -702,40 +823,40 @@ func TestForwardingRouter_FindBackend_WithThermalRouter(t *testing.T) {
 	}
 	monitor := thermal.NewThermalMonitor(thermalConfig, 0)
 	thermalRouterCfg := Config{
-		DefaultBackendID: "thermal-backend",
+		DefaultBackendID: strThermalBackend,
 		PowerAware:       true,
 	}
 	thermalRouter := NewThermalRouter(thermalRouterCfg, monitor)
 
 	thermalBackend := &mockBackendForRouter{
-		id:       "thermal-backend",
-		hardware: "gpu",
+		id:       strThermalBackend,
+		hardware: strGpu,
 		healthy:  true,
 	}
-	thermalRouter.RegisterBackend(thermalBackend)
+	testutil.Check(t, thermalRouter.RegisterBackend(thermalBackend))
 
 	// Create forwarding router with both routers
 	forwardingCfg := DefaultForwardingConfig()
 	fr := NewForwardingRouter(baseRouter, thermalRouter, forwardingCfg)
 
 	// Test finding backend from base router
-	fr.SetEscalationPath([]string{"base-backend"})
+	fr.SetEscalationPath([]string{strBaseBackend})
 	ctx := context.Background()
-	result1, err := fr.GenerateWithForwarding(ctx, "test", "test-model", &backends.Annotations{})
+	result1, err := fr.GenerateWithForwarding(ctx, strTest, "test-model", &backends.Annotations{})
 	if err != nil {
 		t.Fatalf("GenerateWithForwarding for base backend failed: %v", err)
 	}
-	if result1.FinalBackend.ID() != "base-backend" {
+	if result1.FinalBackend.ID() != strBaseBackend {
 		t.Errorf("Expected base-backend, got %s", result1.FinalBackend.ID())
 	}
 
 	// Test finding backend from thermal router
-	fr.SetEscalationPath([]string{"thermal-backend"})
-	result2, err := fr.GenerateWithForwarding(ctx, "test", "test-model", &backends.Annotations{})
+	fr.SetEscalationPath([]string{strThermalBackend})
+	result2, err := fr.GenerateWithForwarding(ctx, strTest, "test-model", &backends.Annotations{})
 	if err != nil {
 		t.Fatalf("GenerateWithForwarding for thermal backend failed: %v", err)
 	}
-	if result2.FinalBackend.ID() != "thermal-backend" {
+	if result2.FinalBackend.ID() != strThermalBackend {
 		t.Errorf("Expected thermal-backend, got %s", result2.FinalBackend.ID())
 	}
 
@@ -748,6 +869,7 @@ type mockStreamReader struct {
 	index  int
 }
 
+// Recv is part of the public API.
 func (m *mockStreamReader) Recv() (*backends.StreamChunk, error) {
 	if m.index >= len(m.chunks) {
 		return nil, nil // EOF
@@ -759,6 +881,7 @@ func (m *mockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return chunk, nil
 }
 
+// Close is part of the public API.
 func (m *mockStreamReader) Close() error {
 	return nil
 }
@@ -766,23 +889,25 @@ func (m *mockStreamReader) Close() error {
 // mockBackendWithStream extends mockBackendForRouter to support streaming
 type mockBackendWithStream struct {
 	mockBackendForRouter
-	streamChunks []string
 	streamError  error
+	streamChunks []string
 }
 
-func (m *mockBackendWithStream) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
+// GenerateStream is part of the public API.
+func (m *mockBackendWithStream) GenerateStream(_ context.Context, _ *backends.GenerateRequest) (backends.StreamReader, error) {
 	if m.streamError != nil {
 		return nil, m.streamError
 	}
 	return &mockStreamReader{chunks: m.streamChunks}, nil
 }
 
+// TestGenerateWithForwardingStream_Success is part of the public API.
 func TestGenerateWithForwardingStream_Success(t *testing.T) {
 	// Create backends with streaming support
 	npuBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-npu",
-			hardware: "npu",
+			id:       strOllamaNpu,
+			hardware: strNpu,
 			healthy:  true,
 		},
 		streamChunks: []string{"Hello", " ", "world", "!"},
@@ -790,27 +915,27 @@ func TestGenerateWithForwardingStream_Success(t *testing.T) {
 
 	intelBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-intel",
-			hardware: "igpu",
+			id:       strOllamaIntel,
+			hardware: strIgpu,
 			healthy:  true,
 		},
-		streamChunks: []string{"Test", " ", "stream"},
+		streamChunks: []string{"Test", " ", strStream},
 	}
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           2,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -821,7 +946,7 @@ func TestGenerateWithForwardingStream_Success(t *testing.T) {
 	stream, backend, err := forwardingRouter.GenerateWithForwardingStream(
 		ctx,
 		"Test prompt",
-		"qwen2.5:0.5b", // Use small model to trigger NPU selection
+		strQwen2505b, // Use small model to trigger NPU selection
 		&backends.Annotations{},
 	)
 
@@ -837,7 +962,7 @@ func TestGenerateWithForwardingStream_Success(t *testing.T) {
 		t.Fatal("Backend is nil")
 	}
 
-	if backend.ID() != "ollama-npu" {
+	if backend.ID() != strOllamaNpu {
 		t.Errorf("Expected backend ollama-npu, got %s", backend.ID())
 	}
 
@@ -861,40 +986,41 @@ func TestGenerateWithForwardingStream_Success(t *testing.T) {
 	t.Logf("Received %d chunks from %s", len(receivedChunks), backend.ID())
 }
 
+// TestGenerateWithForwardingStream_ThermalRespect is part of the public API.
 func TestGenerateWithForwardingStream_ThermalRespect(t *testing.T) {
 	// Create backends
 	npuBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-npu",
-			hardware: "npu",
+			id:       strOllamaNpu,
+			hardware: strNpu,
 			healthy:  false, // Mark as unhealthy
 		},
-		streamChunks: []string{"NPU", " ", "stream"},
+		streamChunks: []string{"NPU", " ", strStream},
 	}
 
 	intelBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-intel",
-			hardware: "igpu",
+			id:       strOllamaIntel,
+			hardware: strIgpu,
 			healthy:  true,
 		},
-		streamChunks: []string{"Intel", " ", "stream"},
+		streamChunks: []string{strIntel, " ", strStream},
 	}
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           2,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel},
 		RespectThermalLimits: true, // Enable thermal checking
 		ReturnBestAttempt:    true,
 	}
@@ -905,7 +1031,7 @@ func TestGenerateWithForwardingStream_ThermalRespect(t *testing.T) {
 	stream, backend, err := forwardingRouter.GenerateWithForwardingStream(
 		ctx,
 		"Test prompt",
-		"qwen2.5:0.5b", // Use small model so NPU is in escalation path
+		strQwen2505b, // Use small model so NPU is in escalation path
 		&backends.Annotations{},
 	)
 
@@ -918,7 +1044,7 @@ func TestGenerateWithForwardingStream_ThermalRespect(t *testing.T) {
 		t.Fatal("Backend is nil")
 	}
 
-	if backend.ID() != "ollama-intel" {
+	if backend.ID() != strOllamaIntel {
 		t.Errorf("Expected to use ollama-intel (NPU is unhealthy), got %s", backend.ID())
 	}
 
@@ -929,59 +1055,60 @@ func TestGenerateWithForwardingStream_ThermalRespect(t *testing.T) {
 	t.Logf("Successfully skipped unhealthy NPU and used %s", backend.ID())
 }
 
+// TestGenerateWithForwardingStream_ModelCompatibility is part of the public API.
 func TestGenerateWithForwardingStream_ModelCompatibility(t *testing.T) {
 	// Create backends with different model support
 	npuBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-npu",
-			hardware: "npu",
+			id:       strOllamaNpu,
+			hardware: strNpu,
 			healthy:  true,
 			supportsModelFunc: func(model string) bool {
-				return model == "qwen2.5:0.5b"
+				return model == strQwen2505b
 			},
 		},
-		streamChunks: []string{"NPU", " ", "response"},
+		streamChunks: []string{"NPU", " ", strResponse},
 	}
 
 	intelBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-intel",
-			hardware: "igpu",
+			id:       strOllamaIntel,
+			hardware: strIgpu,
 			healthy:  true,
 			supportsModelFunc: func(model string) bool {
-				return model == "qwen2.5:0.5b" || model == "llama3:7b"
+				return model == strQwen2505b || model == strLlama37b
 			},
 		},
-		streamChunks: []string{"Intel", " ", "response"},
+		streamChunks: []string{strIntel, " ", strResponse},
 	}
 
 	nvidiaBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-nvidia",
-			hardware: "nvidia",
+			id:       strOllamaNvidia,
+			hardware: strNvidia,
 			healthy:  true,
-			supportsModelFunc: func(model string) bool {
+			supportsModelFunc: func(_ string) bool {
 				return true // Supports all models
 			},
 		},
-		streamChunks: []string{"NVIDIA", " ", "response"},
+		streamChunks: []string{"NVIDIA", " ", strResponse},
 	}
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
-	baseRouter.RegisterBackend(nvidiaBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(nvidiaBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel", "ollama-nvidia"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel, strOllamaNvidia},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -995,18 +1122,18 @@ func TestGenerateWithForwardingStream_ModelCompatibility(t *testing.T) {
 	}{
 		{
 			name:            "Small model uses NPU",
-			model:           "qwen2.5:0.5b",
-			expectedBackend: "ollama-npu",
+			model:           strQwen2505b,
+			expectedBackend: strOllamaNpu,
 		},
 		{
 			name:            "Medium model uses Intel",
-			model:           "llama3:7b",
-			expectedBackend: "ollama-intel",
+			model:           strLlama37b,
+			expectedBackend: strOllamaIntel,
 		},
 		{
 			name:            "Large model uses NVIDIA",
-			model:           "llama3:70b",
-			expectedBackend: "ollama-nvidia",
+			model:           strLlama370b,
+			expectedBackend: strOllamaNvidia,
 		},
 	}
 
@@ -1042,14 +1169,15 @@ func TestGenerateWithForwardingStream_ModelCompatibility(t *testing.T) {
 	}
 }
 
+// TestGenerateWithForwardingStream_NoSuitableBackend is part of the public API.
 func TestGenerateWithForwardingStream_NoSuitableBackend(t *testing.T) {
 	// Create backend that doesn't support the requested model
 	npuBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-npu",
-			hardware: "npu",
+			id:       strOllamaNpu,
+			hardware: strNpu,
 			healthy:  true,
-			supportsModelFunc: func(model string) bool {
+			supportsModelFunc: func(_ string) bool {
 				return false // Doesn't support any models
 			},
 		},
@@ -1058,17 +1186,17 @@ func TestGenerateWithForwardingStream_NoSuitableBackend(t *testing.T) {
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           1,
-		EscalationPath:       []string{"ollama-npu"},
+		EscalationPath:       []string{strOllamaNpu},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1101,12 +1229,13 @@ func TestGenerateWithForwardingStream_NoSuitableBackend(t *testing.T) {
 	}
 }
 
+// TestGenerateWithForwardingStream_BackendGenerateStreamError is part of the public API.
 func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 	// Create backend that returns error on GenerateStream
 	npuBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-npu",
-			hardware: "npu",
+			id:       strOllamaNpu,
+			hardware: strNpu,
 			healthy:  true,
 		},
 		streamError: fmt.Errorf("backend unavailable"),
@@ -1114,27 +1243,27 @@ func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 
 	intelBackend := &mockBackendWithStream{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "ollama-intel",
-			hardware: "igpu",
+			id:       strOllamaIntel,
+			hardware: strIgpu,
 			healthy:  true,
 		},
-		streamChunks: []string{"Intel", " ", "fallback"},
+		streamChunks: []string{strIntel, " ", "fallback"},
 	}
 
 	// Create router
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(npuBackend)
-	baseRouter.RegisterBackend(intelBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(npuBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(intelBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           2,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1145,7 +1274,7 @@ func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 	stream, backend, err := forwardingRouter.GenerateWithForwardingStream(
 		ctx,
 		"Test prompt",
-		"qwen2.5:0.5b", // Use small model so NPU is tried first
+		strQwen2505b, // Use small model so NPU is tried first
 		&backends.Annotations{},
 	)
 
@@ -1158,7 +1287,7 @@ func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 		t.Fatal("Backend is nil")
 	}
 
-	if backend.ID() != "ollama-intel" {
+	if backend.ID() != strOllamaIntel {
 		t.Errorf("Expected fallback to ollama-intel, got %s", backend.ID())
 	}
 
@@ -1169,49 +1298,50 @@ func TestGenerateWithForwardingStream_BackendGenerateStreamError(t *testing.T) {
 	t.Logf("Successfully fell back from NPU to Intel after GenerateStream error")
 }
 
+// TestGenerateWithForwardingStream_EscalationPath is part of the public API.
 func TestGenerateWithForwardingStream_EscalationPath(t *testing.T) {
 	// Create multiple backends with names that match buildEscalationPath expectations
 	mockBackends := []*mockBackendWithStream{
 		{
 			mockBackendForRouter: mockBackendForRouter{
-				id:       "ollama-npu",
-				hardware: "npu",
+				id:       strOllamaNpu,
+				hardware: strNpu,
 				healthy:  true,
 			},
-			streamChunks: []string{"Backend", " ", "1"},
+			streamChunks: []string{strBackend, " ", "1"},
 		},
 		{
 			mockBackendForRouter: mockBackendForRouter{
-				id:       "ollama-intel",
-				hardware: "igpu",
+				id:       strOllamaIntel,
+				hardware: strIgpu,
 				healthy:  true,
 			},
-			streamChunks: []string{"Backend", " ", "2"},
+			streamChunks: []string{strBackend, " ", "2"},
 		},
 		{
 			mockBackendForRouter: mockBackendForRouter{
-				id:       "ollama-nvidia",
-				hardware: "nvidia",
+				id:       strOllamaNvidia,
+				hardware: strNvidia,
 				healthy:  true,
 			},
-			streamChunks: []string{"Backend", " ", "3"},
+			streamChunks: []string{strBackend, " ", "3"},
 		},
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "ollama-npu",
+		DefaultBackendID: strOllamaNpu,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		baseRouter.RegisterBackend(b)
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"ollama-npu", "ollama-intel", "ollama-nvidia"},
+		EscalationPath:       []string{strOllamaNpu, strOllamaIntel, strOllamaNvidia},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1222,7 +1352,7 @@ func TestGenerateWithForwardingStream_EscalationPath(t *testing.T) {
 	stream, backend, err := forwardingRouter.GenerateWithForwardingStream(
 		ctx,
 		"Test prompt",
-		"qwen2.5:0.5b", // Use small model to match escalation path
+		strQwen2505b, // Use small model to match escalation path
 		&backends.Annotations{},
 	)
 
@@ -1244,10 +1374,11 @@ func TestGenerateWithForwardingStream_EscalationPath(t *testing.T) {
 
 // mockBackendWithError extends mockBackendForRouter to return errors on Generate
 type mockBackendWithError struct {
-	mockBackendForRouter
 	generateError error
+	mockBackendForRouter
 }
 
+// Generate is part of the public API.
 func (m *mockBackendWithError) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
 	if m.generateError != nil {
 		return nil, m.generateError
@@ -1255,27 +1386,28 @@ func (m *mockBackendWithError) Generate(ctx context.Context, req *backends.Gener
 	return m.mockBackendForRouter.Generate(ctx, req)
 }
 
+// TestForwardingRouter_BackendNotFound is part of the public API.
 func TestForwardingRouter_BackendNotFound(t *testing.T) {
 	// Create a single backend
 	backend1 := &mockBackendForRouter{
-		id:       "backend-exists",
-		hardware: "npu",
+		id:       strBackendExists,
+		hardware: strNpu,
 		healthy:  true,
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-exists",
+		DefaultBackendID: strBackendExists,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(backend1)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
 
 	// Create forwarding config with non-existent backends in escalation path
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           10, // High retry limit so backend not found is tested
-		EscalationPath:       []string{"backend-does-not-exist", "backend-also-missing", "backend-exists"},
+		EscalationPath:       []string{"backend-does-not-exist", "backend-also-missing", strBackendExists},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1299,7 +1431,7 @@ func TestForwardingRouter_BackendNotFound(t *testing.T) {
 		t.Fatal("FinalBackend is nil")
 	}
 
-	if result.FinalBackend.ID() != "backend-exists" {
+	if result.FinalBackend.ID() != strBackendExists {
 		t.Errorf("Expected backend-exists, got %s", result.FinalBackend.ID())
 	}
 
@@ -1317,12 +1449,13 @@ func TestForwardingRouter_BackendNotFound(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_GenerateFailure is part of the public API.
 func TestForwardingRouter_GenerateFailure(t *testing.T) {
 	// Create backend that fails on Generate
 	failingBackend := &mockBackendWithError{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "failing-backend",
-			hardware: "npu",
+			id:       strFailingBackend,
+			hardware: strNpu,
 			healthy:  true,
 		},
 		generateError: fmt.Errorf("backend temporarily unavailable"),
@@ -1330,24 +1463,24 @@ func TestForwardingRouter_GenerateFailure(t *testing.T) {
 
 	// Create working fallback backend
 	workingBackend := &mockBackendForRouter{
-		id:       "working-backend",
-		hardware: "igpu",
+		id:       strWorkingBackend,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "failing-backend",
+		DefaultBackendID: strFailingBackend,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(failingBackend)
-	baseRouter.RegisterBackend(workingBackend)
+	testutil.Check(t, baseRouter.RegisterBackend(failingBackend))
+	testutil.Check(t, baseRouter.RegisterBackend(workingBackend))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.0,
 		MaxRetries:           3,
-		EscalationPath:       []string{"failing-backend", "working-backend"},
+		EscalationPath:       []string{strFailingBackend, strWorkingBackend},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,
 	}
@@ -1371,7 +1504,7 @@ func TestForwardingRouter_GenerateFailure(t *testing.T) {
 		t.Fatal("FinalBackend is nil")
 	}
 
-	if result.FinalBackend.ID() != "working-backend" {
+	if result.FinalBackend.ID() != strWorkingBackend {
 		t.Errorf("Expected working-backend after failure, got %s", result.FinalBackend.ID())
 	}
 
@@ -1402,34 +1535,35 @@ func TestForwardingRouter_GenerateFailure(t *testing.T) {
 	}
 }
 
+// TestForwardingRouter_LowConfidenceForwarding is part of the public API.
 func TestForwardingRouter_LowConfidenceForwarding(t *testing.T) {
 	// Create backends
 	backend1 := &mockBackendForRouter{
-		id:       "backend-1",
-		hardware: "npu",
+		id:       strBackend1,
+		hardware: strNpu,
 		healthy:  true,
 	}
 
 	backend2 := &mockBackendForRouter{
-		id:       "backend-2",
-		hardware: "igpu",
+		id:       strBackend22,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	// Set very high confidence threshold so all responses have low confidence
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.99, // Very high threshold - responses won't meet this
 		MaxRetries:           3,
-		EscalationPath:       []string{"backend-1", "backend-2"},
+		EscalationPath:       []string{strBackend1, strBackend22},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true, // Will return best attempt even if below threshold
 	}
@@ -1475,34 +1609,35 @@ func TestForwardingRouter_LowConfidenceForwarding(t *testing.T) {
 		result.TotalAttempts, forwardingCfg.MinConfidence)
 }
 
+// TestForwardingRouter_BestAttemptFallback is part of the public API.
 func TestForwardingRouter_BestAttemptFallback(t *testing.T) {
 	// Create backends
 	backend1 := &mockBackendForRouter{
-		id:       "backend-1",
-		hardware: "npu",
+		id:       strBackend1,
+		hardware: strNpu,
 		healthy:  true,
 	}
 
 	backend2 := &mockBackendForRouter{
-		id:       "backend-2",
-		hardware: "igpu",
+		id:       strBackend22,
+		hardware: strIgpu,
 		healthy:  true,
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	// High confidence threshold with ReturnBestAttempt enabled
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.95, // High threshold
 		MaxRetries:           2,
-		EscalationPath:       []string{"backend-1", "backend-2"},
+		EscalationPath:       []string{strBackend1, strBackend22},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true, // KEY: Enable best attempt fallback
 	}
@@ -1552,12 +1687,13 @@ func TestForwardingRouter_BestAttemptFallback(t *testing.T) {
 		forwardingCfg.MinConfidence)
 }
 
+// TestForwardingRouter_AllBackendsFailed is part of the public API.
 func TestForwardingRouter_AllBackendsFailed(t *testing.T) {
 	// Create backends that all fail
 	backend1 := &mockBackendWithError{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "backend-1",
-			hardware: "npu",
+			id:       strBackend1,
+			hardware: strNpu,
 			healthy:  true,
 		},
 		generateError: fmt.Errorf("backend-1 failed"),
@@ -1565,26 +1701,26 @@ func TestForwardingRouter_AllBackendsFailed(t *testing.T) {
 
 	backend2 := &mockBackendWithError{
 		mockBackendForRouter: mockBackendForRouter{
-			id:       "backend-2",
-			hardware: "igpu",
+			id:       strBackend22,
+			hardware: strIgpu,
 			healthy:  true,
 		},
 		generateError: fmt.Errorf("backend-2 failed"),
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	testutil.Check(t, baseRouter.RegisterBackend(backend1))
+	testutil.Check(t, baseRouter.RegisterBackend(backend2))
 
 	forwardingCfg := &ForwardingConfig{
 		Enabled:              true,
 		MinConfidence:        0.5,
 		MaxRetries:           3,
-		EscalationPath:       []string{"backend-1", "backend-2"},
+		EscalationPath:       []string{strBackend1, strBackend22},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    false, // KEY: Disable best attempt fallback
 	}
@@ -1628,23 +1764,24 @@ func TestForwardingRouter_AllBackendsFailed(t *testing.T) {
 	t.Logf("Successfully returned error when all %d backends failed", len(result.Attempts))
 }
 
+// TestForwardingRouter_MaxRetriesEnforced is part of the public API.
 func TestForwardingRouter_MaxRetriesEnforced(t *testing.T) {
 	// Create 5 backends
 	mockBackends := []*mockBackendForRouter{
-		{id: "backend-1", hardware: "npu", healthy: true},
-		{id: "backend-2", hardware: "igpu", healthy: true},
-		{id: "backend-3", hardware: "dgpu", healthy: true},
-		{id: "backend-4", hardware: "nvidia", healthy: true},
-		{id: "backend-5", hardware: "cpu", healthy: true},
+		{id: strBackend1, hardware: strNpu, healthy: true},
+		{id: strBackend22, hardware: strIgpu, healthy: true},
+		{id: strBackend3, hardware: "dgpu", healthy: true},
+		{id: "backend-4", hardware: strNvidia, healthy: true},
+		{id: "backend-5", hardware: strCPU, healthy: true},
 	}
 
 	routerCfg := &Config{
-		DefaultBackendID: "backend-1",
+		DefaultBackendID: strBackend1,
 		PowerAware:       true,
 	}
 	baseRouter := NewRouter(*routerCfg)
 	for _, b := range mockBackends {
-		baseRouter.RegisterBackend(b)
+		testutil.Check(t, baseRouter.RegisterBackend(b))
 	}
 
 	// Set MaxRetries to 2, but have 5 backends in escalation path
@@ -1653,7 +1790,7 @@ func TestForwardingRouter_MaxRetriesEnforced(t *testing.T) {
 		MinConfidence: 0.99, // High threshold to force trying multiple backends
 		MaxRetries:    2,    // KEY: Limit to 2 retries
 		EscalationPath: []string{
-			"backend-1", "backend-2", "backend-3", "backend-4", "backend-5",
+			strBackend1, strBackend22, strBackend3, "backend-4", "backend-5",
 		},
 		RespectThermalLimits: false,
 		ReturnBestAttempt:    true,

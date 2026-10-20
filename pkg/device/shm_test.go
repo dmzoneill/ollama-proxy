@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestSharedMemoryRing_CreateAndOpen is part of the public API.
 func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -17,7 +20,9 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	if ring.GetNumFrames() != 4 {
 		t.Errorf("Expected 4 frames, got %d", ring.GetNumFrames())
@@ -32,13 +37,16 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	if reader.GetNumFrames() != 4 {
 		t.Errorf("Reader: Expected 4 frames, got %d", reader.GetNumFrames())
 	}
 }
 
+// TestSharedMemoryRing_WriteRead is part of the public API.
 func TestSharedMemoryRing_WriteRead(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -47,14 +55,18 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	// Open as reader
 	reader, err := OpenSharedMemoryRing("test-write-read", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	// Write some data
 	testData := []byte("Hello, shared memory!")
@@ -92,6 +104,7 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_MultipleFrames is part of the public API.
 func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -100,13 +113,17 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	reader, err := OpenSharedMemoryRing("test-multi-frame", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	// Write multiple frames
 	for i := 0; i < 3; i++ {
@@ -140,6 +157,7 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_Wrap is part of the public API.
 func TestSharedMemoryRing_Wrap(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -148,13 +166,17 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	reader, err := OpenSharedMemoryRing("test-wrap", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	// Write more frames than capacity to test wrapping
 	for i := 0; i < 10; i++ {
@@ -184,6 +206,7 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_ConcurrentWriteRead is part of the public API.
 func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -192,13 +215,17 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	reader, err := OpenSharedMemoryRing("test-concurrent", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(t, reader.Close())
+	}()
 
 	var wg sync.WaitGroup
 	numWrites := 100
@@ -264,6 +291,7 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_Stats is part of the public API.
 func TestSharedMemoryRing_Stats(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -272,11 +300,15 @@ func TestSharedMemoryRing_Stats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(t, ring.Destroy())
+	}()
 
 	// Write some frames
 	for i := 0; i < 5; i++ {
-		ring.Write([]byte{byte(i)})
+		if _, err := ring.Write([]byte{byte(i)}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	stats := ring.GetStats()
@@ -294,12 +326,15 @@ func TestSharedMemoryRing_Stats(t *testing.T) {
 	}
 }
 
+// BenchmarkSharedMemoryRing_Write is part of the public API.
 func BenchmarkSharedMemoryRing_Write(b *testing.B) {
 	ring, err := CreateSharedMemoryRing("bench-write", 16, 4096, logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(b, ring.Destroy())
+	}()
 
 	data := make([]byte, 4096)
 	for i := range data {
@@ -310,36 +345,47 @@ func BenchmarkSharedMemoryRing_Write(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		ring.Write(data)
+		if _, err := ring.Write(data); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Target: <500ns per write
 }
 
+// BenchmarkSharedMemoryRing_Read is part of the public API.
 func BenchmarkSharedMemoryRing_Read(b *testing.B) {
 	ring, err := CreateSharedMemoryRing("bench-read", 16, 4096, logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to create ring: %v", err)
 	}
-	defer ring.Destroy()
+	defer func() {
+		testutil.CheckCleanup(b, ring.Destroy())
+	}()
 
 	reader, err := OpenSharedMemoryRing("bench-read", logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to open ring: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		testutil.CheckCleanup(b, reader.Close())
+	}()
 
 	// Pre-fill with data
 	data := make([]byte, 4096)
 	for i := 0; i < b.N; i++ {
-		ring.Write(data)
+		if _, err := ring.Write(data); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		reader.Read()
+		if _, _, err := reader.Read(); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Target: <500ns per read

@@ -7,22 +7,23 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/backends"
 )
 
+// TestValidateModelName is part of the public API.
 func TestValidateModelName(t *testing.T) {
 	tests := []struct {
 		name    string
 		model   string
 		wantErr bool
 	}{
-		{"valid simple", "llama3", false},
-		{"valid with version", "llama3:7b", false},
-		{"valid with dot", "qwen2.5:0.5b", false},
-		{"valid with dash", "llama-3-8b", false},
-		{"valid with underscore", "model_name", false},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", MaxModelNameLength+1), true},
-		{"invalid chars space", "model name", true},
-		{"invalid chars slash", "model/name", true},
-		{"invalid chars special", "model@name", true},
+		{name: "valid simple", model: "llama3", wantErr: false},
+		{name: "valid with version", model: strLlama37b, wantErr: false},
+		{name: "valid with dot", model: "qwen2.5:0.5b", wantErr: false},
+		{name: "valid with dash", model: "llama-3-8b", wantErr: false},
+		{name: "valid with underscore", model: "model_name", wantErr: false},
+		{name: "empty", model: "", wantErr: true},
+		{name: "too long", model: strings.Repeat("a", MaxModelNameLength+1), wantErr: true},
+		{name: "invalid chars space", model: "model name", wantErr: true},
+		{name: "invalid chars slash", model: "model/name", wantErr: true},
+		{name: "invalid chars special", model: "model@name", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -35,17 +36,18 @@ func TestValidateModelName(t *testing.T) {
 	}
 }
 
+// TestValidatePrompt is part of the public API.
 func TestValidatePrompt(t *testing.T) {
 	tests := []struct {
 		name    string
 		prompt  string
 		wantErr bool
 	}{
-		{"valid short", "Hello", false},
-		{"valid long", strings.Repeat("a", 1000), false},
-		{"valid max", strings.Repeat("a", MaxPromptLength), false},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", MaxPromptLength+1), true},
+		{name: "valid short", prompt: strHello, wantErr: false},
+		{name: "valid long", prompt: strings.Repeat("a", 1000), wantErr: false},
+		{name: "valid max", prompt: strings.Repeat("a", MaxPromptLength), wantErr: false},
+		{name: "empty", prompt: "", wantErr: true},
+		{name: "too long", prompt: strings.Repeat("a", MaxPromptLength+1), wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -58,46 +60,47 @@ func TestValidatePrompt(t *testing.T) {
 	}
 }
 
+// TestValidateGenerationOptions is part of the public API.
 func TestValidateGenerationOptions(t *testing.T) {
 	tests := []struct {
-		name    string
 		opts    *backends.GenerationOptions
+		name    string
 		wantErr bool
 	}{
-		{"nil options", nil, false},
-		{"valid defaults", &backends.GenerationOptions{
+		{name: "nil options", opts: nil, wantErr: false},
+		{name: "valid defaults", opts: &backends.GenerationOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 			MaxTokens:   1000,
-		}, false},
-		{"temperature too low", &backends.GenerationOptions{
+		}, wantErr: false},
+		{name: "temperature too low", opts: &backends.GenerationOptions{
 			Temperature: -0.1,
-		}, true},
-		{"temperature too high", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "temperature too high", opts: &backends.GenerationOptions{
 			Temperature: 2.1,
-		}, true},
-		{"topP too low", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "topP too low", opts: &backends.GenerationOptions{
 			TopP: -0.1,
-		}, true},
-		{"topP too high", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "topP too high", opts: &backends.GenerationOptions{
 			TopP: 1.1,
-		}, true},
-		{"topK negative", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "topK negative", opts: &backends.GenerationOptions{
 			TopK: -1,
-		}, true},
-		{"topK too high", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "topK too high", opts: &backends.GenerationOptions{
 			TopK: MaxTopK + 1,
-		}, true},
-		{"maxTokens negative", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "maxTokens negative", opts: &backends.GenerationOptions{
 			MaxTokens: -1,
-		}, true},
-		{"maxTokens too high", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "maxTokens too high", opts: &backends.GenerationOptions{
 			MaxTokens: MaxMaxTokens + 1,
-		}, true},
-		{"contextLength negative", &backends.GenerationOptions{
+		}, wantErr: true},
+		{name: "contextLength negative", opts: &backends.GenerationOptions{
 			ContextLength: -1,
-		}, true},
+		}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -110,20 +113,21 @@ func TestValidateGenerationOptions(t *testing.T) {
 	}
 }
 
+// TestValidateBackendID is part of the public API.
 func TestValidateBackendID(t *testing.T) {
 	tests := []struct {
 		name    string
 		id      string
 		wantErr bool
 	}{
-		{"empty is valid", "", false},
-		{"auto is valid", "auto", false},
-		{"valid simple", "ollama-npu", false},
-		{"valid with underscore", "ollama_npu", false},
-		{"valid alphanumeric", "backend123", false},
-		{"invalid with space", "backend id", true},
-		{"invalid with dot", "backend.id", true},
-		{"invalid with special char", "backend@id", true},
+		{name: "empty is valid", id: "", wantErr: false},
+		{name: "auto is valid", id: "auto", wantErr: false},
+		{name: "valid simple", id: "ollama-npu", wantErr: false},
+		{name: "valid with underscore", id: "ollama_npu", wantErr: false},
+		{name: "valid alphanumeric", id: "backend123", wantErr: false},
+		{name: "invalid with space", id: "backend id", wantErr: true},
+		{name: "invalid with dot", id: "backend.id", wantErr: true},
+		{name: "invalid with special char", id: "backend@id", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -136,36 +140,37 @@ func TestValidateBackendID(t *testing.T) {
 	}
 }
 
+// TestValidateGenerateRequest is part of the public API.
 func TestValidateGenerateRequest(t *testing.T) {
 	tests := []struct {
-		name    string
 		req     *backends.GenerateRequest
+		name    string
 		wantErr bool
 	}{
-		{"nil request", nil, true},
-		{"valid request", &backends.GenerateRequest{
-			Prompt: "Hello",
-			Model:  "llama3:7b",
+		{name: "nil request", req: nil, wantErr: true},
+		{name: "valid request", req: &backends.GenerateRequest{
+			Prompt: strHello,
+			Model:  strLlama37b,
 			Options: &backends.GenerationOptions{
 				Temperature: 0.7,
 				TopP:        0.9,
 			},
-		}, false},
-		{"empty prompt", &backends.GenerateRequest{
+		}, wantErr: false},
+		{name: "empty prompt", req: &backends.GenerateRequest{
 			Prompt: "",
-			Model:  "llama3:7b",
-		}, true},
-		{"invalid model", &backends.GenerateRequest{
-			Prompt: "Hello",
+			Model:  strLlama37b,
+		}, wantErr: true},
+		{name: strInvalidModel, req: &backends.GenerateRequest{
+			Prompt: strHello,
 			Model:  "invalid model name",
-		}, true},
-		{"invalid options", &backends.GenerateRequest{
-			Prompt: "Hello",
-			Model:  "llama3:7b",
+		}, wantErr: true},
+		{name: "invalid options", req: &backends.GenerateRequest{
+			Prompt: strHello,
+			Model:  strLlama37b,
 			Options: &backends.GenerationOptions{
 				Temperature: 3.0, // Invalid
 			},
-		}, true},
+		}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -178,29 +183,30 @@ func TestValidateGenerateRequest(t *testing.T) {
 	}
 }
 
+// TestValidateEmbedRequest is part of the public API.
 func TestValidateEmbedRequest(t *testing.T) {
 	tests := []struct {
-		name    string
 		req     *backends.EmbedRequest
+		name    string
 		wantErr bool
 	}{
-		{"nil request", nil, true},
-		{"valid request", &backends.EmbedRequest{
+		{name: "nil request", req: nil, wantErr: true},
+		{name: "valid request", req: &backends.EmbedRequest{
 			Text:  "Hello world",
-			Model: "nomic-embed",
-		}, false},
-		{"empty text", &backends.EmbedRequest{
+			Model: strNomicEmbed,
+		}, wantErr: false},
+		{name: "empty text", req: &backends.EmbedRequest{
 			Text:  "",
-			Model: "nomic-embed",
-		}, true},
-		{"text too long", &backends.EmbedRequest{
+			Model: strNomicEmbed,
+		}, wantErr: true},
+		{name: "text too long", req: &backends.EmbedRequest{
 			Text:  strings.Repeat("a", MaxPromptLength+1),
-			Model: "nomic-embed",
-		}, true},
-		{"invalid model", &backends.EmbedRequest{
-			Text:  "Hello",
-			Model: "invalid model",
-		}, true},
+			Model: strNomicEmbed,
+		}, wantErr: true},
+		{name: strInvalidModel, req: &backends.EmbedRequest{
+			Text:  strHello,
+			Model: strInvalidModel,
+		}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -213,14 +219,15 @@ func TestValidateEmbedRequest(t *testing.T) {
 	}
 }
 
+// TestValidateAnnotations is part of the public API.
 func TestValidateAnnotations(t *testing.T) {
 	tests := []struct {
-		name    string
 		ann     *backends.Annotations
+		name    string
 		wantErr bool
 	}{
-		{"nil annotations", nil, false},
-		{"valid annotations", &backends.Annotations{
+		{name: "nil annotations", ann: nil, wantErr: false},
+		{name: "valid annotations", ann: &backends.Annotations{
 			Target:                "ollama-npu",
 			LatencyCritical:       true,
 			PreferPowerEfficiency: false,
@@ -228,31 +235,31 @@ func TestValidateAnnotations(t *testing.T) {
 			MaxPowerWatts:         15,
 			Priority:              backends.PriorityHigh,
 			MediaType:             backends.MediaTypeText,
-		}, false},
-		{"invalid target", &backends.Annotations{
+		}, wantErr: false},
+		{name: "invalid target", ann: &backends.Annotations{
 			Target: "invalid target",
-		}, true},
-		{"negative max latency", &backends.Annotations{
+		}, wantErr: true},
+		{name: "negative max latency", ann: &backends.Annotations{
 			MaxLatencyMs: -1,
-		}, true},
-		{"negative max power", &backends.Annotations{
+		}, wantErr: true},
+		{name: "negative max power", ann: &backends.Annotations{
 			MaxPowerWatts: -1,
-		}, true},
-		{"negative deadline", &backends.Annotations{
+		}, wantErr: true},
+		{name: "negative deadline", ann: &backends.Annotations{
 			DeadlineMs: -1,
-		}, true},
-		{"invalid priority too low", &backends.Annotations{
+		}, wantErr: true},
+		{name: "invalid priority too low", ann: &backends.Annotations{
 			Priority: backends.Priority(-1),
-		}, true},
-		{"invalid priority too high", &backends.Annotations{
+		}, wantErr: true},
+		{name: "invalid priority too high", ann: &backends.Annotations{
 			Priority: backends.Priority(4),
-		}, true},
-		{"invalid media type", &backends.Annotations{
+		}, wantErr: true},
+		{name: "invalid media type", ann: &backends.Annotations{
 			MediaType: backends.MediaType("invalid"),
-		}, true},
-		{"empty media type is valid", &backends.Annotations{
+		}, wantErr: true},
+		{name: "empty media type is valid", ann: &backends.Annotations{
 			MediaType: "",
-		}, false},
+		}, wantErr: false},
 	}
 
 	for _, tt := range tests {

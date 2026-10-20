@@ -12,32 +12,30 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 const (
-	deviceManagerInterface = "ie.fio.OllamaProxy.DeviceManager"
-	deviceManagerPath      = "/ie/fio/OllamaProxy/DeviceManager"
-
-	deviceInterface = "ie.fio.OllamaProxy.Device"
-	deviceBasePath  = "/ie/fio/OllamaProxy/Device"
+	deviceManagerInterface = "ie.fio.OllamaProxy.Manager"
+	deviceManagerPath      = "/ie/fio/OllamaProxy/Manager"
 )
 
-// DeviceManager manages device registration and access control via D-Bus
-type DeviceManager struct {
+// Manager manages device registration and access control via D-Bus
+type Manager struct {
+	ctx          context.Context
 	conn         *dbus.Conn
 	devices      map[string]*Device
-	accessGrants map[string]*AccessGrant // key: deviceID_clientID
-	mu           sync.RWMutex
+	accessGrants map[string]*AccessGrant
 	props        *prop.Properties
 	logger       *zap.Logger
 	udevMonitor  *UdevMonitor
 	polkit       *PolkitAuthorizer
-	ctx          context.Context
 	cancel       context.CancelFunc
+	mu           sync.RWMutex
 }
 
 // NewDeviceManager creates a new device manager and registers it on D-Bus
-func NewDeviceManager() (*DeviceManager, error) {
+func NewDeviceManager() (*Manager, error) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to system bus: %w", err)
@@ -45,7 +43,7 @@ func NewDeviceManager() (*DeviceManager, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dm := &DeviceManager{
+	dm := &Manager{
 		conn:         conn,
 		devices:      make(map[string]*Device),
 		accessGrants: make(map[string]*AccessGrant),
@@ -57,7 +55,7 @@ func NewDeviceManager() (*DeviceManager, error) {
 
 	// Export the device manager on D-Bus
 	if err := dm.export(); err != nil {
-		conn.Close()
+		warnErr("failed to close dbus connection", conn.Close())
 		cancel()
 		return nil, fmt.Errorf("failed to export device manager: %w", err)
 	}
@@ -80,7 +78,7 @@ func NewDeviceManager() (*DeviceManager, error) {
 }
 
 // export registers the device manager on D-Bus
-func (dm *DeviceManager) export() error {
+func (dm *Manager) export() error {
 	// Create introspection data
 	intro := &introspect.Node{
 		Name: deviceManagerPath,
@@ -93,47 +91,47 @@ func (dm *DeviceManager) export() error {
 					{
 						Name: "RegisterDevice",
 						Args: []introspect.Arg{
-							{Name: "device_type", Type: "s", Direction: "in"},
+							{Name: strDeviceType, Type: "s", Direction: "in"},
 							{Name: "device_path", Type: "s", Direction: "in"},
 							{Name: "device_name", Type: "s", Direction: "in"},
 							{Name: "capabilities", Type: "a{sv}", Direction: "in"},
-							{Name: "device_id", Type: "s", Direction: "out"},
+							{Name: strDeviceID, Type: "s", Direction: strOut},
 						},
 					},
 					{
 						Name: "UnregisterDevice",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s", Direction: "in"},
+							{Name: strDeviceID, Type: "s", Direction: "in"},
 						},
 					},
 					{
 						Name: "ListDevices",
 						Args: []introspect.Arg{
-							{Name: "device_type", Type: "s", Direction: "in"},
-							{Name: "devices", Type: "aa{sv}", Direction: "out"},
+							{Name: strDeviceType, Type: "s", Direction: "in"},
+							{Name: "devices", Type: "aa{sv}", Direction: strOut},
 						},
 					},
 					{
 						Name: "GetDevice",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s", Direction: "in"},
-							{Name: "device", Type: "a{sv}", Direction: "out"},
+							{Name: strDeviceID, Type: "s", Direction: "in"},
+							{Name: strDevice, Type: "a{sv}", Direction: strOut},
 						},
 					},
 					{
 						Name: "RequestDeviceAccess",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s", Direction: "in"},
+							{Name: strDeviceID, Type: "s", Direction: "in"},
 							{Name: "client_id", Type: "s", Direction: "in"},
-							{Name: "grant_id", Type: "s", Direction: "out"},
-							{Name: "shared_memory_path", Type: "s", Direction: "out"},
-							{Name: "unix_socket_path", Type: "s", Direction: "out"},
+							{Name: "grant_id", Type: "s", Direction: strOut},
+							{Name: "shared_memory_path", Type: "s", Direction: strOut},
+							{Name: "unix_socket_path", Type: "s", Direction: strOut},
 						},
 					},
 					{
 						Name: "ReleaseDeviceAccess",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s", Direction: "in"},
+							{Name: strDeviceID, Type: "s", Direction: "in"},
 							{Name: "client_id", Type: "s", Direction: "in"},
 						},
 					},
@@ -142,21 +140,21 @@ func (dm *DeviceManager) export() error {
 					{
 						Name: "DeviceAdded",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s"},
-							{Name: "device_type", Type: "s"},
+							{Name: strDeviceID, Type: "s"},
+							{Name: strDeviceType, Type: "s"},
 							{Name: "device_name", Type: "s"},
 						},
 					},
 					{
 						Name: "DeviceRemoved",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s"},
+							{Name: strDeviceID, Type: "s"},
 						},
 					},
 					{
 						Name: "DeviceStateChanged",
 						Args: []introspect.Arg{
-							{Name: "device_id", Type: "s"},
+							{Name: strDeviceID, Type: "s"},
 							{Name: "old_state", Type: "s"},
 							{Name: "new_state", Type: "s"},
 						},
@@ -199,7 +197,7 @@ func (dm *DeviceManager) export() error {
 }
 
 // createPropSpec creates the property specification for D-Bus
-func (dm *DeviceManager) createPropSpec() map[string]map[string]*prop.Prop {
+func (dm *Manager) createPropSpec() map[string]map[string]*prop.Prop {
 	return map[string]map[string]*prop.Prop{
 		deviceManagerInterface: {
 			"TotalDevices": {
@@ -219,7 +217,7 @@ func (dm *DeviceManager) createPropSpec() map[string]map[string]*prop.Prop {
 // D-Bus Methods
 
 // RegisterDevice registers a new device with the manager
-func (dm *DeviceManager) RegisterDevice(deviceType, devicePath, deviceName string, capabilities map[string]dbus.Variant, sender dbus.Sender) (string, *dbus.Error) {
+func (dm *Manager) RegisterDevice(deviceType, devicePath, deviceName string, capabilities map[string]dbus.Variant, sender dbus.Sender) (string, *dbus.Error) {
 	// Allow system-initiated registrations (auto-discovery)
 	if string(sender) != "ie.fio.OllamaProxy.System" {
 		// Check Polkit authorization for device registration
@@ -236,7 +234,7 @@ func (dm *DeviceManager) RegisterDevice(deviceType, devicePath, deviceName strin
 			dm.polkit.LogAuditEvent(string(sender), "register_device", deviceType, false)
 			dm.logger.Warn("Unauthorized device registration attempt",
 				zap.String("sender", string(sender)),
-				zap.String("device_type", deviceType),
+				zap.String(strDeviceType, deviceType),
 			)
 			return "", dbus.MakeFailedError(fmt.Errorf("permission denied: not authorized to register devices"))
 		}
@@ -258,7 +256,7 @@ func (dm *DeviceManager) RegisterDevice(deviceType, devicePath, deviceName strin
 
 	device := &Device{
 		ID:           deviceID,
-		Type:         DeviceType(deviceType),
+		Type:         Type(deviceType),
 		Name:         deviceName,
 		Path:         devicePath,
 		Capabilities: caps,
@@ -269,7 +267,7 @@ func (dm *DeviceManager) RegisterDevice(deviceType, devicePath, deviceName strin
 	dm.devices[deviceID] = device
 
 	dm.logger.Info("Device registered",
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("type", deviceType),
 		zap.String("name", deviceName),
 		zap.String("path", devicePath),
@@ -288,7 +286,7 @@ func (dm *DeviceManager) RegisterDevice(deviceType, devicePath, deviceName strin
 }
 
 // UnregisterDevice removes a device from the manager
-func (dm *DeviceManager) UnregisterDevice(deviceID string) *dbus.Error {
+func (dm *Manager) UnregisterDevice(deviceID string) *dbus.Error {
 	dm.mu.Lock()
 	defer dm.mu.Unlock()
 
@@ -300,7 +298,7 @@ func (dm *DeviceManager) UnregisterDevice(deviceID string) *dbus.Error {
 	delete(dm.devices, deviceID)
 
 	dm.logger.Info("Device unregistered",
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("name", device.Name))
 
 	// Emit DeviceRemoved signal
@@ -316,7 +314,7 @@ func (dm *DeviceManager) UnregisterDevice(deviceID string) *dbus.Error {
 }
 
 // ListDevices returns a list of devices, optionally filtered by type
-func (dm *DeviceManager) ListDevices(deviceType string) ([]map[string]dbus.Variant, *dbus.Error) {
+func (dm *Manager) ListDevices(deviceType string) ([]map[string]dbus.Variant, *dbus.Error) {
 	dm.mu.RLock()
 	defer dm.mu.RUnlock()
 
@@ -335,7 +333,7 @@ func (dm *DeviceManager) ListDevices(deviceType string) ([]map[string]dbus.Varia
 }
 
 // GetDevice returns information about a specific device
-func (dm *DeviceManager) GetDevice(deviceID string) (map[string]dbus.Variant, *dbus.Error) {
+func (dm *Manager) GetDevice(deviceID string) (map[string]dbus.Variant, *dbus.Error) {
 	dm.mu.RLock()
 	defer dm.mu.RUnlock()
 
@@ -348,7 +346,7 @@ func (dm *DeviceManager) GetDevice(deviceID string) (map[string]dbus.Variant, *d
 }
 
 // RequestDeviceAccess grants access to a device for a client
-func (dm *DeviceManager) RequestDeviceAccess(deviceID, clientID string, sender dbus.Sender) (string, string, string, *dbus.Error) {
+func (dm *Manager) RequestDeviceAccess(deviceID, clientID string, sender dbus.Sender) (string, string, string, *dbus.Error) {
 	dm.mu.Lock()
 	defer dm.mu.Unlock()
 
@@ -362,7 +360,7 @@ func (dm *DeviceManager) RequestDeviceAccess(deviceID, clientID string, sender d
 	if err != nil {
 		dm.logger.Error("Failed to check device access authorization",
 			zap.String("sender", string(sender)),
-			zap.String("device_id", deviceID),
+			zap.String(strDeviceID, deviceID),
 			zap.Error(err),
 		)
 		return "", "", "", dbus.MakeFailedError(fmt.Errorf("authorization check failed: %w", err))
@@ -372,8 +370,8 @@ func (dm *DeviceManager) RequestDeviceAccess(deviceID, clientID string, sender d
 		dm.polkit.LogAuditEvent(string(sender), "access_device", deviceID, false)
 		dm.logger.Warn("Unauthorized device access attempt",
 			zap.String("sender", string(sender)),
-			zap.String("device_id", deviceID),
-			zap.String("device_type", string(device.Type)),
+			zap.String(strDeviceID, deviceID),
+			zap.String(strDeviceType, string(device.Type)),
 		)
 		return "", "", "", dbus.MakeFailedError(fmt.Errorf("permission denied: not authorized to access %s devices", device.Type))
 	}
@@ -402,7 +400,7 @@ func (dm *DeviceManager) RequestDeviceAccess(deviceID, clientID string, sender d
 	device.UpdateLastUsed()
 
 	dm.logger.Info("Device access granted",
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("client_id", clientID),
 		zap.String("grant_id", grantID),
 		zap.String("sender", string(sender)))
@@ -417,7 +415,7 @@ func (dm *DeviceManager) RequestDeviceAccess(deviceID, clientID string, sender d
 }
 
 // ReleaseDeviceAccess releases access to a device for a client
-func (dm *DeviceManager) ReleaseDeviceAccess(deviceID, clientID string) *dbus.Error {
+func (dm *Manager) ReleaseDeviceAccess(deviceID, clientID string) *dbus.Error {
 	dm.mu.Lock()
 	defer dm.mu.Unlock()
 
@@ -442,7 +440,7 @@ func (dm *DeviceManager) ReleaseDeviceAccess(deviceID, clientID string) *dbus.Er
 	}
 
 	dm.logger.Info("Device access released",
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("client_id", clientID),
 		zap.String("grant_id", grant.DeviceID))
 
@@ -451,13 +449,13 @@ func (dm *DeviceManager) ReleaseDeviceAccess(deviceID, clientID string) *dbus.Er
 
 // Property getters
 
-func (dm *DeviceManager) getTotalDevices() int32 {
+func (dm *Manager) getTotalDevices() int32 {
 	dm.mu.RLock()
 	defer dm.mu.RUnlock()
-	return int32(len(dm.devices))
+	return safeconv.Int32FromInt(len(dm.devices))
 }
 
-func (dm *DeviceManager) getAvailableDevices() int32 {
+func (dm *Manager) getAvailableDevices() int32 {
 	dm.mu.RLock()
 	defer dm.mu.RUnlock()
 
@@ -471,7 +469,7 @@ func (dm *DeviceManager) getAvailableDevices() int32 {
 }
 
 // handleUdevEvents processes hotplug events from udev
-func (dm *DeviceManager) handleUdevEvents() {
+func (dm *Manager) handleUdevEvents() {
 	if dm.udevMonitor == nil {
 		return
 	}
@@ -489,7 +487,7 @@ func (dm *DeviceManager) handleUdevEvents() {
 }
 
 // handleUdevEvent processes a single udev event
-func (dm *DeviceManager) handleUdevEvent(event UdevEvent) {
+func (dm *Manager) handleUdevEvent(event UdevEvent) {
 	dm.logger.Debug("Udev event received",
 		zap.String("action", event.Action),
 		zap.String("devpath", event.DevPath),
@@ -497,7 +495,7 @@ func (dm *DeviceManager) handleUdevEvent(event UdevEvent) {
 		zap.String("devname", event.DevName))
 
 	// Auto-register video devices
-	if event.Subsystem == "video4linux" && event.Action == "add" {
+	if event.Subsystem == SubsystemVideo4linux && event.Action == strAdd {
 		capabilities := map[string]dbus.Variant{
 			"subsystem": dbus.MakeVariant(event.Subsystem),
 			"devtype":   dbus.MakeVariant(event.DevType),
@@ -517,7 +515,7 @@ func (dm *DeviceManager) handleUdevEvent(event UdevEvent) {
 	}
 
 	// Handle device removal
-	if event.Action == "remove" {
+	if event.Action == strRemove {
 		dm.mu.Lock()
 		defer dm.mu.Unlock()
 
@@ -525,7 +523,7 @@ func (dm *DeviceManager) handleUdevEvent(event UdevEvent) {
 			if device.Path == event.DevName {
 				delete(dm.devices, id)
 				dm.logger.Info("Auto-removed device",
-					zap.String("device_id", id),
+					zap.String(strDeviceID, id),
 					zap.String("path", event.DevName))
 
 				// Emit removal signal
@@ -539,7 +537,7 @@ func (dm *DeviceManager) handleUdevEvent(event UdevEvent) {
 }
 
 // StartAutoDiscovery starts monitoring for device hotplug events
-func (dm *DeviceManager) StartAutoDiscovery() error {
+func (dm *Manager) StartAutoDiscovery() error {
 	if dm.udevMonitor != nil {
 		// Already started
 		return nil
@@ -561,7 +559,7 @@ func (dm *DeviceManager) StartAutoDiscovery() error {
 }
 
 // processUdevEvents processes hotplug events from udev
-func (dm *DeviceManager) processUdevEvents() {
+func (dm *Manager) processUdevEvents() {
 	for event := range dm.udevMonitor.Events() {
 		dm.logger.Debug("Udev event received",
 			zap.String("action", event.Action),
@@ -570,7 +568,7 @@ func (dm *DeviceManager) processUdevEvents() {
 		)
 
 		switch event.Action {
-		case "add":
+		case strAdd:
 			// Auto-register the device
 			deviceType := string(event.GetDeviceType())
 			deviceName := ParseDeviceName(event)
@@ -590,13 +588,13 @@ func (dm *DeviceManager) processUdevEvents() {
 				)
 			} else {
 				dm.logger.Info("Device auto-registered",
-					zap.String("device_id", deviceID),
+					zap.String(strDeviceID, deviceID),
 					zap.String("type", deviceType),
 					zap.String("name", deviceName),
 				)
 			}
 
-		case "remove":
+		case strRemove:
 			// Find and unregister device by path
 			dm.mu.RLock()
 			var deviceID string
@@ -611,12 +609,12 @@ func (dm *DeviceManager) processUdevEvents() {
 			if deviceID != "" {
 				if err := dm.UnregisterDevice(deviceID); err != nil {
 					dm.logger.Error("Failed to auto-unregister device",
-						zap.String("device_id", deviceID),
+						zap.String(strDeviceID, deviceID),
 						zap.Error(err),
 					)
 				} else {
 					dm.logger.Info("Device auto-unregistered",
-						zap.String("device_id", deviceID),
+						zap.String(strDeviceID, deviceID),
 					)
 				}
 			}
@@ -625,7 +623,7 @@ func (dm *DeviceManager) processUdevEvents() {
 }
 
 // Stop stops the device manager and cleans up resources
-func (dm *DeviceManager) Stop() error {
+func (dm *Manager) Stop() error {
 	dm.cancel()
 
 	if dm.udevMonitor != nil {
@@ -635,7 +633,7 @@ func (dm *DeviceManager) Stop() error {
 	}
 
 	if dm.conn != nil {
-		dm.conn.Close()
+		warnErr("failed to close dbus connection", dm.conn.Close())
 	}
 
 	dm.logger.Info("Device manager stopped")

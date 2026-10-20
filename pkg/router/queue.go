@@ -10,16 +10,16 @@ import (
 
 // BackendQueue tracks pending requests for a backend
 type BackendQueue struct {
-	mu             sync.RWMutex
-	pending        int                    // Current pending requests
-	priorityCounts [4]int                 // Count per priority level
 	lastUpdate     time.Time
+	priorityCounts [4]int
+	pending        int
+	mu             sync.RWMutex
 }
 
 // QueueManager manages all backend queues
 type QueueManager struct {
+	queues map[string]*BackendQueue
 	mu     sync.RWMutex
-	queues map[string]*BackendQueue // backend ID -> queue
 }
 
 // NewQueueManager creates a new queue manager
@@ -155,10 +155,10 @@ func (qm *QueueManager) GetAllQueueStats() map[string]QueueStats {
 
 // QueueStats represents queue statistics for a backend
 type QueueStats struct {
-	BackendID      string
-	Pending        int
-	PriorityCounts [4]int
 	LastUpdate     time.Time
+	BackendID      string
+	PriorityCounts [4]int
+	Pending        int
 }
 
 // QueueTrackingBackend wraps a backend to automatically track queue depth
@@ -170,7 +170,7 @@ type QueueTrackingBackend struct {
 
 // Generate wraps the underlying backend's Generate to track queue depth
 func (qtb *QueueTrackingBackend) Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error) {
-	defer qtb.queueMgr.MarkRequestEnd(qtb.Backend.ID(), qtb.priority)
+	defer qtb.queueMgr.MarkRequestEnd(qtb.ID(), qtb.priority)
 	return qtb.Backend.Generate(ctx, req)
 }
 
@@ -178,7 +178,7 @@ func (qtb *QueueTrackingBackend) Generate(ctx context.Context, req *backends.Gen
 func (qtb *QueueTrackingBackend) GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error) {
 	reader, err := qtb.Backend.GenerateStream(ctx, req)
 	if err != nil {
-		qtb.queueMgr.MarkRequestEnd(qtb.Backend.ID(), qtb.priority)
+		qtb.queueMgr.MarkRequestEnd(qtb.ID(), qtb.priority)
 		return nil, err
 	}
 
@@ -186,7 +186,7 @@ func (qtb *QueueTrackingBackend) GenerateStream(ctx context.Context, req *backen
 	return &trackingStreamReader{
 		StreamReader: reader,
 		onClose: func() {
-			qtb.queueMgr.MarkRequestEnd(qtb.Backend.ID(), qtb.priority)
+			qtb.queueMgr.MarkRequestEnd(qtb.ID(), qtb.priority)
 		},
 	}, nil
 }

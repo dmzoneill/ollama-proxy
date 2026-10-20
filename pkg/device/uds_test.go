@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestUDSDeviceServer_CreateAndStop is part of the public API.
 func TestUDSDeviceServer_CreateAndStop(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-1", logging.Logger)
 	if err != nil {
@@ -23,12 +26,15 @@ func TestUDSDeviceServer_CreateAndStop(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_ClientConnect is part of the public API.
 func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-2", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, server.Stop())
+	}()
 
 	server.Start()
 
@@ -40,7 +46,9 @@ func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		testutil.CheckCleanup(t, client.Close())
+	}()
 
 	// Give time for server to register client
 	time.Sleep(10 * time.Millisecond)
@@ -50,12 +58,15 @@ func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_MessageExchange is part of the public API.
 func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-3", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -65,7 +76,9 @@ func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		testutil.CheckCleanup(t, client.Close())
+	}()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -94,12 +107,15 @@ func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_BroadcastFrameNotification is part of the public API.
 func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-4", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -109,13 +125,17 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect client 1: %v", err)
 	}
-	defer client1.Close()
+	defer func() {
+		testutil.CheckCleanup(t, client1.Close())
+	}()
 
 	client2, err := ConnectUDSClient(server.GetSocketPath(), logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to connect client 2: %v", err)
 	}
-	defer client2.Close()
+	defer func() {
+		testutil.CheckCleanup(t, client2.Close())
+	}()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -152,12 +172,15 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_BroadcastMetadata is part of the public API.
 func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-5", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -166,7 +189,9 @@ func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		testutil.CheckCleanup(t, client.Close())
+	}()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -189,24 +214,36 @@ func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_MultipleClients is part of the public API.
 func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-6", logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(t, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
 
-	// Connect 5 clients
+	// Connect 5 clients. Each client is closed once: clients[2] in the
+	// disconnect step below, the rest when the test returns.
 	clients := make([]*UDSClient, 5)
-	for i := 0; i < 5; i++ {
+	closed := make([]bool, len(clients))
+	t.Cleanup(func() {
+		for i, client := range clients {
+			if client == nil || closed[i] {
+				continue
+			}
+			testutil.CheckCleanup(t, client.Close())
+		}
+	})
+	for i := 0; i < len(clients); i++ {
 		client, err := ConnectUDSClient(server.GetSocketPath(), logging.Logger)
 		if err != nil {
 			t.Fatalf("Failed to connect client %d: %v", i, err)
 		}
-		defer client.Close()
 		clients[i] = client
 	}
 
@@ -217,7 +254,8 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	}
 
 	// Disconnect one client
-	clients[2].Close()
+	testutil.Check(t, clients[2].Close())
+	closed[2] = true
 	time.Sleep(10 * time.Millisecond)
 
 	if server.GetClientCount() != 4 {
@@ -225,12 +263,15 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	}
 }
 
+// BenchmarkUDSDeviceServer_SendMessage is part of the public API.
 func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 	server, err := NewUDSDeviceServer("bench-device", logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(b, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -239,7 +280,9 @@ func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to connect client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		testutil.CheckCleanup(b, client.Close())
+	}()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -248,18 +291,23 @@ func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		server.BroadcastFrameNotification(uint64(i), 1024)
-		client.ReceiveMessage()
+		if _, err := client.ReceiveMessage(); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Target: 10-50μs latency
 }
 
+// BenchmarkUDSClient_SendReceive is part of the public API.
 func BenchmarkUDSClient_SendReceive(b *testing.B) {
 	server, err := NewUDSDeviceServer("bench-device-2", logging.Logger)
 	if err != nil {
 		b.Fatalf("Failed to create UDS server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		testutil.CheckCleanup(b, server.Stop())
+	}()
 
 	server.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -268,7 +316,9 @@ func BenchmarkUDSClient_SendReceive(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to connect client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		testutil.CheckCleanup(b, client.Close())
+	}()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -281,9 +331,7 @@ func BenchmarkUDSClient_SendReceive(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		if err := client.SendMessage(msg); err != nil {
-			b.Fatal(err)
-		}
+		testutil.Check(b, client.SendMessage(msg))
 		if _, err := client.ReceiveMessage(); err != nil {
 			b.Fatal(err)
 		}

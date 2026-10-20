@@ -1,3 +1,4 @@
+// Package thermal monitors device temperatures.
 package thermal
 
 import (
@@ -11,55 +12,52 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/daoneill/ollama-proxy/pkg/logging"
+	"go.uber.org/zap"
 )
 
-// ThermalState represents thermal status of a device
-type ThermalState struct {
-	Temperature float64   // Current temp in Celsius
-	FanSpeed    int       // Fan speed in RPM (0 if not available)
-	FanPercent  int       // Fan speed as percentage (0-100)
-	PowerDraw   float64   // Current power draw in Watts
-	Utilization int       // GPU/NPU utilization percentage
-	Throttling  bool      // Is thermal throttling active?
-	UpdatedAt   time.Time // Last update timestamp
+// State represents thermal status of a device
+type State struct {
+	UpdatedAt   time.Time
+	Temperature float64
+	FanSpeed    int
+	FanPercent  int
+	PowerDraw   float64
+	Utilization int
+	Throttling  bool
 }
 
-// ThermalMonitor tracks thermal state of all backends
-type ThermalMonitor struct {
-	mu sync.RWMutex
-
-	// Thermal state per hardware
-	states map[string]*ThermalState // hardware ID -> state
-
-	// Monitoring configuration
-	updateInterval time.Duration
+// Monitor tracks thermal state of all backends
+type Monitor struct {
 	ctx            context.Context
+	states         map[string]*State
 	cancel         context.CancelFunc
-
-	// Thresholds
-	config *ThermalConfig
+	config         *Config
+	updateInterval time.Duration
+	mu             sync.RWMutex
 }
 
-// ThermalConfig defines thermal limits
-type ThermalConfig struct {
+// Config defines thermal limits
+type Config struct {
 	// Temperature thresholds (Celsius)
-	TempWarning    float64 // Start preferring cooler backends
-	TempCritical   float64 // Stop using this backend
-	TempShutdown   float64 // Emergency - system protection
+	TempWarning  float64 // Start preferring cooler backends
+	TempCritical float64 // Stop using this backend
+	TempShutdown float64 // Emergency - system protection
 
 	// Fan speed thresholds (percentage)
-	FanQuiet       int // Prefer this backend in quiet mode
-	FanModerate    int // Normal operation
-	FanLoud        int // Avoid if possible
+	FanQuiet    int // Prefer this backend in quiet mode
+	FanModerate int // Normal operation
+	FanLoud     int // Avoid if possible
 
 	// Cooling wait time
-	CooldownTime   time.Duration // Wait before retrying hot backend
+	CooldownTime time.Duration // Wait before retrying hot backend
 }
 
 // NewThermalMonitor creates a new thermal monitor
-func NewThermalMonitor(config *ThermalConfig, updateInterval time.Duration) *ThermalMonitor {
+func NewThermalMonitor(config *Config, updateInterval time.Duration) *Monitor {
 	if config == nil {
-		config = &ThermalConfig{
+		config = &Config{
 			TempWarning:  70.0,
 			TempCritical: 85.0,
 			TempShutdown: 95.0,
@@ -72,8 +70,8 @@ func NewThermalMonitor(config *ThermalConfig, updateInterval time.Duration) *The
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	tm := &ThermalMonitor{
-		states:         make(map[string]*ThermalState),
+	tm := &Monitor{
+		states:         make(map[string]*State),
 		updateInterval: updateInterval,
 		ctx:            ctx,
 		cancel:         cancel,
@@ -84,17 +82,17 @@ func NewThermalMonitor(config *ThermalConfig, updateInterval time.Duration) *The
 }
 
 // Start begins monitoring
-func (tm *ThermalMonitor) Start() {
+func (tm *Monitor) Start() {
 	go tm.monitorLoop()
 }
 
 // Stop stops monitoring
-func (tm *ThermalMonitor) Stop() {
+func (tm *Monitor) Stop() {
 	tm.cancel()
 }
 
 // monitorLoop continuously updates thermal state
-func (tm *ThermalMonitor) monitorLoop() {
+func (tm *Monitor) monitorLoop() {
 	ticker := time.NewTicker(tm.updateInterval)
 	defer ticker.Stop()
 
@@ -109,7 +107,7 @@ func (tm *ThermalMonitor) monitorLoop() {
 }
 
 // updateAll updates thermal state for all hardware
-func (tm *ThermalMonitor) updateAll() {
+func (tm *Monitor) updateAll() {
 	// Update NVIDIA GPU
 	if state, err := tm.getNVIDIAState(); err == nil {
 		tm.mu.Lock()
@@ -140,7 +138,7 @@ func (tm *ThermalMonitor) updateAll() {
 }
 
 // getNVIDIAState reads NVIDIA GPU thermal state via nvidia-smi
-func (tm *ThermalMonitor) getNVIDIAState() (*ThermalState, error) {
+func (tm *Monitor) getNVIDIAState() (*State, error) {
 	cmd := exec.Command("nvidia-smi",
 		"--query-gpu=temperature.gpu,fan.speed,power.draw,utilization.gpu,clocks_throttle_reasons.active",
 		"--format=csv,noheader,nounits")
@@ -179,7 +177,7 @@ func (tm *ThermalMonitor) getNVIDIAState() (*ThermalState, error) {
 		throttling = throttleReasons != "0x0000000000000000" && throttleReasons != "Active"
 	}
 
-	return &ThermalState{
+	return &State{
 		Temperature: temp,
 		FanPercent:  fanPercent,
 		PowerDraw:   power,
@@ -190,14 +188,12 @@ func (tm *ThermalMonitor) getNVIDIAState() (*ThermalState, error) {
 }
 
 // getIntelGPUState reads Intel GPU thermal state
-//
-//nolint:unparam // error return kept for consistency with other sensor methods
-func (tm *ThermalMonitor) getIntelGPUState() (*ThermalState, error) {
+func (tm *Monitor) getIntelGPUState() (*State, error) {
 	// Try intel_gpu_top for newer systems (disabled for now)
 	// TODO: Parse intel_gpu_top JSON output when available
 
 	// Fallback: Read from sysfs
-	state := &ThermalState{
+	state := &State{
 		UpdatedAt: time.Now(),
 	}
 
@@ -208,16 +204,20 @@ func (tm *ThermalMonitor) getIntelGPUState() (*ThermalState, error) {
 	}
 
 	for _, pattern := range tempPaths {
-		matches, _ := filepath.Glob(pattern)
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("glob intel gpu temp: %w", err)
+		}
 		for _, path := range matches {
-			if strings.Contains(path, "temp1_input") {
-				tempData, err := os.ReadFile(path)
-				if err == nil {
-					tempMilliC, _ := strconv.Atoi(strings.TrimSpace(string(tempData)))
-					state.Temperature = float64(tempMilliC) / 1000.0
-					break
-				}
+			if !strings.Contains(path, "temp1_input") {
+				continue
 			}
+			temp, readErr := readCelsius(path)
+			if readErr != nil {
+				return nil, readErr
+			}
+			state.Temperature = temp
+			break
 		}
 	}
 
@@ -229,15 +229,13 @@ func (tm *ThermalMonitor) getIntelGPUState() (*ThermalState, error) {
 }
 
 // getIntelNPUState reads NPU thermal state
-//
-//nolint:unparam // error return kept for consistency with other sensor methods
-func (tm *ThermalMonitor) getIntelNPUState() (*ThermalState, error) {
+func (tm *Monitor) getIntelNPUState() (*State, error) {
 	// NPU is typically part of the SoC, low power
 	// Read from sysfs or estimate based on system load
 
-	state := &ThermalState{
-		Temperature: 0,  // NPU temp often not separately reported
-		FanPercent:  0,  // NPU doesn't have dedicated fan
+	state := &State{
+		Temperature: 0,   // NPU temp often not separately reported
+		FanPercent:  0,   // NPU doesn't have dedicated fan
 		PowerDraw:   3.0, // Estimate from config
 		Utilization: 0,   // Would need NPU-specific tools
 		Throttling:  false,
@@ -250,23 +248,27 @@ func (tm *ThermalMonitor) getIntelNPUState() (*ThermalState, error) {
 	}
 
 	for _, pattern := range socTempPaths {
-		matches, _ := filepath.Glob(pattern)
-		if len(matches) > 0 {
-			tempData, err := os.ReadFile(matches[0])
-			if err == nil {
-				tempMilliC, _ := strconv.Atoi(strings.TrimSpace(string(tempData)))
-				state.Temperature = float64(tempMilliC) / 1000.0
-				break
-			}
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("glob npu temp: %w", err)
 		}
+		if len(matches) == 0 {
+			continue
+		}
+		temp, readErr := readCelsius(matches[0])
+		if readErr != nil {
+			return nil, readErr
+		}
+		state.Temperature = temp
+		break
 	}
 
 	return state, nil
 }
 
 // getCPUState reads CPU thermal state
-func (tm *ThermalMonitor) getCPUState() (*ThermalState, error) {
-	state := &ThermalState{
+func (tm *Monitor) getCPUState() (*State, error) {
+	state := &State{
 		UpdatedAt: time.Now(),
 	}
 
@@ -318,23 +320,24 @@ func (tm *ThermalMonitor) getCPUState() (*ThermalState, error) {
 }
 
 // getCPUStateFallback reads from thermal zones directly
-func (tm *ThermalMonitor) getCPUStateFallback() (*ThermalState, error) {
-	state := &ThermalState{
+func (tm *Monitor) getCPUStateFallback() (*State, error) {
+	state := &State{
 		UpdatedAt: time.Now(),
 	}
 
 	// Read from thermal zones
-	thermalPaths, _ := filepath.Glob("/sys/class/thermal/thermal_zone*/temp")
+	thermalPaths, err := filepath.Glob("/sys/class/thermal/thermal_zone*/temp")
+	if err != nil {
+		return nil, fmt.Errorf("glob thermal zones: %w", err)
+	}
 
 	maxTemp := 0.0
 	for _, path := range thermalPaths {
-		tempData, err := os.ReadFile(path)
-		if err != nil {
+		temp, readErr := readCelsius(path)
+		if readErr != nil {
+			logging.Warn("failed to read thermal zone", zap.String("path", path), zap.Error(readErr))
 			continue
 		}
-
-		tempMilliC, _ := strconv.Atoi(strings.TrimSpace(string(tempData)))
-		temp := float64(tempMilliC) / 1000.0
 
 		if temp > maxTemp && temp < 200 { // Sanity check
 			maxTemp = temp
@@ -348,17 +351,26 @@ func (tm *ThermalMonitor) getCPUStateFallback() (*ThermalState, error) {
 }
 
 // getSystemFanSpeed reads system fan speed (for integrated GPUs/NPU/CPU)
-func (tm *ThermalMonitor) getSystemFanSpeed() int {
+func (tm *Monitor) getSystemFanSpeed() int {
 	// Try reading from hwmon
-	fanPaths, _ := filepath.Glob("/sys/class/hwmon/hwmon*/fan*_input")
+	fanPaths, err := filepath.Glob("/sys/class/hwmon/hwmon*/fan*_input")
+	if err != nil {
+		logging.Warn("failed to list fan sensors", zap.Error(err))
+		return 0
+	}
 
 	for _, path := range fanPaths {
-		rpmData, err := os.ReadFile(path)
-		if err != nil {
+		rpmData, readErr := os.ReadFile(path)
+		if readErr != nil {
+			logging.Warn("failed to read fan sensor", zap.String("path", path), zap.Error(readErr))
 			continue
 		}
 
-		rpm, _ := strconv.Atoi(strings.TrimSpace(string(rpmData)))
+		rpm, convErr := strconv.Atoi(strings.TrimSpace(string(rpmData)))
+		if convErr != nil {
+			logging.Warn("failed to parse fan speed", zap.String("path", path), zap.Error(convErr))
+			continue
+		}
 		if rpm > 0 {
 			// Convert RPM to percentage (approximate)
 			// Assume max fan speed ~5000 RPM
@@ -373,8 +385,20 @@ func (tm *ThermalMonitor) getSystemFanSpeed() int {
 	return 0 // Fan speed unknown
 }
 
+func readCelsius(path string) (float64, error) {
+	tempData, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	tempMilliC, err := strconv.Atoi(strings.TrimSpace(string(tempData)))
+	if err != nil {
+		return 0, fmt.Errorf("parse temperature %s: %w", path, err)
+	}
+	return float64(tempMilliC) / 1000.0, nil
+}
+
 // GetState returns thermal state for hardware
-func (tm *ThermalMonitor) GetState(hardware string) *ThermalState {
+func (tm *Monitor) GetState(hardware string) *State {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
@@ -386,11 +410,11 @@ func (tm *ThermalMonitor) GetState(hardware string) *ThermalState {
 }
 
 // GetAllStates returns all thermal states
-func (tm *ThermalMonitor) GetAllStates() map[string]*ThermalState {
+func (tm *Monitor) GetAllStates() map[string]*State {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
-	states := make(map[string]*ThermalState)
+	states := make(map[string]*State)
 	for k, v := range tm.states {
 		states[k] = v
 	}
@@ -398,7 +422,7 @@ func (tm *ThermalMonitor) GetAllStates() map[string]*ThermalState {
 }
 
 // IsHealthy checks if hardware is thermally healthy
-func (tm *ThermalMonitor) IsHealthy(hardware string) bool {
+func (tm *Monitor) IsHealthy(hardware string) bool {
 	state := tm.GetState(hardware)
 	if state == nil {
 		return true // Unknown state, assume healthy
@@ -418,7 +442,7 @@ func (tm *ThermalMonitor) IsHealthy(hardware string) bool {
 }
 
 // CanUse determines if backend can be used based on thermal state
-func (tm *ThermalMonitor) CanUse(hardware string) (bool, string) {
+func (tm *Monitor) CanUse(hardware string) (bool, string) {
 	state := tm.GetState(hardware)
 	if state == nil {
 		return true, "" // Unknown, allow
@@ -446,7 +470,7 @@ func (tm *ThermalMonitor) CanUse(hardware string) (bool, string) {
 
 // GetThermalPenalty calculates routing penalty based on thermal state
 // Higher penalty = less preferred
-func (tm *ThermalMonitor) GetThermalPenalty(hardware string) float64 {
+func (tm *Monitor) GetThermalPenalty(hardware string) float64 {
 	state := tm.GetState(hardware)
 	if state == nil {
 		return 0.0 // No penalty if unknown
@@ -484,7 +508,7 @@ func (tm *ThermalMonitor) GetThermalPenalty(hardware string) float64 {
 }
 
 // ShouldPreferQuiet checks if quiet mode should be active
-func (tm *ThermalMonitor) ShouldPreferQuiet() bool {
+func (tm *Monitor) ShouldPreferQuiet() bool {
 	// Check if any backend is running loud fans
 	for _, state := range tm.GetAllStates() {
 		if state.FanPercent > tm.config.FanModerate {
@@ -495,7 +519,7 @@ func (tm *ThermalMonitor) ShouldPreferQuiet() bool {
 }
 
 // GetCoolestBackend returns the hardware with lowest temperature
-func (tm *ThermalMonitor) GetCoolestBackend(candidates []string) string {
+func (tm *Monitor) GetCoolestBackend(candidates []string) string {
 	coolest := ""
 	lowestTemp := 999.0
 
@@ -515,12 +539,12 @@ func (tm *ThermalMonitor) GetCoolestBackend(candidates []string) string {
 }
 
 // GetConfig returns the thermal configuration
-func (tm *ThermalMonitor) GetConfig() *ThermalConfig {
+func (tm *Monitor) GetConfig() *Config {
 	return tm.config
 }
 
 // String returns human-readable thermal state
-func (ts *ThermalState) String() string {
+func (ts *State) String() string {
 	return fmt.Sprintf("%.1f°C, Fan:%d%%, Power:%.1fW, Util:%d%%, Throttle:%v",
 		ts.Temperature, ts.FanPercent, ts.PowerDraw, ts.Utilization, ts.Throttling)
 }

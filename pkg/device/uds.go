@@ -10,35 +10,38 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // MessageType defines the type of UDS message
 type MessageType byte
 
+// MessageTypeMetadata is an exported const.
 const (
-	MessageTypeMetadata      MessageType = 0x01
-	MessageTypeControl       MessageType = 0x02
-	MessageTypeFrameNotify   MessageType = 0x03
-	MessageTypeError         MessageType = 0x04
-	MessageTypeAck           MessageType = 0x05
+	MessageTypeMetadata    MessageType = 0x01
+	MessageTypeControl     MessageType = 0x02
+	MessageTypeFrameNotify MessageType = 0x03
+	MessageTypeError       MessageType = 0x04
+	MessageTypeAck         MessageType = 0x05
 )
 
 // UDSMessage represents a message sent over Unix Domain Socket
 type UDSMessage struct {
-	Type    MessageType
 	Payload []byte
+	Type    MessageType
 }
 
 // UDSDeviceServer manages Unix Domain Socket connections for a device
 type UDSDeviceServer struct {
+	listener   net.Listener
+	ctx        context.Context
+	clients    map[net.Conn]*ClientConn
+	logger     *zap.Logger
+	cancel     context.CancelFunc
 	socketPath string
 	deviceID   string
-	listener   net.Listener
-	clients    map[net.Conn]*ClientConn
 	mu         sync.RWMutex
-	logger     *zap.Logger
-	ctx        context.Context
-	cancel     context.CancelFunc
 }
 
 // ClientConn represents a connected client
@@ -53,16 +56,18 @@ func NewUDSDeviceServer(deviceID string, logger *zap.Logger) (*UDSDeviceServer, 
 	socketPath := fmt.Sprintf("/tmp/ollama-proxy-%s.sock", deviceID)
 
 	// Remove existing socket if present
-	os.Remove(socketPath)
+	if removeErr := os.Remove(socketPath); removeErr != nil && !os.IsNotExist(removeErr) {
+		warnErr("failed to remove existing socket", removeErr, zap.String("path", socketPath))
+	}
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDS listener: %w", err)
 	}
 
-	// Set permissions
-	if err := os.Chmod(socketPath, 0660); err != nil {
-		listener.Close()
+	// Owner-only access. Group access is not required by the device tests.
+	if err := os.Chmod(socketPath, 0600); err != nil {
+		warnErr("failed to close unix listener", listener.Close())
 		return nil, fmt.Errorf("failed to set socket permissions: %w", err)
 	}
 
@@ -79,7 +84,7 @@ func NewUDSDeviceServer(deviceID string, logger *zap.Logger) (*UDSDeviceServer, 
 	}
 
 	logger.Info("UDS server created",
-		zap.String("device_id", deviceID),
+		zap.String(strDeviceID, deviceID),
 		zap.String("socket_path", socketPath),
 	)
 
@@ -112,7 +117,7 @@ func (s *UDSDeviceServer) acceptLoop() {
 		}
 
 		s.logger.Info("Client connected",
-			zap.String("device_id", s.deviceID),
+			zap.String(strDeviceID, s.deviceID),
 			zap.String("remote", conn.RemoteAddr().String()),
 		)
 
@@ -138,9 +143,9 @@ func (s *UDSDeviceServer) handleClient(client *ClientConn) {
 		delete(s.clients, client.conn)
 		s.mu.Unlock()
 
-		client.conn.Close()
+		warnErr("failed to close client connection", client.conn.Close())
 		s.logger.Info("Client disconnected",
-			zap.String("device_id", s.deviceID),
+			zap.String(strDeviceID, s.deviceID),
 			zap.String("client_id", client.clientID),
 		)
 	}()
@@ -172,10 +177,15 @@ func (s *UDSDeviceServer) processClientMessage(client *ClientConn, msg *UDSMessa
 		)
 		// TODO: Process control commands
 		// For now, just acknowledge
-		s.sendMessage(client, &UDSMessage{
+		if err := s.sendMessage(client, &UDSMessage{
 			Type:    MessageTypeAck,
 			Payload: []byte("OK"),
-		})
+		}); err != nil {
+			s.logger.Error("Failed to send ack",
+				zap.String("client_id", client.clientID),
+				zap.Error(err),
+			)
+		}
 
 	case MessageTypeMetadata:
 		s.logger.Debug("Received metadata request",
@@ -183,10 +193,15 @@ func (s *UDSDeviceServer) processClientMessage(client *ClientConn, msg *UDSMessa
 		)
 		// TODO: Send device metadata
 		// For now, send placeholder
-		s.sendMessage(client, &UDSMessage{
+		if err := s.sendMessage(client, &UDSMessage{
 			Type:    MessageTypeMetadata,
 			Payload: []byte(`{"status":"active"}`),
-		})
+		}); err != nil {
+			s.logger.Error("Failed to send metadata",
+				zap.String("client_id", client.clientID),
+				zap.Error(err),
+			)
+		}
 
 	default:
 		s.logger.Warn("Unknown message type",
@@ -259,7 +274,7 @@ func (s *UDSDeviceServer) sendMessage(client *ClientConn, msg *UDSMessage) error
 	defer client.writeMu.Unlock()
 
 	// Write length (payload size + 1 for type)
-	length := uint32(len(msg.Payload) + 1)
+	length := safeconv.Uint32FromInt(len(msg.Payload) + 1)
 	if err := binary.Write(client.conn, binary.LittleEndian, length); err != nil {
 		return err
 	}
@@ -331,7 +346,7 @@ func (s *UDSDeviceServer) Stop() error {
 	// Close all client connections
 	s.mu.Lock()
 	for conn := range s.clients {
-		conn.Close()
+		warnErr("failed to close client connection", conn.Close())
 	}
 	s.clients = make(map[net.Conn]*ClientConn)
 	s.mu.Unlock()
@@ -352,7 +367,7 @@ func (s *UDSDeviceServer) Stop() error {
 	}
 
 	s.logger.Info("UDS server stopped",
-		zap.String("device_id", s.deviceID),
+		zap.String(strDeviceID, s.deviceID),
 	)
 
 	return nil
@@ -361,8 +376,8 @@ func (s *UDSDeviceServer) Stop() error {
 // UDSClient represents a client connection to a UDS device server
 type UDSClient struct {
 	conn       net.Conn
-	socketPath string
 	logger     *zap.Logger
+	socketPath string
 	readMu     sync.Mutex
 	writeMu    sync.Mutex
 }
@@ -391,7 +406,7 @@ func (c *UDSClient) SendMessage(msg *UDSMessage) error {
 	defer c.writeMu.Unlock()
 
 	// Write length
-	length := uint32(len(msg.Payload) + 1)
+	length := safeconv.Uint32FromInt(len(msg.Payload) + 1)
 	if err := binary.Write(c.conn, binary.LittleEndian, length); err != nil {
 		return err
 	}

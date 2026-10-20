@@ -13,83 +13,73 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/pipeline"
 )
 
-// VirtualDeviceManager manages virtual audio and video devices
-type VirtualDeviceManager struct {
-	audioSystem     AudioSystem
-	videoSystem     *V4L2Loopback
-	deviceManager   *device.DeviceManager
-	pipelineExec    *pipeline.PipelineExecutor
-
-	// Virtual devices
-	audioSources    map[string]*VirtualAudioDevice  // mic devices (backend -> device)
-	audioSinks      map[string]*VirtualAudioDevice  // speaker devices (backend -> device)
-	cameras         map[string]*VirtualVideoDevice  // camera devices (backend -> device)
-
-	// Data bridges
-	audioBridges    map[string]*AudioBridge         // backend -> audio bridge
-	videoBridges    map[string]*VideoBridge         // backend -> video bridge
-	meetingBridges  map[string]*MeetingAudioBridge  // backend -> meeting bridge
-
-	// Backend registry (for meeting bridges)
-	backends        map[string]interface{} // backend ID -> backend interface
-
-	// Configuration
-	config          *Config
-
-	// Lifecycle
-	ctx             context.Context
-	cancel          context.CancelFunc
-	mu              sync.RWMutex
-	logger          *zap.Logger
+// Manager manages virtual audio and video devices
+type Manager struct {
+	audioSystem    AudioSystem
+	ctx            context.Context
+	audioSources   map[string]*AudioDevice
+	meetingBridges map[string]*MeetingAudioBridge
+	deviceManager  *device.Manager
+	audioSinks     map[string]*AudioDevice
+	cameras        map[string]*VideoDevice
+	audioBridges   map[string]*AudioBridge
+	videoBridges   map[string]*VideoBridge
+	pipelineExec   *pipeline.Executor
+	backends       map[string]interface{}
+	config         *Config
+	videoSystem    *V4L2Loopback
+	cancel         context.CancelFunc
+	logger         *zap.Logger
+	mu             sync.RWMutex
 }
 
-// VirtualAudioDevice represents a virtual microphone or speaker
-type VirtualAudioDevice struct {
-	ID             string
-	Name           string
-	Description    string
-	Type           string // "source" (mic) or "sink" (speaker)
-	Backend        string // "ollama-npu", "ollama-igpu", etc.
-	SystemID       string // Module/node ID from audio system
-	SampleRate     int
-	Channels       int
-	Format         string
-	IsRunning      bool
+// AudioDevice represents a virtual microphone or speaker
+type AudioDevice struct {
+	ID          string
+	Name        string
+	Description string
+	Type        string
+	Backend     string
+	SystemID    string
+	Format      string
+	SampleRate  int
+	Channels    int
+	IsRunning   bool
 }
 
-// VirtualVideoDevice represents a virtual camera
-type VirtualVideoDevice struct {
-	ID             string
-	Label          string
-	Backend        string
-	DevicePath     string
-	DeviceNum      int
-	Width          int
-	Height         int
-	Format         string
-	FPS            int
-	IsRunning      bool
+// VideoDevice represents a virtual camera
+type VideoDevice struct {
+	ID         string
+	Label      string
+	Backend    string
+	DevicePath string
+	Format     string
+	DeviceNum  int
+	Width      int
+	Height     int
+	FPS        int
+	IsRunning  bool
 }
 
 // NewVirtualDeviceManager creates a new virtual device manager
 func NewVirtualDeviceManager(
-	deviceManager *device.DeviceManager,
-	pipelineExec *pipeline.PipelineExecutor,
+	deviceManager *device.Manager,
+	pipelineExec *pipeline.Executor,
 	config *Config,
 	logger *zap.Logger,
-) (*VirtualDeviceManager, error) {
+) (*Manager, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	vdm := &VirtualDeviceManager{
+	vdm := &Manager{
 		deviceManager:  deviceManager,
 		pipelineExec:   pipelineExec,
-		audioSources:   make(map[string]*VirtualAudioDevice),
-		audioSinks:     make(map[string]*VirtualAudioDevice),
-		cameras:        make(map[string]*VirtualVideoDevice),
+		audioSources:   make(map[string]*AudioDevice),
+		audioSinks:     make(map[string]*AudioDevice),
+		cameras:        make(map[string]*VideoDevice),
 		audioBridges:   make(map[string]*AudioBridge),
 		videoBridges:   make(map[string]*VideoBridge),
 		meetingBridges: make(map[string]*MeetingAudioBridge),
@@ -128,7 +118,7 @@ func NewVirtualDeviceManager(
 }
 
 // CreateDevicesForBackend creates all virtual devices for a specific backend
-func (vdm *VirtualDeviceManager) CreateDevicesForBackend(backendID, backendName, hardware string) error {
+func (vdm *Manager) CreateDevicesForBackend(backendID, backendName, hardware string) error {
 	vdm.mu.Lock()
 	defer vdm.mu.Unlock()
 
@@ -163,7 +153,7 @@ func (vdm *VirtualDeviceManager) CreateDevicesForBackend(backendID, backendName,
 }
 
 // createAudioSource creates a virtual microphone for a backend
-func (vdm *VirtualDeviceManager) createAudioSource(backendID, backendName, hardware string) error {
+func (vdm *Manager) createAudioSource(backendID, backendName, hardware string) error {
 	if vdm.audioSystem == nil {
 		return fmt.Errorf("audio system not available")
 	}
@@ -181,7 +171,7 @@ func (vdm *VirtualDeviceManager) createAudioSource(backendID, backendName, hardw
 		return fmt.Errorf("failed to create virtual source: %w", err)
 	}
 
-	virtualDevice := &VirtualAudioDevice{
+	virtualDevice := &AudioDevice{
 		ID:          fmt.Sprintf("vmic-%s", backendID),
 		Name:        name,
 		Description: description,
@@ -206,7 +196,7 @@ func (vdm *VirtualDeviceManager) createAudioSource(backendID, backendName, hardw
 }
 
 // createAudioSink creates a virtual speaker for a backend
-func (vdm *VirtualDeviceManager) createAudioSink(backendID, backendName, hardware string) error {
+func (vdm *Manager) createAudioSink(backendID, backendName, hardware string) error {
 	if vdm.audioSystem == nil {
 		return fmt.Errorf("audio system not available")
 	}
@@ -224,7 +214,7 @@ func (vdm *VirtualDeviceManager) createAudioSink(backendID, backendName, hardwar
 		return fmt.Errorf("failed to create virtual sink: %w", err)
 	}
 
-	virtualDevice := &VirtualAudioDevice{
+	virtualDevice := &AudioDevice{
 		ID:          fmt.Sprintf("vspk-%s", backendID),
 		Name:        name,
 		Description: description,
@@ -250,7 +240,7 @@ func (vdm *VirtualDeviceManager) createAudioSink(backendID, backendName, hardwar
 
 // CreateVirtualCameras creates all virtual cameras at once
 // This must be done together because v4l2loopback requires module loading
-func (vdm *VirtualDeviceManager) CreateVirtualCameras(backends []BackendInfo) error {
+func (vdm *Manager) CreateVirtualCameras(backends []BackendInfo) error {
 	if !vdm.config.Video.Enabled || !vdm.config.Video.Camera.Enabled {
 		return nil
 	}
@@ -287,7 +277,7 @@ func (vdm *VirtualDeviceManager) CreateVirtualCameras(backends []BackendInfo) er
 	for i, backend := range backends {
 		devicePath := fmt.Sprintf("/dev/video%d", deviceNums[i])
 
-		virtualDevice := &VirtualVideoDevice{
+		virtualDevice := &VideoDevice{
 			ID:         fmt.Sprintf("vcam-%s", backend.ID),
 			Label:      labels[i],
 			Backend:    backend.ID,
@@ -313,7 +303,7 @@ func (vdm *VirtualDeviceManager) CreateVirtualCameras(backends []BackendInfo) er
 }
 
 // Stop stops all virtual devices and cleans up
-func (vdm *VirtualDeviceManager) Stop() error {
+func (vdm *Manager) Stop() error {
 	vdm.mu.Lock()
 	defer vdm.mu.Unlock()
 
@@ -386,32 +376,32 @@ func (vdm *VirtualDeviceManager) Stop() error {
 }
 
 // GetSourceCount returns the number of virtual microphones
-func (vdm *VirtualDeviceManager) GetSourceCount() int {
+func (vdm *Manager) GetSourceCount() int {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 	return len(vdm.audioSources)
 }
 
 // GetSinkCount returns the number of virtual speakers
-func (vdm *VirtualDeviceManager) GetSinkCount() int {
+func (vdm *Manager) GetSinkCount() int {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 	return len(vdm.audioSinks)
 }
 
 // GetCameraCount returns the number of virtual cameras
-func (vdm *VirtualDeviceManager) GetCameraCount() int {
+func (vdm *Manager) GetCameraCount() int {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 	return len(vdm.cameras)
 }
 
 // ListAudioSources returns all virtual microphones
-func (vdm *VirtualDeviceManager) ListAudioSources() []*VirtualAudioDevice {
+func (vdm *Manager) ListAudioSources() []*AudioDevice {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 
-	devices := make([]*VirtualAudioDevice, 0, len(vdm.audioSources))
+	devices := make([]*AudioDevice, 0, len(vdm.audioSources))
 	for _, device := range vdm.audioSources {
 		devices = append(devices, device)
 	}
@@ -419,11 +409,11 @@ func (vdm *VirtualDeviceManager) ListAudioSources() []*VirtualAudioDevice {
 }
 
 // ListAudioSinks returns all virtual speakers
-func (vdm *VirtualDeviceManager) ListAudioSinks() []*VirtualAudioDevice {
+func (vdm *Manager) ListAudioSinks() []*AudioDevice {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 
-	devices := make([]*VirtualAudioDevice, 0, len(vdm.audioSinks))
+	devices := make([]*AudioDevice, 0, len(vdm.audioSinks))
 	for _, device := range vdm.audioSinks {
 		devices = append(devices, device)
 	}
@@ -431,11 +421,11 @@ func (vdm *VirtualDeviceManager) ListAudioSinks() []*VirtualAudioDevice {
 }
 
 // ListCameras returns all virtual cameras
-func (vdm *VirtualDeviceManager) ListCameras() []*VirtualVideoDevice {
+func (vdm *Manager) ListCameras() []*VideoDevice {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 
-	cameras := make([]*VirtualVideoDevice, 0, len(vdm.cameras))
+	cameras := make([]*VideoDevice, 0, len(vdm.cameras))
 	for _, camera := range vdm.cameras {
 		cameras = append(cameras, camera)
 	}
@@ -450,7 +440,7 @@ type BackendInfo struct {
 }
 
 // RegisterBackend registers a backend for use in meeting bridges
-func (vdm *VirtualDeviceManager) RegisterBackend(backendID string, backend interface{}) {
+func (vdm *Manager) RegisterBackend(backendID string, backend interface{}) {
 	vdm.mu.Lock()
 	defer vdm.mu.Unlock()
 
@@ -462,146 +452,138 @@ func (vdm *VirtualDeviceManager) RegisterBackend(backendID string, backend inter
 
 // StartMeetingBridge starts a meeting audio bridge for a specific backend
 // This enables the Google Meet AI assistant functionality
-func (vdm *VirtualDeviceManager) StartMeetingBridge(backendID string) error {
+func (vdm *Manager) StartMeetingBridge(backendID string) error {
 	vdm.mu.Lock()
 	defer vdm.mu.Unlock()
 
-	// Check if devices exist for this backend
+	micDevice, speakerDevice, err := vdm.meetingAudioDevices(backendID)
+	if err != nil {
+		return err
+	}
+
+	sttBackend, llmBackend, err := vdm.meetingPipelineBackends(backendID)
+	if err != nil {
+		return err
+	}
+
+	speakerMonitor := speakerDevice.Name + ".monitor"
+	bridge := NewMeetingAudioBridge(
+		speakerMonitor,
+		micDevice.Name,
+		sttBackend,
+		llmBackend,
+		sttBackend,
+		vdm.pipelineExec,
+		vdm.logger,
+	)
+	if err := bridge.Start(); err != nil {
+		return fmt.Errorf("failed to start meeting bridge: %w", err)
+	}
+
+	vdm.meetingBridges[backendID] = bridge
+	vdm.logger.Info("Started meeting audio bridge",
+		zap.String("backend_id", backendID),
+		zap.String("speaker_monitor", speakerMonitor),
+		zap.String("microphone_sink", micDevice.Name),
+	)
+	return nil
+}
+
+func (vdm *Manager) meetingAudioDevices(backendID string) (*AudioDevice, *AudioDevice, error) {
 	micDevice, micExists := vdm.audioSources[backendID]
 	speakerDevice, speakerExists := vdm.audioSinks[backendID]
-
 	if !micExists || !speakerExists {
-		return fmt.Errorf("audio devices not found for backend %s", backendID)
+		return nil, nil, fmt.Errorf("audio devices not found for backend %s", backendID)
 	}
-
-	// Check if bridge already running
-	if existing, exists := vdm.meetingBridges[backendID]; exists {
-		if existing.IsRunning() {
-			return fmt.Errorf("meeting bridge already running for backend %s", backendID)
-		}
+	if existing, running := vdm.meetingBridges[backendID]; running && existing.IsRunning() {
+		return nil, nil, fmt.Errorf("meeting bridge already running for backend %s", backendID)
 	}
+	return micDevice, speakerDevice, nil
+}
 
-	// Get backends from registry
-	// For meeting bridge, we need: STT backend, LLM backend, TTS backend
-	// Use NPU backend for STT/TTS (whisper.cpp + piper via subprocess)
-	backendInterface, exists := vdm.backends[backendID]
-	if !exists {
-		return fmt.Errorf("backend %s not registered", backendID)
+func (vdm *Manager) meetingPipelineBackends(backendID string) (interface{}, interface{}, error) {
+	backendInterface, registered := vdm.backends[backendID]
+	if !registered {
+		return nil, nil, fmt.Errorf("backend %s not registered", backendID)
 	}
-
-	// Type assert to audio backend interface
-	sttBackend, ok := backendInterface.(interface {
+	if _, ok := backendInterface.(interface {
 		ID() string
 		SupportsAudioToText() bool
 		SupportsTextToAudio() bool
 		TranscribeAudio(ctx context.Context, req *backends.TranscribeRequest) (*backends.TranscribeResponse, error)
 		SynthesizeSpeech(ctx context.Context, req *backends.SynthesizeRequest) (*backends.SynthesizeResponse, error)
-	})
-	if !ok {
-		return fmt.Errorf("backend %s does not support audio processing", backendID)
+	}); !ok {
+		return nil, nil, fmt.Errorf("backend %s does not support audio processing", backendID)
 	}
 
-	// Use same backend for TTS
-	ttsBackend := sttBackend
+	llmBackendID := vdm.selectMeetingLLMBackend(backendID)
+	llmBackend, err := vdm.meetingLLMBackend(llmBackendID)
+	if err != nil {
+		return nil, nil, err
+	}
+	vdm.prepareMeetingLLM(llmBackendID, llmBackend)
+	return backendInterface, llmBackend, nil
+}
 
-	// Find LLM backend (prefer OpenVINO CPU for best performance)
-	// Based on Xenith analysis: CPU with OpenVINO INT4 is 12x faster than NPU
-	var llmBackendID string
-
-	// First preference: OpenVINO CPU (200ms, INT4 optimized)
-	if _, exists := vdm.backends["openvino-cpu"]; exists {
-		llmBackendID = "openvino-cpu"
-	} else {
-		// Second preference: iGPU (if OpenVINO not available)
-		for id := range vdm.backends {
-			if strings.Contains(id, "igpu") {
-				llmBackendID = id
-				break
-			}
+func (vdm *Manager) selectMeetingLLMBackend(requested string) string {
+	if _, ok := vdm.backends["openvino-cpu"]; ok {
+		return "openvino-cpu"
+	}
+	for id := range vdm.backends {
+		if strings.Contains(id, "igpu") {
+			return id
 		}
 	}
+	return requested
+}
 
-	if llmBackendID == "" {
-		// Fallback to requested backend
-		llmBackendID = backendID
+func (vdm *Manager) meetingLLMBackend(llmBackendID string) (interface{}, error) {
+	llmBackendInterface, registered := vdm.backends[llmBackendID]
+	if !registered {
+		return nil, fmt.Errorf("LLM backend %s not registered", llmBackendID)
 	}
-
-	llmBackendInterface, exists := vdm.backends[llmBackendID]
-	if !exists {
-		return fmt.Errorf("LLM backend %s not registered", llmBackendID)
-	}
-
-	llmBackend, ok := llmBackendInterface.(interface {
+	if _, ok := llmBackendInterface.(interface {
 		ID() string
 		SupportsGenerate() bool
 		Generate(ctx context.Context, req *backends.GenerateRequest) (*backends.GenerateResponse, error)
 		GenerateStream(ctx context.Context, req *backends.GenerateRequest) (backends.StreamReader, error)
-	})
-	if !ok {
-		return fmt.Errorf("backend %s does not support text generation", llmBackendID)
+	}); !ok {
+		return nil, fmt.Errorf("backend %s does not support text generation", llmBackendID)
 	}
+	return llmBackendInterface, nil
+}
 
-	// Audio models are handled via subprocess (whisper.cpp + Piper)
-	// For Ollama backends: Ensure LLM model is available
-	// For OpenVINO backends: Model is already on disk
-	if llmBackendID != "openvino-cpu" {
-		vdm.logger.Info("Ensuring LLM model available for meeting bridge",
-			zap.String("llm_backend", llmBackendID),
-			zap.String("model", "qwen2.5:0.5b"),
-		)
-
-		if ensurer, ok := llmBackend.(interface {
-			EnsureModel(ctx context.Context, modelName string) error
-		}); ok {
-			ctx := context.Background()
-			if err := ensurer.EnsureModel(ctx, "qwen2.5:0.5b"); err != nil {
-				vdm.logger.Warn("Failed to ensure LLM model",
-					zap.String("model", "qwen2.5:0.5b"),
-					zap.Error(err),
-				)
-			}
-		}
-	} else {
+func (vdm *Manager) prepareMeetingLLM(llmBackendID string, llmBackend interface{}) {
+	if llmBackendID == "openvino-cpu" {
 		vdm.logger.Info("Using OpenVINO LLM backend for meeting bridge",
 			zap.String("llm_backend", llmBackendID),
 			zap.String("model", "qwen2.5-1.5b-int4"),
 			zap.String("device", "CPU"),
 			zap.String("note", "INT4 optimized, 200ms target latency"),
 		)
+		return
 	}
 
-	// Create meeting bridge
-	// Speaker monitor name is the speaker sink name + ".monitor"
-	speakerMonitor := speakerDevice.Name + ".monitor"
-
-	bridge := NewMeetingAudioBridge(
-		speakerMonitor,
-		micDevice.Name,
-		sttBackend,  // NPU/CPU backend (whisper.cpp)
-		llmBackend,  // OpenVINO CPU (qwen2.5-1.5b-int4) or Ollama iGPU fallback
-		ttsBackend,  // NPU/CPU backend (piper)
-		vdm.pipelineExec,
-		vdm.logger,
+	vdm.logger.Info("Ensuring LLM model available for meeting bridge",
+		zap.String("llm_backend", llmBackendID),
+		zap.String("model", "qwen2.5:0.5b"),
 	)
-
-	// Start the bridge
-	if err := bridge.Start(); err != nil {
-		return fmt.Errorf("failed to start meeting bridge: %w", err)
+	ensurer, ok := llmBackend.(interface {
+		EnsureModel(ctx context.Context, modelName string) error
+	})
+	if !ok {
+		return
 	}
-
-	vdm.meetingBridges[backendID] = bridge
-
-	vdm.logger.Info("Started meeting audio bridge",
-		zap.String("backend_id", backendID),
-		zap.String("speaker_monitor", speakerMonitor),
-		zap.String("microphone_sink", micDevice.Name),
-	)
-
-	return nil
+	if err := ensurer.EnsureModel(context.Background(), "qwen2.5:0.5b"); err != nil {
+		vdm.logger.Warn("Failed to ensure LLM model",
+			zap.String("model", "qwen2.5:0.5b"),
+			zap.Error(err),
+		)
+	}
 }
 
 // StopMeetingBridge stops a meeting audio bridge for a specific backend
-func (vdm *VirtualDeviceManager) StopMeetingBridge(backendID string) error {
+func (vdm *Manager) StopMeetingBridge(backendID string) error {
 	vdm.mu.Lock()
 	defer vdm.mu.Unlock()
 
@@ -624,7 +606,7 @@ func (vdm *VirtualDeviceManager) StopMeetingBridge(backendID string) error {
 }
 
 // GetMeetingBridgeStatus returns the status of a meeting bridge
-func (vdm *VirtualDeviceManager) GetMeetingBridgeStatus(backendID string) (bool, error) {
+func (vdm *Manager) GetMeetingBridgeStatus(backendID string) (bool, error) {
 	vdm.mu.RLock()
 	defer vdm.mu.RUnlock()
 
