@@ -1,6 +1,3 @@
-//go:build ignore
-// +build ignore
-
 // Package main verifies backend interface satisfaction at compile time.
 package main
 
