@@ -4,42 +4,42 @@ package openai
 
 // ChatCompletionRequest represents a request to /v1/chat/completions
 type ChatCompletionRequest struct {
-	Model            string                         `json:"model"`
-	Messages         []ChatCompletionMessage        `json:"messages"`
-	Temperature      *float32                       `json:"temperature,omitempty"`
-	TopP             *float32                       `json:"top_p,omitempty"`
-	N                *int                           `json:"n,omitempty"`
-	Stream           bool                           `json:"stream,omitempty"`
-	Stop             []string                       `json:"stop,omitempty"`
-	MaxTokens        *int32                         `json:"max_tokens,omitempty"`
-	PresencePenalty  *float32                       `json:"presence_penalty,omitempty"`
-	FrequencyPenalty *float32                       `json:"frequency_penalty,omitempty"`
-	LogitBias        map[string]float32             `json:"logit_bias,omitempty"`
-	User             string                         `json:"user,omitempty"`
+	Temperature      *float32                `json:"temperature,omitempty"`
+	TopP             *float32                `json:"top_p,omitempty"`
+	N                *int                    `json:"n,omitempty"`
+	MaxTokens        *int32                  `json:"max_tokens,omitempty"`
+	PresencePenalty  *float32                `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float32                `json:"frequency_penalty,omitempty"`
+	LogitBias        map[string]float32      `json:"logit_bias,omitempty"`
+	Model            string                  `json:"model"`
+	User             string                  `json:"user,omitempty"`
+	Messages         []ChatCompletionMessage `json:"messages"`
+	Stop             []string                `json:"stop,omitempty"`
+	Stream           bool                    `json:"stream,omitempty"`
 }
 
 // ChatCompletionMessage represents a message in the chat
 type ChatCompletionMessage struct {
-	Role    string `json:"role"`    // system, user, assistant, function
+	Role    string `json:"role"` // system, user, assistant, function
 	Content string `json:"content"`
 	Name    string `json:"name,omitempty"`
 }
 
 // ChatCompletionResponse represents a response from /v1/chat/completions
 type ChatCompletionResponse struct {
-	ID      string                   `json:"id"`
-	Object  string                   `json:"object"` // "chat.completion"
-	Created int64                    `json:"created"`
-	Model   string                   `json:"model"`
-	Choices []ChatCompletionChoice   `json:"choices"`
-	Usage   ChatCompletionUsage      `json:"usage"`
+	ID      string                 `json:"id"`
+	Object  string                 `json:"object"`
+	Model   string                 `json:"model"`
+	Choices []ChatCompletionChoice `json:"choices"`
+	Created int64                  `json:"created"`
+	Usage   ChatCompletionUsage    `json:"usage"`
 }
 
 // ChatCompletionChoice represents a completion choice
 type ChatCompletionChoice struct {
-	Index        int                   `json:"index"`
 	Message      ChatCompletionMessage `json:"message"`
-	FinishReason string                `json:"finish_reason"` // stop, length, content_filter, null
+	FinishReason string                `json:"finish_reason"`
+	Index        int                   `json:"index"`
 }
 
 // ChatCompletionUsage represents token usage statistics
@@ -52,17 +52,17 @@ type ChatCompletionUsage struct {
 // ChatCompletionChunk represents a streaming chunk from /v1/chat/completions
 type ChatCompletionChunk struct {
 	ID      string                      `json:"id"`
-	Object  string                      `json:"object"` // "chat.completion.chunk"
-	Created int64                       `json:"created"`
+	Object  string                      `json:"object"`
 	Model   string                      `json:"model"`
 	Choices []ChatCompletionChunkChoice `json:"choices"`
+	Created int64                       `json:"created"`
 }
 
 // ChatCompletionChunkChoice represents a streaming choice
 type ChatCompletionChunkChoice struct {
-	Index        int                        `json:"index"`
-	Delta        ChatCompletionChunkDelta   `json:"delta"`
-	FinishReason *string                    `json:"finish_reason"` // null until final chunk
+	FinishReason *string                  `json:"finish_reason"`
+	Delta        ChatCompletionChunkDelta `json:"delta"`
+	Index        int                      `json:"index"`
 }
 
 // ChatCompletionChunkDelta represents the incremental content in a chunk
@@ -73,40 +73,40 @@ type ChatCompletionChunkDelta struct {
 
 // CompletionRequest represents a request to /v1/completions (legacy)
 type CompletionRequest struct {
-	Model            string             `json:"model"`
-	Prompt           interface{}        `json:"prompt"` // string or []string
-	Suffix           string             `json:"suffix,omitempty"`
+	Prompt           interface{}        `json:"prompt"`
+	LogProbs         *int               `json:"logprobs,omitempty"`
+	PresencePenalty  *float32           `json:"presence_penalty,omitempty"`
 	MaxTokens        *int32             `json:"max_tokens,omitempty"`
 	Temperature      *float32           `json:"temperature,omitempty"`
 	TopP             *float32           `json:"top_p,omitempty"`
 	N                *int               `json:"n,omitempty"`
-	Stream           bool               `json:"stream,omitempty"`
-	LogProbs         *int               `json:"logprobs,omitempty"`
-	Echo             bool               `json:"echo,omitempty"`
-	Stop             []string           `json:"stop,omitempty"`
-	PresencePenalty  *float32           `json:"presence_penalty,omitempty"`
-	FrequencyPenalty *float32           `json:"frequency_penalty,omitempty"`
-	BestOf           *int               `json:"best_of,omitempty"`
 	LogitBias        map[string]float32 `json:"logit_bias,omitempty"`
+	BestOf           *int               `json:"best_of,omitempty"`
+	FrequencyPenalty *float32           `json:"frequency_penalty,omitempty"`
+	Model            string             `json:"model"`
+	Suffix           string             `json:"suffix,omitempty"`
 	User             string             `json:"user,omitempty"`
+	Stop             []string           `json:"stop,omitempty"`
+	Stream           bool               `json:"stream,omitempty"`
+	Echo             bool               `json:"echo,omitempty"`
 }
 
 // CompletionResponse represents a response from /v1/completions
 type CompletionResponse struct {
 	ID      string             `json:"id"`
-	Object  string             `json:"object"` // "text_completion"
-	Created int64              `json:"created"`
+	Object  string             `json:"object"`
 	Model   string             `json:"model"`
 	Choices []CompletionChoice `json:"choices"`
+	Created int64              `json:"created"`
 	Usage   CompletionUsage    `json:"usage"`
 }
 
 // CompletionChoice represents a completion choice
 type CompletionChoice struct {
-	Text         string  `json:"text"`
-	Index        int     `json:"index"`
-	LogProbs     *int    `json:"logprobs"`
-	FinishReason string  `json:"finish_reason"`
+	LogProbs     *int   `json:"logprobs"`
+	Text         string `json:"text"`
+	FinishReason string `json:"finish_reason"`
+	Index        int    `json:"index"`
 }
 
 // CompletionUsage represents token usage statistics
@@ -118,18 +118,18 @@ type CompletionUsage struct {
 
 // CompletionChunk represents a streaming chunk from /v1/completions
 type CompletionChunk struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"` // "text_completion.chunk"
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
+	ID      string                  `json:"id"`
+	Object  string                  `json:"object"`
+	Model   string                  `json:"model"`
 	Choices []CompletionChunkChoice `json:"choices"`
+	Created int64                   `json:"created"`
 }
 
 // CompletionChunkChoice represents a streaming choice
 type CompletionChunkChoice struct {
+	FinishReason *string `json:"finish_reason"`
 	Text         string  `json:"text"`
 	Index        int     `json:"index"`
-	FinishReason *string `json:"finish_reason"`
 }
 
 // EmbeddingRequest represents a request to /v1/embeddings
@@ -142,17 +142,17 @@ type EmbeddingRequest struct {
 
 // EmbeddingResponse represents a response from /v1/embeddings
 type EmbeddingResponse struct {
-	Object string          `json:"object"` // "list"
-	Data   []EmbeddingData `json:"data"`
+	Object string          `json:"object"`
 	Model  string          `json:"model"`
+	Data   []EmbeddingData `json:"data"`
 	Usage  EmbeddingUsage  `json:"usage"`
 }
 
 // EmbeddingData represents a single embedding
 type EmbeddingData struct {
-	Object    string    `json:"object"` // "embedding"
-	Index     int       `json:"index"`
+	Object    string    `json:"object"`
 	Embedding []float32 `json:"embedding"`
+	Index     int       `json:"index"`
 }
 
 // EmbeddingUsage represents token usage for embeddings
@@ -170,12 +170,12 @@ type ModelsResponse struct {
 // Model represents a model in the models list
 type Model struct {
 	ID         string   `json:"id"`
-	Object     string   `json:"object"` // "model"
-	Created    int64    `json:"created"`
+	Object     string   `json:"object"`
 	OwnedBy    string   `json:"owned_by"`
-	Permission []string `json:"permission,omitempty"`
 	Root       string   `json:"root,omitempty"`
 	Parent     string   `json:"parent,omitempty"`
+	Permission []string `json:"permission,omitempty"`
+	Created    int64    `json:"created"`
 }
 
 // ErrorResponse represents an OpenAI API error

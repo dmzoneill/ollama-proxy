@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// TestChatChunkPool is part of the public API.
 func TestChatChunkPool(t *testing.T) {
 	// Test getting a chunk from pool
 	chunk := getChatChunk()
@@ -31,9 +32,10 @@ func TestChatChunkPool(t *testing.T) {
 	// Test that large chunks aren't returned to pool
 	largeChunk := getChatChunk()
 	largeChunk.Choices = make([]ChatCompletionChunkChoice, 15) // More than 10
-	putChatChunk(largeChunk) // Should not panic, but won't be pooled
+	putChatChunk(largeChunk)                                   // Should not panic, but won't be pooled
 }
 
+// TestCompletionChunkPool is part of the public API.
 func TestCompletionChunkPool(t *testing.T) {
 	// Test getting a chunk from pool
 	chunk := getCompletionChunk()
@@ -41,7 +43,7 @@ func TestCompletionChunkPool(t *testing.T) {
 		t.Fatal("getCompletionChunk returned nil")
 	}
 
-	if chunk.Object != "text_completion.chunk" {
+	if chunk.Object != strTextCompletionChunk {
 		t.Errorf("Expected Object='text_completion.chunk', got %s", chunk.Object)
 	}
 
@@ -64,6 +66,7 @@ func TestCompletionChunkPool(t *testing.T) {
 	putCompletionChunk(largeChunk)
 }
 
+// TestSSEBufferPool is part of the public API.
 func TestSSEBufferPool(t *testing.T) {
 	// Test getting a buffer from pool
 	buf := getSSEBuffer()
@@ -93,10 +96,11 @@ func TestSSEBufferPool(t *testing.T) {
 
 	// Test that huge buffers aren't returned to pool
 	hugeBuf := getSSEBuffer()
-	hugeBuf.Grow(20000) // More than 16384
+	hugeBuf.Grow(20000)   // More than 16384
 	putSSEBuffer(hugeBuf) // Should not panic, but won't be pooled
 }
 
+// TestJSONBytesPool is part of the public API.
 func TestJSONBytesPool(t *testing.T) {
 	// Test getting bytes from pool
 	b := getJSONBytes()
@@ -115,5 +119,5 @@ func TestJSONBytesPool(t *testing.T) {
 
 	// Test that large slices aren't returned to pool
 	largeBytes := make([]byte, 20000) // More than 8192
-	putJSONBytes(&largeBytes)          // Should not panic, but won't be pooled
+	putJSONBytes(&largeBytes)         // Should not panic, but won't be pooled
 }

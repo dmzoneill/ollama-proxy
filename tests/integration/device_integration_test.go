@@ -11,6 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
+// TestMain is part of the public API.
 func TestMain(m *testing.M) {
 	// Initialize logging
 	if err := logging.InitLogger("info", false); err != nil {
@@ -260,9 +261,9 @@ func TestV4L2_BasicOperation(t *testing.T) {
 	defer v4l2Device.Close()
 
 	// Set format
-	if err := v4l2Device.SetFormat(640, 480, device.V4L2_PIX_FMT_YUYV); err != nil {
+	if err := v4l2Device.SetFormat(640, 480, device.V4l2PixFmtYuyv); err != nil {
 		// Try MJPEG if YUYV not supported
-		if err := v4l2Device.SetFormat(640, 480, device.V4L2_PIX_FMT_MJPEG); err != nil {
+		if err := v4l2Device.SetFormat(640, 480, device.V4l2PixFmtMjpeg); err != nil {
 			t.Skipf("Failed to set format: %v", err)
 		}
 	}

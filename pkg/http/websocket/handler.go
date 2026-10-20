@@ -1,3 +1,4 @@
+// Package websocket serves streaming chat over WebSocket.
 package websocket
 
 import (
@@ -17,39 +18,37 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
+	CheckOrigin: func(_ *http.Request) bool {
 		// TODO: Implement proper CORS policy
 		return true
 	},
 }
 
-// WebSocketRequest represents an incoming WebSocket request
-type WebSocketRequest struct {
-	RequestID   string                 `json:"request_id"`
-	Model       string                 `json:"model"`
-	Prompt      string                 `json:"prompt"`
-	Options     map[string]interface{} `json:"options,omitempty"`
-	Stream      bool                   `json:"stream,omitempty"`
-	Priority    string                 `json:"priority,omitempty"` // "best-effort", "normal", "high", "critical"
-	MaxLatency  int32                  `json:"max_latency_ms,omitempty"`
+// Request represents an incoming WebSocket request
+type Request struct {
+	Options    map[string]interface{} `json:"options,omitempty"`
+	RequestID  string                 `json:"request_id"`
+	Model      string                 `json:"model"`
+	Prompt     string                 `json:"prompt"`
+	Priority   string                 `json:"priority,omitempty"`
+	MaxLatency int32                  `json:"max_latency_ms,omitempty"`
+	Stream     bool                   `json:"stream,omitempty"`
 }
 
-// WebSocketChunk represents a streaming response chunk
-type WebSocketChunk struct {
-	RequestID string  `json:"request_id"`
-	Token     string  `json:"token,omitempty"`
-	Done      bool    `json:"done"`
-	Error     *string `json:"error,omitempty"`
-
-	// Performance metrics
-	TTFT        int64   `json:"ttft_ms,omitempty"`         // Time to first token
-	TotalTimeMs int64   `json:"total_time_ms,omitempty"`
-	TokenCount  int     `json:"token_count,omitempty"`
+// Chunk represents a streaming response chunk
+type Chunk struct {
+	Error        *string `json:"error,omitempty"`
+	RequestID    string  `json:"request_id"`
+	Token        string  `json:"token,omitempty"`
+	TTFT         int64   `json:"ttft_ms,omitempty"`
+	TotalTimeMs  int64   `json:"total_time_ms,omitempty"`
+	TokenCount   int     `json:"token_count,omitempty"`
 	TokensPerSec float32 `json:"tokens_per_sec,omitempty"`
+	Done         bool    `json:"done"`
 }
 
-// WebSocketError represents an error response
-type WebSocketError struct {
+// Error represents an error response
+type Error struct {
 	Error     string `json:"error"`
 	RequestID string `json:"request_id,omitempty"`
 }
@@ -63,13 +62,19 @@ func HandleWebSocketStream(r *router.Router) http.HandlerFunc {
 			logging.Logger.Error("WebSocket upgrade failed", zap.Error(err))
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				logging.Warn("close websocket", zap.Error(err))
+			}
+		}()
 
-		// Set read deadline
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		if err := conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+			logging.Warn("set websocket read deadline", zap.Error(err))
+			return
+		}
 
 		// Read initial request
-		var streamReq WebSocketRequest
+		var streamReq Request
 		if err := conn.ReadJSON(&streamReq); err != nil {
 			sendError(conn, "invalid request", streamReq.RequestID)
 			return
@@ -80,7 +85,7 @@ func HandleWebSocketStream(r *router.Router) http.HandlerFunc {
 		switch streamReq.Priority {
 		case "best-effort", "low":
 			priority = backends.PriorityBestEffort
-		case "high":
+		case strHigh:
 			priority = backends.PriorityHigh
 		case "critical", "realtime":
 			priority = backends.PriorityCritical
@@ -122,7 +127,7 @@ func HandleWebSocketStream(r *router.Router) http.HandlerFunc {
 }
 
 // handleStreamingRequest processes a streaming WebSocket request
-func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req *backends.GenerateRequest, wsReq *WebSocketRequest) {
+func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req *backends.GenerateRequest, wsReq *Request) {
 	ctx := context.Background()
 	startTime := time.Now()
 
@@ -131,7 +136,11 @@ func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req 
 		sendError(conn, fmt.Sprintf("stream start failed: %v", err), wsReq.RequestID)
 		return
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			logging.Warn("close websocket stream", zap.Error(err))
+		}
+	}()
 
 	var firstTokenTime *time.Time
 	tokenCount := 0
@@ -142,12 +151,14 @@ func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req 
 		if err != nil {
 			if err != io.EOF {
 				errorMsg := err.Error()
-				wsChunk := WebSocketChunk{
+				wsChunk := Chunk{
 					RequestID: wsReq.RequestID,
 					Done:      true,
 					Error:     &errorMsg,
 				}
-				conn.WriteJSON(wsChunk)
+				if err := conn.WriteJSON(wsChunk); err != nil {
+					logging.Warn("write websocket error chunk", zap.Error(err))
+				}
 			}
 			break
 		}
@@ -160,7 +171,7 @@ func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req 
 		tokenCount++
 
 		// Passthrough mode: Send chunk with minimal transformation
-		wsChunk := WebSocketChunk{
+		wsChunk := Chunk{
 			RequestID: wsReq.RequestID,
 			Token:     chunk.Token,
 			Done:      chunk.Done,
@@ -182,7 +193,10 @@ func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req 
 		}
 
 		// Write with timeout
-		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			logging.Warn("set websocket write deadline", zap.Error(err))
+			break
+		}
 		if err := conn.WriteJSON(wsChunk); err != nil {
 			logging.Logger.Error("WebSocket write failed", zap.Error(err))
 			break
@@ -195,7 +209,7 @@ func handleStreamingRequest(conn *websocket.Conn, backend backends.Backend, req 
 }
 
 // handleNonStreamingRequest processes a non-streaming WebSocket request
-func handleNonStreamingRequest(conn *websocket.Conn, backend backends.Backend, req *backends.GenerateRequest, wsReq *WebSocketRequest) {
+func handleNonStreamingRequest(conn *websocket.Conn, backend backends.Backend, req *backends.GenerateRequest, wsReq *Request) {
 	ctx := context.Background()
 	startTime := time.Now()
 
@@ -208,7 +222,7 @@ func handleNonStreamingRequest(conn *websocket.Conn, backend backends.Backend, r
 	elapsed := time.Since(startTime)
 
 	// Send complete response
-	wsChunk := WebSocketChunk{
+	wsChunk := Chunk{
 		RequestID:    wsReq.RequestID,
 		Token:        response.Response,
 		Done:         true,
@@ -217,14 +231,17 @@ func handleNonStreamingRequest(conn *websocket.Conn, backend backends.Backend, r
 		TokensPerSec: 1.0 / float32(elapsed.Seconds()),
 	}
 
-	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		logging.Warn("set websocket write deadline", zap.Error(err))
+		return
+	}
 	if err := conn.WriteJSON(wsChunk); err != nil {
 		logging.Logger.Error("WebSocket write failed", zap.Error(err))
 	}
 }
 
 // convertWebSocketRequest converts WebSocket request to internal format
-func convertWebSocketRequest(wsReq *WebSocketRequest) *backends.GenerateRequest {
+func convertWebSocketRequest(wsReq *Request) *backends.GenerateRequest {
 	req := &backends.GenerateRequest{
 		Prompt: wsReq.Prompt,
 		Model:  wsReq.Model,
@@ -234,10 +251,10 @@ func convertWebSocketRequest(wsReq *WebSocketRequest) *backends.GenerateRequest 
 	if wsReq.Options != nil {
 		options := &backends.GenerationOptions{}
 
-		if temp, ok := wsReq.Options["temperature"].(float64); ok {
+		if temp, ok := wsReq.Options[strTemperature].(float64); ok {
 			options.Temperature = float32(temp)
 		}
-		if topP, ok := wsReq.Options["top_p"].(float64); ok {
+		if topP, ok := wsReq.Options[strTopP].(float64); ok {
 			options.TopP = float32(topP)
 		}
 		if topK, ok := wsReq.Options["top_k"].(float64); ok {
@@ -255,9 +272,14 @@ func convertWebSocketRequest(wsReq *WebSocketRequest) *backends.GenerateRequest 
 
 // sendError sends an error message via WebSocket
 func sendError(conn *websocket.Conn, message string, requestID string) {
-	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	conn.WriteJSON(WebSocketError{
+	if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		logging.Warn("set websocket error deadline", zap.Error(err))
+		return
+	}
+	if err := conn.WriteJSON(Error{
 		Error:     message,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		logging.Warn("write websocket error", zap.Error(err))
+	}
 }

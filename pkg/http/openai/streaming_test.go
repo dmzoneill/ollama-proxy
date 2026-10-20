@@ -13,12 +13,13 @@ import (
 
 // MockStreamReader implements backends.StreamReader for testing
 type MockStreamReader struct {
+	err    error
 	chunks []*backends.StreamChunk
 	index  int
 	closed bool
-	err    error
 }
 
+// Recv is part of the public API.
 func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	if m.closed {
 		return nil, fmt.Errorf("EOF")
@@ -38,6 +39,7 @@ func (m *MockStreamReader) Recv() (*backends.StreamChunk, error) {
 	return chunk, nil
 }
 
+// Close is part of the public API.
 func (m *MockStreamReader) Close() error {
 	m.closed = true
 	return nil
@@ -84,8 +86,8 @@ func parseSSEResponse(body string) []map[string]interface{} {
 // Test: StreamChatCompletion with normal chunks
 func TestStreamChatCompletion_Normal(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "Hello", Done: false},
-		{Token: " world", Done: false},
+		{Token: strHello2, Done: false},
+		{Token: strWorld2, Done: false},
 		{Token: "!", Done: true},
 	}
 
@@ -98,15 +100,15 @@ func TestStreamChatCompletion_Normal(t *testing.T) {
 	}
 
 	// Check headers
-	if ct := recorder.Header().Get("Content-Type"); ct != "text/event-stream" {
+	if ct := recorder.Header().Get("Content-Type"); ct != strTextEventStream {
 		t.Errorf("Expected Content-Type 'text/event-stream', got %s", ct)
 	}
 
-	if cc := recorder.Header().Get("Cache-Control"); cc != "no-cache" {
+	if cc := recorder.Header().Get("Cache-Control"); cc != strNoCache {
 		t.Errorf("Expected Cache-Control 'no-cache', got %s", cc)
 	}
 
-	if conn := recorder.Header().Get("Connection"); conn != "keep-alive" {
+	if conn := recorder.Header().Get("Connection"); conn != strKeepAlive {
 		t.Errorf("Expected Connection 'keep-alive', got %s", conn)
 	}
 
@@ -131,7 +133,7 @@ func TestStreamChatCompletion_Normal(t *testing.T) {
 				if delta, ok := choice["delta"]; ok {
 					deltaMap := delta.(map[string]interface{})
 					if content, ok := deltaMap["content"]; ok {
-						if content != "Hello" {
+						if content != strHello2 {
 							t.Errorf("Expected content 'Hello', got %v", content)
 						}
 					}
@@ -142,7 +144,7 @@ func TestStreamChatCompletion_Normal(t *testing.T) {
 
 	// Check model and ID are set
 	if len(messages) > 0 {
-		if model, ok := messages[0]["model"]; ok {
+		if model, ok := messages[0][strModel]; ok {
 			if model != "gpt-4" {
 				t.Errorf("Expected model 'gpt-4', got %v", model)
 			}
@@ -170,7 +172,7 @@ func TestStreamChatCompletion_Normal(t *testing.T) {
 // Test: StreamChatCompletion with finish_reason
 func TestStreamChatCompletion_FinishReason(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "Response", Done: true},
+		{Token: strResponse, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -190,7 +192,7 @@ func TestStreamChatCompletion_FinishReason(t *testing.T) {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
 				if finishReason, ok := choice["finish_reason"]; ok {
-					if finishReason != "stop" {
+					if finishReason != strStop {
 						t.Errorf("Expected finish_reason 'stop', got %v", finishReason)
 					}
 				} else {
@@ -225,7 +227,7 @@ func TestStreamChatCompletion_EmptyChunks(t *testing.T) {
 // Test: StreamChatCompletion with reader close error
 func TestStreamChatCompletion_ReaderError(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "Hello", Done: false},
+		{Token: strHello2, Done: false},
 	}
 
 	reader := NewMockStreamReaderWithError(chunks, fmt.Errorf("connection lost"))
@@ -313,7 +315,7 @@ func TestStreamCompletion_Normal(t *testing.T) {
 	}
 
 	// Check headers
-	if ct := recorder.Header().Get("Content-Type"); ct != "text/event-stream" {
+	if ct := recorder.Header().Get("Content-Type"); ct != strTextEventStream {
 		t.Errorf("Expected Content-Type 'text/event-stream', got %s", ct)
 	}
 
@@ -328,7 +330,7 @@ func TestStreamCompletion_Normal(t *testing.T) {
 	// Verify object type is text_completion.chunk
 	if len(messages) > 0 {
 		if obj, ok := messages[0]["object"]; ok {
-			if obj != "text_completion.chunk" {
+			if obj != strTextCompletionChunk {
 				t.Errorf("Expected object 'text_completion.chunk', got %v", obj)
 			}
 		}
@@ -338,7 +340,7 @@ func TestStreamCompletion_Normal(t *testing.T) {
 // Test: StreamCompletion with finish_reason
 func TestStreamCompletion_FinishReason(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "Response", Done: true},
+		{Token: strResponse, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -357,7 +359,7 @@ func TestStreamCompletion_FinishReason(t *testing.T) {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
 				if finishReason, ok := choice["finish_reason"]; ok {
-					if finishReason != "stop" {
+					if finishReason != strStop {
 						t.Errorf("Expected finish_reason 'stop', got %v", finishReason)
 					}
 				}
@@ -372,7 +374,7 @@ func TestStreamCompletion_ManyChunks(t *testing.T) {
 	for i := 0; i < 49; i++ {
 		chunks[i] = &backends.StreamChunk{Token: fmt.Sprintf("word%d ", i), Done: false}
 	}
-	chunks[49] = &backends.StreamChunk{Token: "end", Done: true}
+	chunks[49] = &backends.StreamChunk{Token: strEnd, Done: true}
 
 	reader := NewMockStreamReader(chunks)
 	recorder := httptest.NewRecorder()
@@ -413,7 +415,7 @@ func TestStreamCompletion_SpecialChars(t *testing.T) {
 // Test: SSE format validation for chat completion
 func TestStreamChatCompletion_SSEFormat(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -445,7 +447,7 @@ func TestStreamChatCompletion_SSEFormat(t *testing.T) {
 // Test: SSE format validation for completion
 func TestStreamCompletion_SSEFormat(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -470,7 +472,7 @@ func TestStreamCompletion_SSEFormat(t *testing.T) {
 
 // Test: Token streaming integrity for chat
 func TestStreamChatCompletion_TokenIntegrity(t *testing.T) {
-	expectedTokens := []string{"Hello", " ", "world", "!"}
+	expectedTokens := []string{strHello2, " ", strWorld, "!"}
 	chunks := make([]*backends.StreamChunk, len(expectedTokens))
 	for i, token := range expectedTokens {
 		chunks[i] = &backends.StreamChunk{
@@ -567,8 +569,8 @@ func TestStreamCompletion_TokenIntegrity(t *testing.T) {
 // Test: Error handling with EOF
 func TestStreamChatCompletion_NormalEOF(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "hello", Done: false},
-		{Token: "world", Done: true},
+		{Token: strHello, Done: false},
+		{Token: strWorld, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -633,8 +635,8 @@ func TestStreamCompletion_ActualError(t *testing.T) {
 // Test: Stream completion with index tracking
 func TestStreamChatCompletion_Index(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "chunk1", Done: false},
-		{Token: "chunk2", Done: false},
+		{Token: strChunk1, Done: false},
+		{Token: strChunk2, Done: false},
 		{Token: "chunk3", Done: true},
 	}
 
@@ -705,8 +707,8 @@ func TestStreamCompletion_Index(t *testing.T) {
 // Test: Timestamp consistency for chat completion
 func TestStreamChatCompletion_TimestampConsistency(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "hello", Done: false},
-		{Token: "world", Done: true},
+		{Token: strHello, Done: false},
+		{Token: strWorld, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -750,7 +752,7 @@ func TestStreamChatCompletion_TimestampConsistency(t *testing.T) {
 // Test: Timestamp consistency for completion
 func TestStreamCompletion_TimestampConsistency(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -787,7 +789,7 @@ func TestStreamChatCompletion_LargeResponse(t *testing.T) {
 			Done:  false,
 		}
 	}
-	chunks[499] = &backends.StreamChunk{Token: "end", Done: true}
+	chunks[499] = &backends.StreamChunk{Token: strEnd, Done: true}
 
 	reader := NewMockStreamReader(chunks)
 	recorder := httptest.NewRecorder()
@@ -816,7 +818,7 @@ func TestStreamCompletion_LargeResponse(t *testing.T) {
 			Done:  false,
 		}
 	}
-	chunks[299] = &backends.StreamChunk{Token: "end", Done: true}
+	chunks[299] = &backends.StreamChunk{Token: strEnd, Done: true}
 
 	reader := NewMockStreamReader(chunks)
 	recorder := httptest.NewRecorder()
@@ -835,7 +837,7 @@ func TestStreamCompletion_LargeResponse(t *testing.T) {
 // Test: Reader close is called
 func TestStreamChatCompletion_ReaderClosed(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -854,7 +856,7 @@ func TestStreamChatCompletion_ReaderClosed(t *testing.T) {
 // Test: Reader close is called for completion
 func TestStreamCompletion_ReaderClosed(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -910,8 +912,8 @@ func TestStreamCompletion_NoTokens(t *testing.T) {
 // Test: Multiple done flags don't break streaming
 func TestStreamChatCompletion_MultipleDone(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "hello", Done: true},
-		{Token: "world", Done: true},
+		{Token: strHello, Done: true},
+		{Token: strWorld, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -955,7 +957,7 @@ func TestStreamCompletion_MultipleDone(t *testing.T) {
 // Test: Response header flushing
 func TestStreamChatCompletion_Flushing(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -975,7 +977,7 @@ func TestStreamChatCompletion_Flushing(t *testing.T) {
 // Test: Completion response header flushing
 func TestStreamCompletion_Flushing(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -997,7 +999,7 @@ func TestStreamChatCompletion_JSONError(t *testing.T) {
 	// We can't directly cause a marshal error with normal types, so we test
 	// that normal JSON marshaling works
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1018,7 +1020,7 @@ func TestStreamChatCompletion_JSONError(t *testing.T) {
 // Test: Chat vs Completion object types
 func TestStreamChat_vs_Completion_ObjectTypes(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	// Test chat completion
@@ -1039,7 +1041,7 @@ func TestStreamChat_vs_Completion_ObjectTypes(t *testing.T) {
 	}
 
 	// Completion should have "text_completion.chunk"
-	if !strings.Contains(body2, "text_completion.chunk") {
+	if !strings.Contains(body2, strTextCompletionChunk) {
 		t.Error("Expected 'text_completion.chunk' in completion response")
 	}
 }
@@ -1047,8 +1049,8 @@ func TestStreamChat_vs_Completion_ObjectTypes(t *testing.T) {
 // Test: ValidateSSEEventFormat for both streaming functions
 func TestStreamChatCompletion_ValidSSEEvent(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "hello", Done: false},
-		{Token: "world", Done: true},
+		{Token: strHello, Done: false},
+		{Token: strWorld, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1069,7 +1071,7 @@ func TestStreamChatCompletion_ValidSSEEvent(t *testing.T) {
 			eventCount++
 			// Next line should be blank (or end of string)
 			if lines[i+1] != "" && i+1 < len(lines)-1 {
-				// It's okay if the last line doesn't have a blank line after
+				t.Errorf("SSE event at line %d is not followed by a blank line", i)
 			}
 		}
 	}
@@ -1082,8 +1084,8 @@ func TestStreamChatCompletion_ValidSSEEvent(t *testing.T) {
 // Test: Model and ID propagation in chunks
 func TestStreamChatCompletion_ModelIDPropagation(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "chunk1", Done: false},
-		{Token: "chunk2", Done: true},
+		{Token: strChunk1, Done: false},
+		{Token: strChunk2, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1104,7 +1106,7 @@ func TestStreamChatCompletion_ModelIDPropagation(t *testing.T) {
 		if _, ok := msg["done"]; ok {
 			continue
 		}
-		if model, ok := msg["model"]; ok {
+		if model, ok := msg[strModel]; ok {
 			if model != testModel {
 				t.Errorf("Expected model %s, got %v", testModel, model)
 			}
@@ -1138,7 +1140,7 @@ func TestStreamCompletion_ModelIDPropagation(t *testing.T) {
 	messages := parseSSEResponse(body)
 
 	for _, msg := range messages {
-		if model, ok := msg["model"]; ok {
+		if model, ok := msg[strModel]; ok {
 			if model != testModel {
 				t.Errorf("Expected model %s, got %v", testModel, model)
 			}
@@ -1256,7 +1258,7 @@ func TestStreamCompletion_TextField(t *testing.T) {
 // Test: Chat completion with chunks that test branch coverage
 func TestStreamChatCompletion_ChoiceStructure(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1296,8 +1298,8 @@ func TestStreamChatCompletion_ChoiceStructure(t *testing.T) {
 // Test: Completion with chunks that test object field
 func TestStreamCompletion_Object(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "hello", Done: false},
-		{Token: "world", Done: true},
+		{Token: strHello, Done: false},
+		{Token: strWorld, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1317,7 +1319,7 @@ func TestStreamCompletion_Object(t *testing.T) {
 			continue
 		}
 		if obj, ok := msg["object"]; ok {
-			if obj != "text_completion.chunk" {
+			if obj != strTextCompletionChunk {
 				t.Errorf("Expected object 'text_completion.chunk', got %v", obj)
 			}
 		} else {
@@ -1349,7 +1351,7 @@ func TestStreamChatCompletion_AllFields(t *testing.T) {
 		}
 
 		// Check all required top-level fields
-		requiredFields := []string{"id", "object", "created", "model", "choices"}
+		requiredFields := []string{"id", "object", "created", strModel, "choices"}
 		for _, field := range requiredFields {
 			if _, ok := msg[field]; !ok {
 				t.Errorf("Expected %s field in message", field)
@@ -1401,7 +1403,7 @@ func TestStreamCompletion_AllFields(t *testing.T) {
 		}
 
 		// Check all required top-level fields
-		requiredFields := []string{"id", "object", "created", "model", "choices"}
+		requiredFields := []string{"id", "object", "created", strModel, "choices"}
 		for _, field := range requiredFields {
 			if _, ok := msg[field]; !ok {
 				t.Errorf("Expected %s field in message", field)
@@ -1410,7 +1412,7 @@ func TestStreamCompletion_AllFields(t *testing.T) {
 
 		// Verify object is correct
 		if obj, ok := msg["object"]; ok {
-			if obj != "text_completion.chunk" {
+			if obj != strTextCompletionChunk {
 				t.Errorf("Expected object 'text_completion.chunk', got %v", obj)
 			}
 		}
@@ -1420,7 +1422,7 @@ func TestStreamCompletion_AllFields(t *testing.T) {
 // Test: Response headers are set immediately
 func TestStreamChatCompletion_HeadersSetImmediately(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1433,10 +1435,10 @@ func TestStreamChatCompletion_HeadersSetImmediately(t *testing.T) {
 
 	// All headers should be set
 	headers := map[string]string{
-		"Content-Type":        "text/event-stream",
-		"Cache-Control":       "no-cache",
-		"Connection":          "keep-alive",
-		"X-Accel-Buffering":   "no",
+		"Content-Type":      strTextEventStream,
+		"Cache-Control":     strNoCache,
+		"Connection":        strKeepAlive,
+		"X-Accel-Buffering": "no",
 	}
 
 	for header, expected := range headers {
@@ -1449,7 +1451,7 @@ func TestStreamChatCompletion_HeadersSetImmediately(t *testing.T) {
 // Test: Completion response headers
 func TestStreamCompletion_HeadersSetImmediately(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "test", Done: true},
+		{Token: strTest, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1462,9 +1464,9 @@ func TestStreamCompletion_HeadersSetImmediately(t *testing.T) {
 
 	// Check headers
 	headers := map[string]string{
-		"Content-Type":  "text/event-stream",
-		"Cache-Control": "no-cache",
-		"Connection":    "keep-alive",
+		"Content-Type":  strTextEventStream,
+		"Cache-Control": strNoCache,
+		"Connection":    strKeepAlive,
 	}
 
 	for header, expected := range headers {
@@ -1504,9 +1506,10 @@ func TestStreamChatCompletion_NilFinishReasonInitially(t *testing.T) {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
 				finishReason := choice["finish_reason"]
-				if finishReason == nil {
+				switch finishReason {
+				case nil:
 					foundNonFinal = true
-				} else if finishReason == "stop" {
+				case strStop:
 					foundFinal = true
 				}
 			}
@@ -1524,8 +1527,8 @@ func TestStreamChatCompletion_NilFinishReasonInitially(t *testing.T) {
 // Test: Completion with nil finish reason initially
 func TestStreamCompletion_NilFinishReasonInitially(t *testing.T) {
 	chunks := []*backends.StreamChunk{
-		{Token: "chunk1", Done: false},
-		{Token: "chunk2", Done: true},
+		{Token: strChunk1, Done: false},
+		{Token: strChunk2, Done: true},
 	}
 
 	reader := NewMockStreamReader(chunks)
@@ -1547,7 +1550,7 @@ func TestStreamCompletion_NilFinishReasonInitially(t *testing.T) {
 		if choices, ok := msg["choices"]; ok {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
-				if finishReason, ok := choice["finish_reason"]; ok && finishReason == "stop" {
+				if finishReason, ok := choice["finish_reason"]; ok && finishReason == strStop {
 					foundFinal = true
 				}
 			}
