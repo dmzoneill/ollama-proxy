@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daoneill/ollama-proxy/pkg/testutil"
+
 	"github.com/daoneill/ollama-proxy/pkg/device"
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 	"github.com/godbus/dbus/v5"
@@ -34,9 +36,7 @@ func TestDeviceManager_FullLifecycle(t *testing.T) {
 		t.Skipf("Failed to create device manager (D-Bus may not be available): %v", err)
 	}
 	defer func() {
-		if err := dm.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, dm.Stop())
 	}()
 
 	// Test 1: Register a virtual microphone
@@ -123,9 +123,7 @@ func TestSharedMemory_VideoStreaming(t *testing.T) {
 		t.Skipf("Failed to create shared memory (may not have permissions): %v", err)
 	}
 	defer func() {
-		if err := shmRing.Destroy(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, shmRing.Destroy())
 	}()
 
 	// Open as reader
@@ -134,9 +132,7 @@ func TestSharedMemory_VideoStreaming(t *testing.T) {
 		t.Fatalf("Failed to open shared memory as reader: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, reader.Close())
 	}()
 
 	// Simulate video streaming
@@ -211,9 +207,7 @@ func TestUDS_Metadata(t *testing.T) {
 		t.Fatalf("Failed to create UDS server: %v", err)
 	}
 	defer func() {
-		if err := server.Stop(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, server.Stop())
 	}()
 
 	server.Start()
@@ -225,9 +219,7 @@ func TestUDS_Metadata(t *testing.T) {
 		t.Fatalf("Failed to connect UDS client: %v", err)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, client.Close())
 	}()
 
 	time.Sleep(10 * time.Millisecond)
@@ -279,9 +271,7 @@ func TestV4L2_BasicOperation(t *testing.T) {
 		t.Skipf("Failed to open V4L2 device: %v", err)
 	}
 	defer func() {
-		if err := v4l2Device.Close(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, v4l2Device.Close())
 	}()
 
 	// Set format
@@ -306,9 +296,7 @@ func TestV4L2_BasicOperation(t *testing.T) {
 		t.Fatalf("Failed to start streaming: %v", err)
 	}
 	defer func() {
-		if err := v4l2Device.StopStreaming(); err != nil {
-			t.Error(err)
-		}
+		testutil.CheckCleanup(t, v4l2Device.StopStreaming())
 	}()
 
 	// Capture a few frames
@@ -345,9 +333,7 @@ func BenchmarkEndToEnd_Latency(b *testing.B) {
 		b.Skipf("Failed to create shared memory: %v", err)
 	}
 	defer func() {
-		if err := shmRing.Destroy(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, shmRing.Destroy())
 	}()
 
 	reader, err := device.OpenSharedMemoryRing("bench-e2e", logging.Logger)
@@ -355,9 +341,7 @@ func BenchmarkEndToEnd_Latency(b *testing.B) {
 		b.Fatalf("Failed to open shared memory: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			b.Error(err)
-		}
+		testutil.CheckCleanup(b, reader.Close())
 	}()
 
 	frame := make([]byte, frameSize)
