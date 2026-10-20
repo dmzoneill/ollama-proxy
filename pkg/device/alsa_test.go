@@ -7,6 +7,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestALSADevice_OpenClose is part of the public API.
 func TestALSADevice_OpenClose(t *testing.T) {
 	// Skip if no ALSA device available
 	if _, err := os.Stat("/dev/snd/pcmC0D0c"); os.IsNotExist(err) {
@@ -32,6 +33,7 @@ func TestALSADevice_OpenClose(t *testing.T) {
 	}
 }
 
+// TestALSADevice_GetCapabilities is part of the public API.
 func TestALSADevice_GetCapabilities(t *testing.T) {
 	if _, err := os.Stat("/dev/snd/pcmC0D0c"); os.IsNotExist(err) {
 		t.Skip("No /dev/snd/pcmC0D0c device available")
@@ -45,8 +47,8 @@ func TestALSADevice_GetCapabilities(t *testing.T) {
 
 	caps := device.GetCapabilities()
 
-	if caps["sample_rate"] != uint32(44100) {
-		t.Errorf("Expected sample rate 44100 in caps, got %v", caps["sample_rate"])
+	if caps[strSampleRate] != uint32(44100) {
+		t.Errorf("Expected sample rate 44100 in caps, got %v", caps[strSampleRate])
 	}
 
 	if caps["channels"] != uint32(1) {
@@ -60,6 +62,7 @@ func TestALSADevice_GetCapabilities(t *testing.T) {
 	t.Logf("ALSA Device Capabilities: %+v", caps)
 }
 
+// TestALSADevice_Prepare is part of the public API.
 func TestALSADevice_Prepare(t *testing.T) {
 	if _, err := os.Stat("/dev/snd/pcmC0D0c"); os.IsNotExist(err) {
 		t.Skip("No /dev/snd/pcmC0D0c device available")
@@ -77,6 +80,7 @@ func TestALSADevice_Prepare(t *testing.T) {
 	}
 }
 
+// TestALSADevice_StartStopCapture is part of the public API.
 func TestALSADevice_StartStopCapture(t *testing.T) {
 	if _, err := os.Stat("/dev/snd/pcmC0D0c"); os.IsNotExist(err) {
 		t.Skip("No /dev/snd/pcmC0D0c device available")
@@ -109,6 +113,7 @@ func TestALSADevice_StartStopCapture(t *testing.T) {
 	}
 }
 
+// TestSimplifiedALSACapture_Create is part of the public API.
 func TestSimplifiedALSACapture_Create(t *testing.T) {
 	capture, err := NewSimplifiedALSACapture("default", 48000, 2, logging.Logger)
 	if err != nil {
@@ -129,6 +134,7 @@ func TestSimplifiedALSACapture_Create(t *testing.T) {
 	}
 }
 
+// TestSimplifiedALSACapture_GetCapabilities is part of the public API.
 func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 	capture, err := NewSimplifiedALSACapture("default", 44100, 1, logging.Logger)
 	if err != nil {
@@ -138,8 +144,8 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 
 	caps := capture.GetCapabilities()
 
-	if caps["sample_rate"] != uint32(44100) {
-		t.Errorf("Expected sample rate 44100, got %v", caps["sample_rate"])
+	if caps[strSampleRate] != uint32(44100) {
+		t.Errorf("Expected sample rate 44100, got %v", caps[strSampleRate])
 	}
 
 	if caps["channels"] != uint32(1) {
@@ -153,13 +159,14 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 	t.Logf("Simplified ALSA Capabilities: %+v", caps)
 }
 
+// TestALSADevice_IntegrationWithSHM is part of the public API.
 func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
 
 	// Create shared memory ring for audio
-	// 48kHz stereo S16_LE = 48000 * 2 * 2 = 192,000 bytes/sec
+	// 48kHz stereo S16Le = 48000 * 2 * 2 = 192,000 bytes/sec
 	// Use 10ms buffers = 1920 bytes per frame
 	frameSize := uint64(1920)
 	shmRing, err := CreateSharedMemoryRing("test-alsa-shm", 16, frameSize, logging.Logger)
@@ -221,6 +228,7 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 	t.Log("Successfully transferred audio data via SHM")
 }
 
+// BenchmarkSimplifiedALSACapture_Write is part of the public API.
 func BenchmarkSimplifiedALSACapture_Write(b *testing.B) {
 	shmRing, err := CreateSharedMemoryRing("bench-alsa", 16, 1920, logging.Logger)
 	if err != nil {

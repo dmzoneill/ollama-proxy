@@ -14,31 +14,32 @@ import (
 
 // UdevEvent represents a hotplug event from the kernel
 type UdevEvent struct {
-	Action     string // "add", "remove", "change"
-	DevPath    string // /devices/pci0000:00/...
-	Subsystem  string // "video4linux", "sound", "input"
-	DevName    string // /dev/video0, /dev/snd/pcmC0D0c
-	DevType    string // Device type (if available)
 	Properties map[string]string
+	Action     string
+	DevPath    string
+	Subsystem  string
+	DevName    string
+	DevType    string
 }
 
 // UdevMonitor monitors kernel udev events via netlink socket
 type UdevMonitor struct {
-	socket  int
 	eventCh chan UdevEvent
 	stopCh  chan struct{}
 	logger  *zap.Logger
+	socket  int
 }
 
+// NetlinkKobjectUevent is an exported const.
 const (
 	// Netlink socket constants
-	NETLINK_KOBJECT_UEVENT = 15
-	UEVENT_BUFFER_SIZE     = 8192
+	NetlinkKobjectUevent = 15
+	UeventBufferSize     = 8192
 
 	// Subsystems we care about
-	SUBSYSTEM_VIDEO4LINUX = "video4linux"
-	SUBSYSTEM_SOUND       = "sound"
-	SUBSYSTEM_INPUT       = "input"
+	SubsystemVideo4linux = "video4linux"
+	SubsystemSound       = "sound"
+	SubsystemInput       = "input"
 )
 
 // NewUdevMonitor creates a new udev event monitor
@@ -47,7 +48,7 @@ func NewUdevMonitor() (*UdevMonitor, error) {
 	fd, err := syscall.Socket(
 		syscall.AF_NETLINK,
 		syscall.SOCK_RAW,
-		NETLINK_KOBJECT_UEVENT,
+		NetlinkKobjectUevent,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create netlink socket: %w", err)
@@ -61,7 +62,7 @@ func NewUdevMonitor() (*UdevMonitor, error) {
 	}
 
 	if err := syscall.Bind(fd, addr); err != nil {
-		syscall.Close(fd)
+		warnErr("failed to close netlink socket", syscall.Close(fd))
 		return nil, fmt.Errorf("failed to bind netlink socket: %w", err)
 	}
 
@@ -96,7 +97,7 @@ func (um *UdevMonitor) Stop() error {
 
 // receiveLoop continuously receives events from the netlink socket
 func (um *UdevMonitor) receiveLoop() {
-	buffer := make([]byte, UEVENT_BUFFER_SIZE)
+	buffer := make([]byte, UeventBufferSize)
 
 	for {
 		select {
@@ -143,7 +144,8 @@ func (um *UdevMonitor) receiveLoop() {
 // parseUevent parses a raw netlink uevent message
 // Format: null-separated key=value pairs
 // Example: "add@/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/video4linux/video0\x00
-//           ACTION=add\x00DEVPATH=/devices/.../video0\x00SUBSYSTEM=video4linux\x00..."
+//
+//	ACTION=add\x00DEVPATH=/devices/.../video0\x00SUBSYSTEM=video4linux\x00..."
 func (um *UdevMonitor) parseUevent(data []byte) (UdevEvent, error) {
 	event := UdevEvent{
 		Properties: make(map[string]string),
@@ -205,13 +207,13 @@ func (um *UdevMonitor) parseUevent(data []byte) (UdevEvent, error) {
 // isRelevantEvent checks if we care about this event
 func (um *UdevMonitor) isRelevantEvent(event UdevEvent) bool {
 	// Only process add/remove/change events
-	if event.Action != "add" && event.Action != "remove" && event.Action != "change" {
+	if event.Action != strAdd && event.Action != strRemove && event.Action != "change" {
 		return false
 	}
 
 	// Only process relevant subsystems
 	switch event.Subsystem {
-	case SUBSYSTEM_VIDEO4LINUX, SUBSYSTEM_SOUND, SUBSYSTEM_INPUT:
+	case SubsystemVideo4linux, SubsystemSound, SubsystemInput:
 		return true
 	default:
 		return false
@@ -224,18 +226,18 @@ func (e UdevEvent) String() string {
 		e.Action, e.DevPath, e.Subsystem, e.DevName, e.DevType)
 }
 
-// GetDeviceType maps udev subsystem to our DeviceType
-func (e UdevEvent) GetDeviceType() DeviceType {
+// GetDeviceType maps udev subsystem to our Type
+func (e UdevEvent) GetDeviceType() Type {
 	switch e.Subsystem {
-	case SUBSYSTEM_VIDEO4LINUX:
+	case SubsystemVideo4linux:
 		return DeviceTypeCamera
-	case SUBSYSTEM_SOUND:
+	case SubsystemSound:
 		// ALSA naming: pcmC{card}D{dev}c = capture, pcmC{card}D{dev}p = playback
 		if strings.HasSuffix(e.DevName, "c") {
 			return DeviceTypeMicrophone
 		}
 		return DeviceTypeSpeaker
-	case SUBSYSTEM_INPUT:
+	case SubsystemInput:
 		// Check device type
 		if strings.Contains(strings.ToLower(e.DevType), "keyboard") {
 			return DeviceTypeKeyboard
@@ -256,7 +258,9 @@ func MonitorDevices() error {
 	if err != nil {
 		return err
 	}
-	defer monitor.Stop()
+	defer func() {
+		warnErr("failed to stop udev monitor", monitor.Stop())
+	}()
 
 	monitor.Start()
 
@@ -273,7 +277,7 @@ func MonitorDevices() error {
 
 		// Print some properties
 		for k, v := range event.Properties {
-			if k == "PRODUCT" || k == "ID_MODEL" || k == "ID_VENDOR" {
+			if k == "PRODUCT" || k == "IdModel" || k == "IdVendor" {
 				fmt.Printf("  %s=%s\n", k, v)
 			}
 		}
@@ -283,20 +287,16 @@ func MonitorDevices() error {
 	return nil
 }
 
-// Helper function to check if running as root (required for netlink)
-func requiresRoot() bool {
-	return os.Geteuid() != 0
-}
-
 // init checks if we have permission to create netlink socket
 func init() {
 	// Test netlink socket creation
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, NETLINK_KOBJECT_UEVENT)
-	if err == nil {
-		syscall.Close(fd)
-	} else if err == syscall.EPERM {
+	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, NetlinkKobjectUevent)
+	switch err {
+	case nil:
+		warnErr("failed to close netlink probe socket", syscall.Close(fd))
+	case syscall.EPERM:
 		// Log warning but don't fail - let NewUdevMonitor handle it
-		logging.Logger.Warn("Netlink socket creation requires elevated privileges (may need CAP_NET_ADMIN or root)")
+		logging.Warn("Netlink socket creation requires elevated privileges (may need CAP_NET_ADMIN or root)")
 	}
 }
 
@@ -322,7 +322,7 @@ func GetCapabilities(devPath string) map[string]string {
 // ParseDeviceName extracts a friendly name from udev properties
 func ParseDeviceName(event UdevEvent) string {
 	// Try ID_MODEL first
-	if model, ok := event.Properties["ID_MODEL"]; ok && model != "" {
+	if model, ok := event.Properties["IdModel"]; ok && model != "" {
 		return strings.ReplaceAll(model, "_", " ")
 	}
 

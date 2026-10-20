@@ -14,20 +14,17 @@ import (
 )
 
 // GRPCService implements the gRPC DeviceService interface
-// It bridges gRPC calls to the D-Bus DeviceManager
+// It bridges gRPC calls to the D-Bus Manager
 type GRPCService struct {
 	devicev1.UnimplementedDeviceServiceServer
-
-	deviceManager *DeviceManager
+	deviceManager *Manager
 	logger        *zap.Logger
-
-	// Watchers for device events
-	watchersMu sync.RWMutex
-	watchers   map[string]chan *devicev1.DeviceEvent
+	watchers      map[string]chan *devicev1.DeviceEvent
+	watchersMu    sync.RWMutex
 }
 
 // NewGRPCService creates a new gRPC device service
-func NewGRPCService(dm *DeviceManager) *GRPCService {
+func NewGRPCService(dm *Manager) *GRPCService {
 	return &GRPCService{
 		deviceManager: dm,
 		logger:        dm.logger,
@@ -36,14 +33,14 @@ func NewGRPCService(dm *DeviceManager) *GRPCService {
 }
 
 // RegisterDevice registers a new device
-func (s *GRPCService) RegisterDevice(ctx context.Context, req *devicev1.RegisterDeviceRequest) (*devicev1.RegisterDeviceResponse, error) {
+func (s *GRPCService) RegisterDevice(_ context.Context, req *devicev1.RegisterDeviceRequest) (*devicev1.RegisterDeviceResponse, error) {
 	s.logger.Info("gRPC RegisterDevice called",
 		zap.String("type", req.Type.String()),
 		zap.String("path", req.Path),
 		zap.String("name", req.Name),
 	)
 
-	// Convert gRPC DeviceType to string
+	// Convert gRPC Type to string
 	deviceType := deviceTypeToString(req.Type)
 	if deviceType == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid device type: %v", req.Type)
@@ -67,9 +64,9 @@ func (s *GRPCService) RegisterDevice(ctx context.Context, req *devicev1.Register
 }
 
 // UnregisterDevice removes a device
-func (s *GRPCService) UnregisterDevice(ctx context.Context, req *devicev1.UnregisterDeviceRequest) (*devicev1.UnregisterDeviceResponse, error) {
+func (s *GRPCService) UnregisterDevice(_ context.Context, req *devicev1.UnregisterDeviceRequest) (*devicev1.UnregisterDeviceResponse, error) {
 	s.logger.Info("gRPC UnregisterDevice called",
-		zap.String("device_id", req.DeviceId),
+		zap.String(strDeviceID, req.DeviceId),
 	)
 
 	dbusErr := s.deviceManager.UnregisterDevice(req.DeviceId)
@@ -83,7 +80,7 @@ func (s *GRPCService) UnregisterDevice(ctx context.Context, req *devicev1.Unregi
 }
 
 // ListDevices lists all devices
-func (s *GRPCService) ListDevices(ctx context.Context, req *devicev1.ListDevicesRequest) (*devicev1.ListDevicesResponse, error) {
+func (s *GRPCService) ListDevices(_ context.Context, req *devicev1.ListDevicesRequest) (*devicev1.ListDevicesResponse, error) {
 	s.logger.Debug("gRPC ListDevices called",
 		zap.String("filter_type", req.FilterType.String()),
 	)
@@ -113,9 +110,9 @@ func (s *GRPCService) ListDevices(ctx context.Context, req *devicev1.ListDevices
 }
 
 // GetDevice gets details about a specific device
-func (s *GRPCService) GetDevice(ctx context.Context, req *devicev1.GetDeviceRequest) (*devicev1.GetDeviceResponse, error) {
+func (s *GRPCService) GetDevice(_ context.Context, req *devicev1.GetDeviceRequest) (*devicev1.GetDeviceResponse, error) {
 	s.logger.Debug("gRPC GetDevice called",
-		zap.String("device_id", req.DeviceId),
+		zap.String(strDeviceID, req.DeviceId),
 	)
 
 	deviceMap, dbusErr := s.deviceManager.GetDevice(req.DeviceId)
@@ -131,9 +128,9 @@ func (s *GRPCService) GetDevice(ctx context.Context, req *devicev1.GetDeviceRequ
 }
 
 // RequestDeviceAccess requests access to a device
-func (s *GRPCService) RequestDeviceAccess(ctx context.Context, req *devicev1.RequestDeviceAccessRequest) (*devicev1.RequestDeviceAccessResponse, error) {
+func (s *GRPCService) RequestDeviceAccess(_ context.Context, req *devicev1.RequestDeviceAccessRequest) (*devicev1.RequestDeviceAccessResponse, error) {
 	s.logger.Info("gRPC RequestDeviceAccess called",
-		zap.String("device_id", req.DeviceId),
+		zap.String(strDeviceID, req.DeviceId),
 		zap.String("client_id", req.ClientId),
 	)
 
@@ -150,9 +147,9 @@ func (s *GRPCService) RequestDeviceAccess(ctx context.Context, req *devicev1.Req
 }
 
 // ReleaseDeviceAccess releases access to a device
-func (s *GRPCService) ReleaseDeviceAccess(ctx context.Context, req *devicev1.ReleaseDeviceAccessRequest) (*devicev1.ReleaseDeviceAccessResponse, error) {
+func (s *GRPCService) ReleaseDeviceAccess(_ context.Context, req *devicev1.ReleaseDeviceAccessRequest) (*devicev1.ReleaseDeviceAccessResponse, error) {
 	s.logger.Info("gRPC ReleaseDeviceAccess called",
-		zap.String("device_id", req.DeviceId),
+		zap.String(strDeviceID, req.DeviceId),
 		zap.String("client_id", req.ClientId),
 	)
 
@@ -167,9 +164,9 @@ func (s *GRPCService) ReleaseDeviceAccess(ctx context.Context, req *devicev1.Rel
 }
 
 // SubscribeToDevice streams device data (server streaming)
-func (s *GRPCService) SubscribeToDevice(req *devicev1.SubscribeToDeviceRequest, stream devicev1.DeviceService_SubscribeToDeviceServer) error {
+func (s *GRPCService) SubscribeToDevice(req *devicev1.SubscribeToDeviceRequest, _ devicev1.DeviceService_SubscribeToDeviceServer) error {
 	s.logger.Info("gRPC SubscribeToDevice called",
-		zap.String("device_id", req.DeviceId),
+		zap.String(strDeviceID, req.DeviceId),
 		zap.String("client_id", req.ClientId),
 	)
 
@@ -179,7 +176,7 @@ func (s *GRPCService) SubscribeToDevice(req *devicev1.SubscribeToDeviceRequest, 
 }
 
 // DeviceChannel establishes bidirectional streaming
-func (s *GRPCService) DeviceChannel(stream devicev1.DeviceService_DeviceChannelServer) error {
+func (s *GRPCService) DeviceChannel(_ devicev1.DeviceService_DeviceChannelServer) error {
 	s.logger.Info("gRPC DeviceChannel called")
 
 	// TODO: Implement bidirectional streaming when device drivers are ready
@@ -231,7 +228,7 @@ func (s *GRPCService) WatchDevices(req *devicev1.WatchDevicesRequest, stream dev
 			}
 
 		case <-stream.Context().Done():
-			s.logger.Info("WatchDevices stream cancelled",
+			s.logger.Info("WatchDevices stream canceled",
 				zap.String("watcher_id", watcherID),
 			)
 			return stream.Context().Err()
@@ -243,20 +240,20 @@ func (s *GRPCService) WatchDevices(req *devicev1.WatchDevicesRequest, stream dev
 func convertDBusDeviceToProto(deviceMap map[string]dbus.Variant) *devicev1.Device {
 	device := &devicev1.Device{}
 
-	if v, ok := deviceMap["ID"]; ok {
-		device.Id = v.Value().(string)
+	if id, ok := dbusVariantString(deviceMap, "ID"); ok {
+		device.Id = id
 	}
-	if v, ok := deviceMap["Type"]; ok {
-		device.Type = stringToDeviceType(v.Value().(string))
+	if deviceType, ok := dbusVariantString(deviceMap, "Type"); ok {
+		device.Type = stringToDeviceType(deviceType)
 	}
-	if v, ok := deviceMap["Name"]; ok {
-		device.Name = v.Value().(string)
+	if name, ok := dbusVariantString(deviceMap, "Name"); ok {
+		device.Name = name
 	}
-	if v, ok := deviceMap["Path"]; ok {
-		device.Path = v.Value().(string)
+	if path, ok := dbusVariantString(deviceMap, "Path"); ok {
+		device.Path = path
 	}
-	if v, ok := deviceMap["State"]; ok {
-		device.State = stringToDeviceState(v.Value().(string))
+	if state, ok := dbusVariantString(deviceMap, "State"); ok {
+		device.State = stringToDeviceState(state)
 	}
 	if v, ok := deviceMap["RegisteredAt"]; ok {
 		if t, ok := v.Value().(time.Time); ok {
@@ -280,7 +277,16 @@ func convertDBusDeviceToProto(deviceMap map[string]dbus.Variant) *devicev1.Devic
 	return device
 }
 
-// Helper: Convert protobuf DeviceType to string
+func dbusVariantString(deviceMap map[string]dbus.Variant, key string) (string, bool) {
+	v, found := deviceMap[key]
+	if !found {
+		return "", false
+	}
+	s, ok := v.Value().(string)
+	return s, ok
+}
+
+// Helper: Convert protobuf Type to string
 func deviceTypeToString(dt devicev1.DeviceType) string {
 	switch dt {
 	case devicev1.DeviceType_DEVICE_TYPE_MICROPHONE:
@@ -300,7 +306,7 @@ func deviceTypeToString(dt devicev1.DeviceType) string {
 	}
 }
 
-// Helper: Convert string to protobuf DeviceType
+// Helper: Convert string to protobuf Type
 func stringToDeviceType(s string) devicev1.DeviceType {
 	switch s {
 	case "microphone":
@@ -320,7 +326,7 @@ func stringToDeviceType(s string) devicev1.DeviceType {
 	}
 }
 
-// Helper: Convert string to protobuf DeviceState
+// Helper: Convert string to protobuf State
 func stringToDeviceState(s string) devicev1.DeviceState {
 	switch s {
 	case "available":
@@ -337,7 +343,7 @@ func stringToDeviceState(s string) devicev1.DeviceState {
 }
 
 // NotifyDeviceEvent sends a device event to all watchers
-// This should be called by DeviceManager when devices change
+// This should be called by Manager when devices change
 func (s *GRPCService) NotifyDeviceEvent(event *devicev1.DeviceEvent) {
 	s.watchersMu.RLock()
 	defer s.watchersMu.RUnlock()

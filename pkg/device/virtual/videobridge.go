@@ -9,35 +9,27 @@ import (
 
 	"github.com/daoneill/ollama-proxy/pkg/device"
 	"github.com/daoneill/ollama-proxy/pkg/pipeline"
+	"github.com/daoneill/ollama-proxy/pkg/safeconv"
 )
 
 // VideoBridge bridges physical camera to virtual camera via processing pipeline
 type VideoBridge struct {
-	// Devices
-	physicalCamera string // /dev/video0
-	virtualCamera  string // /dev/video20
-
-	// V4L2 devices
-	v4l2Input  *device.V4L2Device
-	v4l2Output *device.V4L2Device
-
-	// Pipeline
-	pipeline     *pipeline.Pipeline
-	pipelineExec *pipeline.PipelineExecutor
-
-	// Configuration
-	width  int
-	height int
-	format uint32 // V4L2 pixel format
-	fps    int
-
-	// Lifecycle
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	running bool
-	mu      sync.RWMutex
-	logger  *zap.Logger
+	ctx            context.Context
+	v4l2Input      *device.V4L2Device
+	v4l2Output     *device.V4L2Device
+	pipeline       *pipeline.Pipeline
+	pipelineExec   *pipeline.Executor
+	logger         *zap.Logger
+	cancel         context.CancelFunc
+	virtualCamera  string
+	physicalCamera string
+	wg             sync.WaitGroup
+	fps            int
+	height         int
+	width          int
+	mu             sync.RWMutex
+	format         uint32
+	running        bool
 }
 
 // NewVideoBridge creates a new video bridge
@@ -45,7 +37,7 @@ func NewVideoBridge(
 	physicalCamera string,
 	virtualCamera string,
 	pipeline *pipeline.Pipeline,
-	pipelineExec *pipeline.PipelineExecutor,
+	pipelineExec *pipeline.Executor,
 	logger *zap.Logger,
 ) *VideoBridge {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,7 +49,7 @@ func NewVideoBridge(
 		pipelineExec:   pipelineExec,
 		width:          640,
 		height:         480,
-		format:         device.V4L2_PIX_FMT_YUYV,
+		format:         device.V4l2PixFmtYuyv,
 		fps:            30,
 		ctx:            ctx,
 		cancel:         cancel,
@@ -86,39 +78,41 @@ func (vb *VideoBridge) Start() error {
 		return fmt.Errorf("failed to open physical camera: %w", err)
 	}
 
+	width := safeconv.Uint32FromInt(vb.width)
+	height := safeconv.Uint32FromInt(vb.height)
+
 	// Configure input format
-	if err := vb.v4l2Input.SetFormat(uint32(vb.width), uint32(vb.height), vb.format); err != nil {
-		vb.v4l2Input.Close()
+	if err := vb.v4l2Input.SetFormat(width, height, vb.format); err != nil {
+		vb.cleanup()
 		return fmt.Errorf("failed to set input format: %w", err)
 	}
 
 	// Request and map input buffers
 	if err := vb.v4l2Input.RequestBuffers(4); err != nil {
-		vb.v4l2Input.Close()
+		vb.cleanup()
 		return fmt.Errorf("failed to request input buffers: %w", err)
 	}
 
 	if err := vb.v4l2Input.MapBuffers(4); err != nil {
-		vb.v4l2Input.Close()
+		vb.cleanup()
 		return fmt.Errorf("failed to map input buffers: %w", err)
 	}
 
 	// Start input streaming
 	if err := vb.v4l2Input.StartStreaming(); err != nil {
-		vb.v4l2Input.Close()
+		vb.cleanup()
 		return fmt.Errorf("failed to start input streaming: %w", err)
 	}
 
 	// Open virtual camera (output)
 	vb.v4l2Output, err = device.OpenV4L2Device(vb.virtualCamera, vb.logger)
 	if err != nil {
-		vb.v4l2Input.StopStreaming()
-		vb.v4l2Input.Close()
+		vb.cleanup()
 		return fmt.Errorf("failed to open virtual camera: %w", err)
 	}
 
 	// Configure output format
-	if err := vb.v4l2Output.SetFormat(uint32(vb.width), uint32(vb.height), vb.format); err != nil {
+	if err := vb.v4l2Output.SetFormat(width, height, vb.format); err != nil {
 		vb.cleanup()
 		return fmt.Errorf("failed to set output format: %w", err)
 	}
@@ -168,7 +162,7 @@ func (vb *VideoBridge) processVideoFrames() {
 	for {
 		select {
 		case <-vb.ctx.Done():
-			vb.logger.Info("Video processing stopped (context cancelled)")
+			vb.logger.Info("Video processing stopped (context canceled)")
 			return
 		default:
 		}
@@ -180,22 +174,12 @@ func (vb *VideoBridge) processVideoFrames() {
 			continue
 		}
 
-		// TODO: Get frame data - need to expose V4L2MappedBuffer.data field
-		// For now, skip processing to get the code to compile
-		// frameData := vb.v4l2Input.buffers[buf.Index].data[:buf.BytesUsed]
-
-		// Process frame through pipeline (if configured)
-		// processedFrame, err := vb.processFrame(frameData)
-		// if err != nil {
-		// 	vb.logger.Error("Failed to process frame", zap.Error(err))
-		// 	// Use original frame on error
-		// 	processedFrame = frameData
-		// }
-
-		// TODO: Write frame to virtual camera - need WriteFrame method
-		// if err := vb.v4l2Output.WriteFrame(processedFrame); err != nil {
-		// 	vb.logger.Error("Failed to write frame to virtual camera", zap.Error(err))
-		// }
+		frameData, readErr := vb.v4l2Input.BufferData(buf.Index, buf.BytesUsed)
+		if readErr != nil {
+			vb.logger.Error("Failed to read captured frame", zap.Error(readErr))
+		} else if _, procErr := vb.processFrame(frameData); procErr != nil {
+			vb.logger.Error("Failed to process frame", zap.Error(procErr))
+		}
 
 		// Re-queue buffer for next frame
 		if err := vb.v4l2Input.QueueBuffer(buf.Index); err != nil {
@@ -240,13 +224,13 @@ func (vb *VideoBridge) processFrame(frameData []byte) ([]byte, error) {
 // cleanup cleans up V4L2 devices
 func (vb *VideoBridge) cleanup() {
 	if vb.v4l2Input != nil {
-		vb.v4l2Input.StopStreaming()
-		vb.v4l2Input.Close()
+		warnErr("failed to stop v4l2 input", vb.v4l2Input.StopStreaming())
+		warnErr("failed to close v4l2 input", vb.v4l2Input.Close())
 		vb.v4l2Input = nil
 	}
 
 	if vb.v4l2Output != nil {
-		vb.v4l2Output.Close()
+		warnErr("failed to close v4l2 output", vb.v4l2Output.Close())
 		vb.v4l2Output = nil
 	}
 }

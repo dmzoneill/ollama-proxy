@@ -4,63 +4,60 @@ import "fmt"
 
 // Config holds virtual device configuration
 type Config struct {
-	Enabled bool        `yaml:"enabled"`
-	Audio   AudioConfig `yaml:"audio"`
-	Video   VideoConfig `yaml:"video"`
-
-	// Backend-specific model configuration
 	BackendModels map[string]BackendModelConfig `yaml:"backend_models"`
+	Audio         AudioConfig                   `yaml:"audio"`
+	Video         VideoConfig                   `yaml:"video"`
+	Enabled       bool                          `yaml:"enabled"`
 }
 
 // AudioConfig holds audio device configuration
 type AudioConfig struct {
-	Enabled         bool                 `yaml:"enabled"`
-	AutoDetectSystem bool                `yaml:"auto_detect_system"`
-	AllowFallback   bool                 `yaml:"allow_fallback"` // Allow startup without audio system
-	Microphone      MicrophoneConfig     `yaml:"microphone"`
-	Speaker         SpeakerConfig        `yaml:"speaker"`
-	Processing      AudioProcessingConfig `yaml:"processing"`
+	Processing       AudioProcessingConfig `yaml:"processing"`
+	Microphone       MicrophoneConfig      `yaml:"microphone"`
+	Speaker          SpeakerConfig         `yaml:"speaker"`
+	Enabled          bool                  `yaml:"enabled"`
+	AutoDetectSystem bool                  `yaml:"auto_detect_system"`
+	AllowFallback    bool                  `yaml:"allow_fallback"`
 }
 
 // MicrophoneConfig holds microphone device configuration
 type MicrophoneConfig struct {
-	Enabled    bool   `yaml:"enabled"`
+	Format     string `yaml:"format"`
 	SampleRate int    `yaml:"sample_rate"`
 	Channels   int    `yaml:"channels"`
-	Format     string `yaml:"format"`
+	Enabled    bool   `yaml:"enabled"`
 }
 
 // SpeakerConfig holds speaker device configuration
 type SpeakerConfig struct {
-	Enabled    bool   `yaml:"enabled"`
+	Format     string `yaml:"format"`
 	SampleRate int    `yaml:"sample_rate"`
 	Channels   int    `yaml:"channels"`
-	Format     string `yaml:"format"`
+	Enabled    bool   `yaml:"enabled"`
 }
 
 // AudioProcessingConfig holds audio processing configuration
 type AudioProcessingConfig struct {
+	TranscriptionModel string `yaml:"transcription_model"`
+	TTSModel           string `yaml:"tts_model"`
 	NoiseCancellation  bool   `yaml:"noise_cancellation"`
-	TranscriptionModel string `yaml:"transcription_model"` // e.g., "whisper-tiny"
-	TTSModel           string `yaml:"tts_model"`           // e.g., "piper-tts-fast"
 }
 
 // VideoConfig holds video device configuration
 type VideoConfig struct {
-	Enabled bool         `yaml:"enabled"`
 	Camera  CameraConfig `yaml:"camera"`
+	Enabled bool         `yaml:"enabled"`
 }
 
 // CameraConfig holds camera device configuration
 type CameraConfig struct {
-	Enabled       bool   `yaml:"enabled"`
-	Width         int    `yaml:"width"`
-	Height        int    `yaml:"height"`
-	FPS           int    `yaml:"fps"`
-	Format        string `yaml:"format"`
-	DeviceNumbers []int  `yaml:"device_numbers"` // /dev/videoN numbers
-
-	Processing CameraProcessingConfig `yaml:"processing"`
+	Format        string                 `yaml:"format"`
+	DeviceNumbers []int                  `yaml:"device_numbers"`
+	Width         int                    `yaml:"width"`
+	Height        int                    `yaml:"height"`
+	FPS           int                    `yaml:"fps"`
+	Processing    CameraProcessingConfig `yaml:"processing"`
+	Enabled       bool                   `yaml:"enabled"`
 }
 
 // CameraProcessingConfig holds camera processing configuration
@@ -89,18 +86,18 @@ func DefaultConfig() *Config {
 				Enabled:    true,
 				SampleRate: 16000, // 16kHz is standard for speech
 				Channels:   1,     // Mono for speech
-				Format:     "s16le",
+				Format:     strS16le,
 			},
 			Speaker: SpeakerConfig{
 				Enabled:    true,
 				SampleRate: 22050, // 22kHz for TTS output
 				Channels:   2,     // Stereo for output
-				Format:     "s16le",
+				Format:     strS16le,
 			},
 			Processing: AudioProcessingConfig{
 				NoiseCancellation:  true,
-				TranscriptionModel: "whisper-tiny",
-				TTSModel:           "piper-tts-fast",
+				TranscriptionModel: strWhisperTiny,
+				TTSModel:           strPiperTtsFast,
 			},
 		},
 		Video: VideoConfig{
@@ -121,9 +118,9 @@ func DefaultConfig() *Config {
 		},
 		BackendModels: map[string]BackendModelConfig{
 			"ollama-npu": {
-				STTModel: "whisper-tiny",
+				STTModel: strWhisperTiny,
 				LLMModel: "qwen2.5:0.5b",
-				TTSModel: "piper-tts-fast",
+				TTSModel: strPiperTtsFast,
 			},
 			"ollama-igpu": {
 				STTModel: "whisper-base",
@@ -136,9 +133,9 @@ func DefaultConfig() *Config {
 				TTSModel: "bark-tts",
 			},
 			"ollama-cpu": {
-				STTModel: "whisper-tiny",
+				STTModel: strWhisperTiny,
 				LLMModel: "llama3:7b",
-				TTSModel: "piper-tts-fast",
+				TTSModel: strPiperTtsFast,
 			},
 		},
 	}
@@ -149,36 +146,45 @@ func (c *Config) Validate() error {
 	if !c.Enabled {
 		return nil // Nothing to validate if disabled
 	}
-
-	if c.Audio.Enabled {
-		if c.Audio.Microphone.Enabled {
-			if c.Audio.Microphone.SampleRate <= 0 {
-				return ErrInvalidSampleRate
-			}
-			if c.Audio.Microphone.Channels <= 0 || c.Audio.Microphone.Channels > 2 {
-				return ErrInvalidChannels
-			}
-		}
-
-		if c.Audio.Speaker.Enabled {
-			if c.Audio.Speaker.SampleRate <= 0 {
-				return ErrInvalidSampleRate
-			}
-			if c.Audio.Speaker.Channels <= 0 || c.Audio.Speaker.Channels > 2 {
-				return ErrInvalidChannels
-			}
-		}
+	if err := c.validateAudio(); err != nil {
+		return err
 	}
+	return c.validateVideo()
+}
 
-	if c.Video.Enabled && c.Video.Camera.Enabled {
-		if c.Video.Camera.Width <= 0 || c.Video.Camera.Height <= 0 {
-			return ErrInvalidResolution
-		}
-		if c.Video.Camera.FPS <= 0 || c.Video.Camera.FPS > 120 {
-			return ErrInvalidFPS
-		}
+func (c *Config) validateAudio() error {
+	if !c.Audio.Enabled {
+		return nil
 	}
+	if err := validatePCM(c.Audio.Microphone.Enabled, c.Audio.Microphone.SampleRate, c.Audio.Microphone.Channels); err != nil {
+		return err
+	}
+	return validatePCM(c.Audio.Speaker.Enabled, c.Audio.Speaker.SampleRate, c.Audio.Speaker.Channels)
+}
 
+func validatePCM(enabled bool, sampleRate, channels int) error {
+	if !enabled {
+		return nil
+	}
+	if sampleRate <= 0 {
+		return ErrInvalidSampleRate
+	}
+	if channels <= 0 || channels > 2 {
+		return ErrInvalidChannels
+	}
+	return nil
+}
+
+func (c *Config) validateVideo() error {
+	if !c.Video.Enabled || !c.Video.Camera.Enabled {
+		return nil
+	}
+	if c.Video.Camera.Width <= 0 || c.Video.Camera.Height <= 0 {
+		return ErrInvalidResolution
+	}
+	if c.Video.Camera.FPS <= 0 || c.Video.Camera.FPS > 120 {
+		return ErrInvalidFPS
+	}
 	return nil
 }
 
@@ -198,8 +204,8 @@ func (c *Config) GetBackendModels(backendID string) *BackendModelConfig {
 
 // Configuration errors
 var (
-	ErrInvalidSampleRate  = fmt.Errorf("invalid sample rate")
-	ErrInvalidChannels    = fmt.Errorf("invalid channel count")
-	ErrInvalidResolution  = fmt.Errorf("invalid resolution")
-	ErrInvalidFPS         = fmt.Errorf("invalid FPS")
+	ErrInvalidSampleRate = fmt.Errorf("invalid sample rate")
+	ErrInvalidChannels   = fmt.Errorf("invalid channel count")
+	ErrInvalidResolution = fmt.Errorf("invalid resolution")
+	ErrInvalidFPS        = fmt.Errorf("invalid FPS")
 )

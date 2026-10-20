@@ -1,3 +1,4 @@
+// Package device manages local audio and video devices.
 package device
 
 import (
@@ -9,33 +10,33 @@ import (
 
 // ALSA ioctl constants
 const (
-	SNDRV_PCM_IOCTL_HW_PARAMS = 0xc2604111
-	SNDRV_PCM_IOCTL_SW_PARAMS = 0xc0684113
-	SNDRV_PCM_IOCTL_PREPARE   = 0x00004140
-	SNDRV_PCM_IOCTL_START     = 0x00004142
-	SNDRV_PCM_IOCTL_DROP      = 0x00004143
+	SndrvPcmIoctlHwParams = 0xc2604111
+	SndrvPcmIoctlSwParams = 0xc0684113
+	SndrvPcmIoctlPrepare  = 0x00004140
+	SndrvPcmIoctlStart    = 0x00004142
+	SndrvPcmIoctlDrop     = 0x00004143
 
-	SNDRV_PCM_ACCESS_RW_INTERLEAVED = 3
-	SNDRV_PCM_FORMAT_S16_LE         = 2
-	SNDRV_PCM_FORMAT_S32_LE         = 10
+	SndrvPcmAccessRwInterleaved = 3
+	SndrvPcmFormatS16Le         = 2
+	SndrvPcmFormatS32Le         = 10
 
-	SNDRV_PCM_STREAM_PLAYBACK = 0
-	SNDRV_PCM_STREAM_CAPTURE  = 1
+	SndrvPcmStreamPlayback = 0
+	SndrvPcmStreamCapture  = 1
 )
 
 // ALSADevice represents an ALSA audio device
 type ALSADevice struct {
-	deviceName   string
-	fd           int
-	sampleRate   uint32
-	channels     uint32
-	format       uint32
-	periodSize   uint32
-	bufferSize   uint32
-	capturing    bool
-	logger       *zap.Logger
-	shmRing      *SharedMemoryRing
-	stopChan     chan struct{}
+	logger     *zap.Logger
+	shmRing    *SharedMemoryRing
+	stopChan   chan struct{}
+	deviceName string
+	fd         int
+	sampleRate uint32
+	channels   uint32
+	format     uint32
+	periodSize uint32
+	bufferSize uint32
+	capturing  bool
 }
 
 // OpenALSADevice opens an ALSA PCM device for capture
@@ -62,7 +63,7 @@ func OpenALSADevice(deviceName string, sampleRate, channels uint32, logger *zap.
 		fd:         fd,
 		sampleRate: sampleRate,
 		channels:   channels,
-		format:     SNDRV_PCM_FORMAT_S16_LE,
+		format:     SndrvPcmFormatS16Le,
 		periodSize: 1024,
 		bufferSize: 4096,
 		logger:     logger,
@@ -70,9 +71,9 @@ func OpenALSADevice(deviceName string, sampleRate, channels uint32, logger *zap.
 	}
 
 	logger.Info("Opened ALSA device",
-		zap.String("device", deviceName),
+		zap.String(strDevice, deviceName),
 		zap.String("path", pcmPath),
-		zap.Uint32("sample_rate", sampleRate),
+		zap.Uint32(strSampleRate, sampleRate),
 		zap.Uint32("channels", channels),
 	)
 
@@ -86,7 +87,7 @@ func (d *ALSADevice) SetHardwareParams() error {
 	// This is a simplified placeholder that shows the structure
 
 	d.logger.Info("ALSA hardware parameters set",
-		zap.Uint32("sample_rate", d.sampleRate),
+		zap.Uint32(strSampleRate, d.sampleRate),
 		zap.Uint32("channels", d.channels),
 		zap.Uint32("period_size", d.periodSize),
 		zap.Uint32("buffer_size", d.bufferSize),
@@ -152,7 +153,7 @@ func (d *ALSADevice) CaptureLoop(shmRing *SharedMemoryRing) error {
 	d.shmRing = shmRing
 
 	// Calculate frame size in bytes
-	// For S16_LE: 2 bytes per sample
+	// For S16Le: 2 bytes per sample
 	bytesPerSample := uint32(2)
 	frameBytes := d.periodSize * d.channels * bytesPerSample
 
@@ -220,15 +221,15 @@ func (d *ALSADevice) Close() error {
 		d.fd = -1
 	}
 
-	d.logger.Info("ALSA device closed", zap.String("device", d.deviceName))
+	d.logger.Info("ALSA device closed", zap.String(strDevice, d.deviceName))
 	return nil
 }
 
 // GetCapabilities returns device capabilities as a map
 func (d *ALSADevice) GetCapabilities() map[string]interface{} {
 	return map[string]interface{}{
-		"device":      d.deviceName,
-		"sample_rate": d.sampleRate,
+		strDevice:     d.deviceName,
+		strSampleRate: d.sampleRate,
 		"channels":    d.channels,
 		"format":      "S16_LE",
 		"period_size": d.periodSize,
@@ -239,20 +240,20 @@ func (d *ALSADevice) GetCapabilities() map[string]interface{} {
 // SimplifiedALSACapture provides a simplified ALSA capture using PipeWire/PulseAudio
 // This is a fallback implementation that uses PulseAudio's simple API
 type SimplifiedALSACapture struct {
-	deviceName string
-	sampleRate uint32
-	channels   uint32
 	logger     *zap.Logger
 	shmRing    *SharedMemoryRing
 	stopChan   chan struct{}
+	deviceName string
 	buffer     []byte
+	sampleRate uint32
+	channels   uint32
 }
 
 // NewSimplifiedALSACapture creates a simplified audio capture device
 // In a real implementation, this would use libpulse-simple or libpipewire
 func NewSimplifiedALSACapture(deviceName string, sampleRate, channels uint32, logger *zap.Logger) (*SimplifiedALSACapture, error) {
 	// Calculate buffer size for 10ms of audio
-	// S16_LE: 2 bytes per sample
+	// S16Le: 2 bytes per sample
 	bufferFrames := (sampleRate * 10) / 1000 // 10ms worth
 	bufferSize := bufferFrames * channels * 2
 
@@ -266,8 +267,8 @@ func NewSimplifiedALSACapture(deviceName string, sampleRate, channels uint32, lo
 	}
 
 	logger.Info("Created simplified ALSA capture",
-		zap.String("device", deviceName),
-		zap.Uint32("sample_rate", sampleRate),
+		zap.String(strDevice, deviceName),
+		zap.Uint32(strSampleRate, sampleRate),
 		zap.Uint32("channels", channels),
 		zap.Uint32("buffer_size", bufferSize),
 	)
@@ -319,8 +320,8 @@ func (s *SimplifiedALSACapture) Close() error {
 // GetCapabilities returns capabilities
 func (s *SimplifiedALSACapture) GetCapabilities() map[string]interface{} {
 	return map[string]interface{}{
-		"device":      s.deviceName,
-		"sample_rate": s.sampleRate,
+		strDevice:     s.deviceName,
+		strSampleRate: s.sampleRate,
 		"channels":    s.channels,
 		"format":      "S16_LE",
 		"api":         "simplified",

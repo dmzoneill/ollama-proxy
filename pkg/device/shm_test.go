@@ -8,6 +8,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestSharedMemoryRing_CreateAndOpen is part of the public API.
 func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -39,6 +40,7 @@ func TestSharedMemoryRing_CreateAndOpen(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_WriteRead is part of the public API.
 func TestSharedMemoryRing_WriteRead(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -92,6 +94,7 @@ func TestSharedMemoryRing_WriteRead(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_MultipleFrames is part of the public API.
 func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -140,6 +143,7 @@ func TestSharedMemoryRing_MultipleFrames(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_Wrap is part of the public API.
 func TestSharedMemoryRing_Wrap(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -184,6 +188,7 @@ func TestSharedMemoryRing_Wrap(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_ConcurrentWriteRead is part of the public API.
 func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -264,6 +269,7 @@ func TestSharedMemoryRing_ConcurrentWriteRead(t *testing.T) {
 	}
 }
 
+// TestSharedMemoryRing_Stats is part of the public API.
 func TestSharedMemoryRing_Stats(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping shared memory test in short mode")
@@ -294,6 +300,7 @@ func TestSharedMemoryRing_Stats(t *testing.T) {
 	}
 }
 
+// BenchmarkSharedMemoryRing_Write is part of the public API.
 func BenchmarkSharedMemoryRing_Write(b *testing.B) {
 	ring, err := CreateSharedMemoryRing("bench-write", 16, 4096, logging.Logger)
 	if err != nil {
@@ -316,6 +323,7 @@ func BenchmarkSharedMemoryRing_Write(b *testing.B) {
 	// Target: <500ns per write
 }
 
+// BenchmarkSharedMemoryRing_Read is part of the public API.
 func BenchmarkSharedMemoryRing_Read(b *testing.B) {
 	ring, err := CreateSharedMemoryRing("bench-read", 16, 4096, logging.Logger)
 	if err != nil {

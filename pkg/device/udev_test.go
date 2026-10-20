@@ -6,24 +6,25 @@ import (
 	"time"
 )
 
+// TestUdevEvent_GetDeviceType is part of the public API.
 func TestUdevEvent_GetDeviceType(t *testing.T) {
 	tests := []struct {
-		name      string
-		event     UdevEvent
-		expected  DeviceType
+		name     string
+		event    UdevEvent
+		expected Type
 	}{
 		{
 			name: "Video4Linux camera",
 			event: UdevEvent{
-				Subsystem: SUBSYSTEM_VIDEO4LINUX,
-				DevName:   "/dev/video0",
+				Subsystem: SubsystemVideo4linux,
+				DevName:   strDevVideo0,
 			},
 			expected: DeviceTypeCamera,
 		},
 		{
 			name: "Sound capture (microphone)",
 			event: UdevEvent{
-				Subsystem: SUBSYSTEM_SOUND,
+				Subsystem: SubsystemSound,
 				DevName:   "/dev/snd/pcmC0D0c",
 			},
 			expected: DeviceTypeMicrophone,
@@ -31,7 +32,7 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 		{
 			name: "Sound playback (speaker)",
 			event: UdevEvent{
-				Subsystem: SUBSYSTEM_SOUND,
+				Subsystem: SubsystemSound,
 				DevName:   "/dev/snd/pcmC0D0p",
 			},
 			expected: DeviceTypeSpeaker,
@@ -39,7 +40,7 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 		{
 			name: "Keyboard input",
 			event: UdevEvent{
-				Subsystem: SUBSYSTEM_INPUT,
+				Subsystem: SubsystemInput,
 				DevType:   "keyboard",
 			},
 			expected: DeviceTypeKeyboard,
@@ -47,7 +48,7 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 		{
 			name: "Mouse input",
 			event: UdevEvent{
-				Subsystem: SUBSYSTEM_INPUT,
+				Subsystem: SubsystemInput,
 				DevType:   "mouse",
 			},
 			expected: DeviceTypeMouse,
@@ -64,18 +65,19 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 	}
 }
 
+// TestUdevEvent_String is part of the public API.
 func TestUdevEvent_String(t *testing.T) {
 	event := UdevEvent{
-		Action:    "add",
+		Action:    strAdd,
 		DevPath:   "/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/video4linux/video0",
 		Subsystem: "video4linux",
-		DevName:   "/dev/video0",
+		DevName:   strDevVideo0,
 		DevType:   "video_device",
 	}
 
 	str := event.String()
 
-	if !strings.Contains(str, "add") {
+	if !strings.Contains(str, strAdd) {
 		t.Error("String should contain action")
 	}
 
@@ -83,11 +85,12 @@ func TestUdevEvent_String(t *testing.T) {
 		t.Error("String should contain subsystem")
 	}
 
-	if !strings.Contains(str, "/dev/video0") {
+	if !strings.Contains(str, strDevVideo0) {
 		t.Error("String should contain device name")
 	}
 }
 
+// TestParseUevent is part of the public API.
 func TestParseUevent(t *testing.T) {
 	// Note: This test creates a mock UdevMonitor just for parsing
 	// We don't actually start it (which would require root/CAP_NET_ADMIN)
@@ -103,14 +106,14 @@ func TestParseUevent(t *testing.T) {
 		"DEVNAME=/dev/video0\x00" +
 		"DEVTYPE=video_device\x00" +
 		"PRODUCT=1234/5678/0001\x00" +
-		"ID_MODEL=USB_Camera\x00\x00")
+		"IdModel=USB_Camera\x00\x00")
 
 	event, err := um.parseUevent(rawEvent)
 	if err != nil {
 		t.Fatalf("parseUevent failed: %v", err)
 	}
 
-	if event.Action != "add" {
+	if event.Action != strAdd {
 		t.Errorf("Expected action 'add', got '%s'", event.Action)
 	}
 
@@ -122,7 +125,7 @@ func TestParseUevent(t *testing.T) {
 		t.Errorf("Expected subsystem 'video4linux', got '%s'", event.Subsystem)
 	}
 
-	if event.DevName != "/dev/video0" {
+	if event.DevName != strDevVideo0 {
 		t.Errorf("Expected DevName '/dev/video0', got '%s'", event.DevName)
 	}
 
@@ -135,32 +138,33 @@ func TestParseUevent(t *testing.T) {
 		t.Error("PRODUCT property not parsed correctly")
 	}
 
-	if event.Properties["ID_MODEL"] != "USB_Camera" {
-		t.Error("ID_MODEL property not parsed correctly")
+	if event.Properties["IdModel"] != "USB_Camera" {
+		t.Error("IdModel property not parsed correctly")
 	}
 }
 
+// TestIsRelevantEvent is part of the public API.
 func TestIsRelevantEvent(t *testing.T) {
 	um := &UdevMonitor{}
 
 	tests := []struct {
-		name     string
 		event    UdevEvent
+		name     string
 		expected bool
 	}{
 		{
 			name: "Video4Linux add",
 			event: UdevEvent{
-				Action:    "add",
-				Subsystem: SUBSYSTEM_VIDEO4LINUX,
+				Action:    strAdd,
+				Subsystem: SubsystemVideo4linux,
 			},
 			expected: true,
 		},
 		{
 			name: "Sound remove",
 			event: UdevEvent{
-				Action:    "remove",
-				Subsystem: SUBSYSTEM_SOUND,
+				Action:    strRemove,
+				Subsystem: SubsystemSound,
 			},
 			expected: true,
 		},
@@ -168,14 +172,14 @@ func TestIsRelevantEvent(t *testing.T) {
 			name: "Input change",
 			event: UdevEvent{
 				Action:    "change",
-				Subsystem: SUBSYSTEM_INPUT,
+				Subsystem: SubsystemInput,
 			},
 			expected: true,
 		},
 		{
 			name: "Irrelevant subsystem",
 			event: UdevEvent{
-				Action:    "add",
+				Action:    strAdd,
 				Subsystem: "block",
 			},
 			expected: false,
@@ -184,7 +188,7 @@ func TestIsRelevantEvent(t *testing.T) {
 			name: "Irrelevant action",
 			event: UdevEvent{
 				Action:    "bind",
-				Subsystem: SUBSYSTEM_VIDEO4LINUX,
+				Subsystem: SubsystemVideo4linux,
 			},
 			expected: false,
 		},
@@ -200,6 +204,7 @@ func TestIsRelevantEvent(t *testing.T) {
 	}
 }
 
+// TestParseDeviceName is part of the public API.
 func TestParseDeviceName(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -207,10 +212,10 @@ func TestParseDeviceName(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "ID_MODEL present",
+			name: "IdModel present",
 			event: UdevEvent{
 				Properties: map[string]string{
-					"ID_MODEL": "Logitech_Webcam",
+					"IdModel": "Logitech_Webcam",
 				},
 			},
 			expected: "Logitech Webcam",
@@ -221,7 +226,7 @@ func TestParseDeviceName(t *testing.T) {
 				Properties: map[string]string{
 					"PRODUCT": "046d/0825/0010",
 				},
-				DevName: "/dev/video0",
+				DevName: strDevVideo0,
 			},
 			expected: "046d/0825/0010",
 		},
@@ -251,6 +256,7 @@ func TestParseDeviceName(t *testing.T) {
 	}
 }
 
+// TestUdevMonitor_Creation is part of the public API.
 func TestUdevMonitor_Creation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping udev monitor test in short mode")
@@ -281,6 +287,7 @@ func TestUdevMonitor_Creation(t *testing.T) {
 	}
 }
 
+// TestUdevMonitor_StartStop is part of the public API.
 func TestUdevMonitor_StartStop(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping udev monitor test in short mode")
@@ -317,6 +324,7 @@ func TestUdevMonitor_StartStop(t *testing.T) {
 	}
 }
 
+// TestUdevMonitor_EventChannel is part of the public API.
 func TestUdevMonitor_EventChannel(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping udev monitor test in short mode")
@@ -388,6 +396,7 @@ func TestUdevMonitor_Integration(t *testing.T) {
 	}
 }
 
+// BenchmarkParseUevent is part of the public API.
 func BenchmarkParseUevent(b *testing.B) {
 	um := &UdevMonitor{}
 
@@ -408,12 +417,13 @@ func BenchmarkParseUevent(b *testing.B) {
 	// Target: <1μs per parse, 0-1 allocations
 }
 
+// BenchmarkIsRelevantEvent is part of the public API.
 func BenchmarkIsRelevantEvent(b *testing.B) {
 	um := &UdevMonitor{}
 
 	event := UdevEvent{
-		Action:    "add",
-		Subsystem: SUBSYSTEM_VIDEO4LINUX,
+		Action:    strAdd,
+		Subsystem: SubsystemVideo4linux,
 	}
 
 	b.ResetTimer()

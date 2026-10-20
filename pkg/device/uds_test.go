@@ -8,6 +8,7 @@ import (
 	"github.com/daoneill/ollama-proxy/pkg/logging"
 )
 
+// TestUDSDeviceServer_CreateAndStop is part of the public API.
 func TestUDSDeviceServer_CreateAndStop(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-1", logging.Logger)
 	if err != nil {
@@ -23,6 +24,7 @@ func TestUDSDeviceServer_CreateAndStop(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_ClientConnect is part of the public API.
 func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-2", logging.Logger)
 	if err != nil {
@@ -50,6 +52,7 @@ func TestUDSDeviceServer_ClientConnect(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_MessageExchange is part of the public API.
 func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-3", logging.Logger)
 	if err != nil {
@@ -94,6 +97,7 @@ func TestUDSDeviceServer_MessageExchange(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_BroadcastFrameNotification is part of the public API.
 func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-4", logging.Logger)
 	if err != nil {
@@ -152,6 +156,7 @@ func TestUDSDeviceServer_BroadcastFrameNotification(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_BroadcastMetadata is part of the public API.
 func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-5", logging.Logger)
 	if err != nil {
@@ -189,6 +194,7 @@ func TestUDSDeviceServer_BroadcastMetadata(t *testing.T) {
 	}
 }
 
+// TestUDSDeviceServer_MultipleClients is part of the public API.
 func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	server, err := NewUDSDeviceServer("test-device-6", logging.Logger)
 	if err != nil {
@@ -225,6 +231,7 @@ func TestUDSDeviceServer_MultipleClients(t *testing.T) {
 	}
 }
 
+// BenchmarkUDSDeviceServer_SendMessage is part of the public API.
 func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 	server, err := NewUDSDeviceServer("bench-device", logging.Logger)
 	if err != nil {
@@ -254,6 +261,7 @@ func BenchmarkUDSDeviceServer_SendMessage(b *testing.B) {
 	// Target: 10-50μs latency
 }
 
+// BenchmarkUDSClient_SendReceive is part of the public API.
 func BenchmarkUDSClient_SendReceive(b *testing.B) {
 	server, err := NewUDSDeviceServer("bench-device-2", logging.Logger)
 	if err != nil {
