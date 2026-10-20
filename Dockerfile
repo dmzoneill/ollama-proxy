@@ -20,18 +20,16 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o ollama-proxy \
     ./cmd/proxy
 
-# Final stage - minimal image
-FROM alpine:latest
+# Final stage - minimal image. Pin the release tag and apk package
+# versions so image rebuilds do not float.
+FROM alpine:3.24.2
 
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
-
-# Create non-root user
-RUN addgroup -S ollama && adduser -S ollama -G ollama
-
-# Create config directory
-RUN mkdir -p /etc/ollama-proxy/config
-RUN chown -R ollama:ollama /etc/ollama-proxy
+# Install CA certificates, then create the unprivileged user and config directory.
+RUN apk --no-cache add ca-certificates=20260909-r0 \
+    && addgroup -S ollama \
+    && adduser -S ollama -G ollama \
+    && mkdir -p /etc/ollama-proxy/config \
+    && chown -R ollama:ollama /etc/ollama-proxy
 
 # Copy binary from builder
 COPY --from=builder /app/ollama-proxy /usr/local/bin/ollama-proxy
