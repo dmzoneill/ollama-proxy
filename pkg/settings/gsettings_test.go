@@ -565,19 +565,32 @@ func TestNewSettingsType(t *testing.T) {
 }
 
 // TestInterfaceConsistency tests that all methods exist and have expected signatures
-func TestInterfaceConsistency(_ *testing.T) {
+func TestInterfaceConsistency(t *testing.T) {
 	s := &Settings{available: true}
 
-	// Test that all methods exist and are callable
-	// (even if they would fail due to unavailability)
-
-	_, _ = s.GetDefaultMode()
-	_, _ = s.GetLastMode()
-	_ = s.SetLastMode(efficiency.ModeBalanced)
-	_, _ = s.ShouldRememberMode()
-	_, _ = s.GetQuietHoursEnabled()
-	_, _ = s.GetQuietHoursStart()
-	_, _ = s.GetQuietHoursEnd()
+	// Test that all methods exist and are callable.
+	// GSettings may reject the call when the schema is not installed.
+	if _, err := s.GetDefaultMode(); err != nil {
+		t.Log(err)
+	}
+	if _, err := s.GetLastMode(); err != nil {
+		t.Log(err)
+	}
+	if err := s.SetLastMode(efficiency.ModeBalanced); err != nil {
+		t.Log(err)
+	}
+	if _, err := s.ShouldRememberMode(); err != nil {
+		t.Log(err)
+	}
+	if _, err := s.GetQuietHoursEnabled(); err != nil {
+		t.Log(err)
+	}
+	if _, err := s.GetQuietHoursStart(); err != nil {
+		t.Log(err)
+	}
+	if _, err := s.GetQuietHoursEnd(); err != nil {
+		t.Log(err)
+	}
 	_ = s.GetNotifyOnModeChange()
 	_ = s.GetNotifyOnBackendFailure()
 	_ = s.GetNotifyOnThermalThrottle()
@@ -654,7 +667,11 @@ func TestOSEnvDoesNotAffectDefaults(t *testing.T) {
 		t.Error("Default notification setting should be true")
 	}
 
-	if quiet, _ := s.GetQuietHoursStart(); quiet != 22 {
+	quiet, err := s.GetQuietHoursStart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quiet != 22 {
 		t.Error("Default quiet hours start should be 22")
 	}
 }
@@ -669,14 +686,29 @@ func TestGsettingsPanic(t *testing.T) {
 
 	s := &Settings{available: false}
 
-	// Call all methods - should not panic
-	s.GetDefaultMode()
-	s.GetLastMode()
-	s.SetLastMode(efficiency.ModeBalanced)
-	s.ShouldRememberMode()
-	s.GetQuietHoursEnabled()
-	s.GetQuietHoursStart()
-	s.GetQuietHoursEnd()
+	// Call all methods - should not panic.
+	// Unavailable settings return an error from the mode getters.
+	if _, err := s.GetDefaultMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := s.GetLastMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	if err := s.SetLastMode(efficiency.ModeBalanced); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ShouldRememberMode(); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := s.GetQuietHoursEnabled(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetQuietHoursStart(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetQuietHoursEnd(); err != nil {
+		t.Fatal(err)
+	}
 	s.GetNotifyOnModeChange()
 	s.GetNotifyOnBackendFailure()
 	s.GetNotifyOnThermalThrottle()
@@ -764,8 +796,14 @@ func TestModeIntValues(t *testing.T) {
 func TestGetQuietHoursStartEndDefaults(t *testing.T) {
 	s := &Settings{available: false}
 
-	start, _ := s.GetQuietHoursStart()
-	end, _ := s.GetQuietHoursEnd()
+	start, err := s.GetQuietHoursStart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	end, err := s.GetQuietHoursEnd()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if start != 22 {
 		t.Errorf("Quiet hours start default should be 22, got %d", start)

@@ -28,9 +28,9 @@ func InitLogger(level string, production bool) error {
 		config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	case strInfo:
 		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	case "warn":
+	case strWarn:
 		config.Level = zap.NewAtomicLevelAt(zapcore.WarnLevel)
-	case "error":
+	case strError:
 		config.Level = zap.NewAtomicLevelAt(zapcore.ErrorLevel)
 	default:
 		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)

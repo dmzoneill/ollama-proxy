@@ -14,7 +14,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 		t.Fatal("Expected non-nil pipeline")
 	}
 
-	if pipeline.ID != "voice-assistant" {
+	if pipeline.ID != strVoiceAssistant2 {
 		t.Errorf("Expected ID 'voice-assistant', got %s", pipeline.ID)
 	}
 
@@ -27,7 +27,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 	}
 
 	// Check first stage
-	if pipeline.Stages[0].ID != "voice-to-text" {
+	if pipeline.Stages[0].ID != strVoiceToText {
 		t.Error("Expected first stage to be 'voice-to-text'")
 	}
 
@@ -52,7 +52,7 @@ func TestVoiceAssistantPipeline(t *testing.T) {
 	}
 
 	// Check second stage
-	if pipeline.Stages[1].ID != "process-text" {
+	if pipeline.Stages[1].ID != strProcessText {
 		t.Error("Expected second stage to be 'process-text'")
 	}
 
@@ -124,7 +124,7 @@ func TestAdaptiveTextPipeline(t *testing.T) {
 	}
 
 	stage := pipeline.Stages[0]
-	if stage.ID != "generate-text" {
+	if stage.ID != strGenerateText {
 		t.Error("Expected stage ID 'generate-text'")
 	}
 
@@ -210,7 +210,7 @@ func TestCodeGenerationPipeline(t *testing.T) {
 		t.Error("Expected iGPU preference")
 	}
 
-	if pipeline.Stages[0].Model != "deepseek-coder:6.7b" {
+	if pipeline.Stages[0].Model != strDeepseekCoder67b {
 		t.Errorf("Expected deepseek-coder:6.7b model")
 	}
 
@@ -510,7 +510,7 @@ func TestBudgetAwarePipeline(t *testing.T) {
 	}
 
 	stage := pipeline.Stages[0]
-	if stage.ID != "generate-text" {
+	if stage.ID != strGenerateText {
 		t.Error("Expected stage 'generate-text'")
 	}
 
@@ -635,8 +635,8 @@ func TestVoiceAssistantStageSequence(t *testing.T) {
 		id  string
 		typ StageType
 	}{
-		{id: "voice-to-text", typ: StageTypeAudioToText},
-		{id: "process-text", typ: StageTypeTextGen},
+		{id: strVoiceToText, typ: StageTypeAudioToText},
+		{id: strProcessText, typ: StageTypeTextGen},
 		{id: strTextToVoice, typ: StageTypeTextToAudio},
 	}
 
@@ -656,7 +656,7 @@ func TestCodeGenerationStageSequence(t *testing.T) {
 	pipeline := CodeGenerationPipeline()
 
 	// First stage should generate, second should review
-	if pipeline.Stages[0].Model != "deepseek-coder:6.7b" {
+	if pipeline.Stages[0].Model != strDeepseekCoder67b {
 		t.Error("Expected draft stage to use deepseek-coder")
 	}
 

@@ -326,7 +326,7 @@ func TestConfidenceEstimator_UncertaintyPatterns(t *testing.T) {
 					if uncertainty == tt.expectedPattern ||
 						uncertainty == "Explicit uncertainty: '"+tt.expectedPattern+"'" ||
 						uncertainty == strHedgingLanguage ||
-						uncertainty == "Inability statement" {
+						uncertainty == strInabilityStatement {
 						found = true
 						break
 					}

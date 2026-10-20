@@ -9,4 +9,7 @@ const (
 	strRemove     = "remove"
 	strSampleRate = "sample_rate"
 	strOut        = "out"
+	strChannels   = "channels"
+	strFormat     = "format"
+	strS16LE      = "S16_LE"
 )

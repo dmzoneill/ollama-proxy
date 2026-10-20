@@ -231,7 +231,7 @@ func (p *Policy) GetRecommendedBackend(
 		strOllamaNpu:    3,
 		strOllamaIgpu:   12,
 		strOllamaNvidia: 55,
-		"ollama-cpu":    28,
+		strOllamaCPU:    28,
 	}
 
 	if backendPower[requestedBackend] > maxPower {
@@ -257,7 +257,7 @@ func estimateEnergy(backend string, estimatedTokens int) float64 {
 		strOllamaNpu:    {tokensPerSec: 10, powerWatts: 3},
 		strOllamaIgpu:   {tokensPerSec: 22, powerWatts: 12},
 		strOllamaNvidia: {tokensPerSec: 65, powerWatts: 55},
-		"ollama-cpu":    {tokensPerSec: 6, powerWatts: 28},
+		strOllamaCPU:    {tokensPerSec: 6, powerWatts: 28},
 	}
 
 	char := characteristics[backend]

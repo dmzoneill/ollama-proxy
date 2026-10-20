@@ -26,7 +26,7 @@ func TestNewOllamaBackend(t *testing.T) {
 				BackendConfig: backends.BackendConfig{
 					ID:           "test-backend",
 					Name:         strTestBackend,
-					Hardware:     "cpu",
+					Hardware:     strCPU,
 					PowerWatts:   10.0,
 					AvgLatencyMs: 500,
 				},
@@ -39,7 +39,7 @@ func TestNewOllamaBackend(t *testing.T) {
 			cfg: Config{
 				BackendConfig: backends.BackendConfig{
 					ID:       "test-backend",
-					Hardware: "cpu",
+					Hardware: strCPU,
 				},
 				Endpoint: "",
 			},
@@ -63,12 +63,15 @@ func TestNewOllamaBackend(t *testing.T) {
 
 // TestOllamaBackend_ID is part of the public API.
 func TestOllamaBackend_ID(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: "test-id",
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.ID() != "test-id" {
 		t.Errorf("Expected ID 'test-id', got '%s'", backend.ID())
@@ -77,28 +80,34 @@ func TestOllamaBackend_ID(t *testing.T) {
 
 // TestOllamaBackend_Type is part of the public API.
 func TestOllamaBackend_Type(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
-			Type: "ollama",
+			Type: strOllama,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if backend.Type() != "ollama" {
+	if backend.Type() != strOllama {
 		t.Errorf("Expected Type 'ollama', got '%s'", backend.Type())
 	}
 }
 
 // TestOllamaBackend_Name is part of the public API.
 func TestOllamaBackend_Name(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTestBackend,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.Name() != strTestBackend {
 		t.Errorf("Expected Name 'Test Backend', got '%s'", backend.Name())
@@ -107,13 +116,16 @@ func TestOllamaBackend_Name(t *testing.T) {
 
 // TestOllamaBackend_Hardware is part of the public API.
 func TestOllamaBackend_Hardware(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:       strTest,
 			Hardware: "gpu",
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.Hardware() != "gpu" {
 		t.Errorf("Expected Hardware 'gpu', got '%s'", backend.Hardware())
@@ -122,13 +134,16 @@ func TestOllamaBackend_Hardware(t *testing.T) {
 
 // TestOllamaBackend_PowerWatts is part of the public API.
 func TestOllamaBackend_PowerWatts(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:         strTest,
 			PowerWatts: 15.5,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.PowerWatts() != 15.5 {
 		t.Errorf("Expected PowerWatts 15.5, got %f", backend.PowerWatts())
@@ -137,13 +152,16 @@ func TestOllamaBackend_PowerWatts(t *testing.T) {
 
 // TestOllamaBackend_AvgLatencyMs is part of the public API.
 func TestOllamaBackend_AvgLatencyMs(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:           strTest,
 			AvgLatencyMs: 250,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.AvgLatencyMs() != 250 {
 		t.Errorf("Expected AvgLatencyMs 250, got %d", backend.AvgLatencyMs())
@@ -152,13 +170,16 @@ func TestOllamaBackend_AvgLatencyMs(t *testing.T) {
 
 // TestOllamaBackend_Priority is part of the public API.
 func TestOllamaBackend_Priority(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:       strTest,
 			Priority: 7,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.Priority() != 7 {
 		t.Errorf("Expected Priority 7, got %d", backend.Priority())
@@ -176,18 +197,24 @@ func TestOllamaBackend_HealthCheck_Success(t *testing.T) {
 		response := map[string]interface{}{
 			"models": []interface{}{},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := backend.HealthCheck(context.Background())
+	err = backend.HealthCheck(context.Background())
 	if err != nil {
 		t.Errorf("HealthCheck failed: %v", err)
 	}
@@ -205,14 +232,17 @@ func TestOllamaBackend_HealthCheck_Failure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := backend.HealthCheck(context.Background())
+	err = backend.HealthCheck(context.Background())
 	if err == nil {
 		t.Error("Expected health check to fail, got nil error")
 	}
@@ -225,14 +255,17 @@ func TestOllamaBackend_HealthCheck_Failure(t *testing.T) {
 // TestOllamaBackend_HealthCheck_ConnectionError is part of the public API.
 func TestOllamaBackend_HealthCheck_ConnectionError(t *testing.T) {
 	// Use an unreachable endpoint to trigger connection error
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: "http://localhost:1", // Port 1 should be unreachable
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := backend.HealthCheck(context.Background())
+	err = backend.HealthCheck(context.Background())
 	if err == nil {
 		t.Error("Expected health check to fail with connection error, got nil error")
 	}
@@ -255,14 +288,17 @@ func TestOllamaBackend_Start(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := backend.Start(context.Background())
+	err = backend.Start(context.Background())
 	if err != nil {
 		t.Errorf("Start failed: %v", err)
 	}
@@ -341,13 +377,16 @@ func TestOllamaBackend_SupportsModel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewOllamaBackend(Config{
+			backend, err := NewOllamaBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					ModelCapability: tt.modelCap,
 				},
 				Endpoint: strHTTPLocalhost11434,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			result := backend.SupportsModel(tt.modelName)
 			if result != tt.expectedResult {
@@ -359,12 +398,15 @@ func TestOllamaBackend_SupportsModel(t *testing.T) {
 
 // TestOllamaBackend_UpdateMetrics is part of the public API.
 func TestOllamaBackend_UpdateMetrics(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with success
 	backend.UpdateMetrics(100, true)
@@ -438,7 +480,10 @@ func TestOllamaBackend_Generate(t *testing.T) {
 
 		// Parse request
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		if req[strModel] != strLlama37b {
 			t.Errorf("Expected model 'llama3:7b', got '%v'", req[strModel])
@@ -449,16 +494,22 @@ func TestOllamaBackend_Generate(t *testing.T) {
 			strResponse: "Hello, world!",
 			strDone:     true,
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	req := &backends.GenerateRequest{
 		Prompt: "Say hello",
@@ -491,19 +542,32 @@ func TestOllamaBackend_GenerateStream(t *testing.T) {
 		}
 
 		for _, resp := range responses {
-			data, _ := json.Marshal(resp)
-			w.Write(data)
-			w.Write([]byte("\n"))
+			data, err := json.Marshal(resp)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, err := w.Write([]byte("\n")); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	req := &backends.GenerateRequest{
 		Prompt: "Say hello",
@@ -514,7 +578,11 @@ func TestOllamaBackend_GenerateStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
-	defer stream.Close()
+	defer func() {
+		if err := stream.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var fullResponse strings.Builder
 	for {
@@ -536,14 +604,17 @@ func TestOllamaBackend_GenerateStream(t *testing.T) {
 
 // TestOllamaBackend_Stop is part of the public API.
 func TestOllamaBackend_Stop(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := backend.Stop(context.Background())
+	err = backend.Stop(context.Background())
 	if err != nil {
 		t.Errorf("Stop failed: %v", err)
 	}
@@ -551,12 +622,15 @@ func TestOllamaBackend_Stop(t *testing.T) {
 
 // TestOllamaBackend_Capabilities is part of the public API.
 func TestOllamaBackend_Capabilities(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !backend.SupportsGenerate() {
 		t.Error("Expected SupportsGenerate to be true")
@@ -573,7 +647,7 @@ func TestOllamaBackend_Capabilities(t *testing.T) {
 
 // TestOllamaBackend_GetMaxModelSizeGB is part of the public API.
 func TestOllamaBackend_GetMaxModelSizeGB(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -582,6 +656,9 @@ func TestOllamaBackend_GetMaxModelSizeGB(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if backend.GetMaxModelSizeGB() != 24 {
 		t.Errorf("Expected MaxModelSizeGB 24, got %d", backend.GetMaxModelSizeGB())
@@ -591,7 +668,7 @@ func TestOllamaBackend_GetMaxModelSizeGB(t *testing.T) {
 // TestOllamaBackend_GetSupportedModelPatterns is part of the public API.
 func TestOllamaBackend_GetSupportedModelPatterns(t *testing.T) {
 	patterns := []string{"llama*", "qwen*"}
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -600,6 +677,9 @@ func TestOllamaBackend_GetSupportedModelPatterns(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	result := backend.GetSupportedModelPatterns()
 	if len(result) != len(patterns) {
@@ -610,7 +690,7 @@ func TestOllamaBackend_GetSupportedModelPatterns(t *testing.T) {
 // TestOllamaBackend_GetPreferredModels is part of the public API.
 func TestOllamaBackend_GetPreferredModels(t *testing.T) {
 	models := []string{strLlama37b, strQwen205b}
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -619,6 +699,9 @@ func TestOllamaBackend_GetPreferredModels(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	result := backend.GetPreferredModels()
 	if len(result) != len(models) {
@@ -643,7 +726,10 @@ func TestOllamaBackend_ListModels(t *testing.T) {
 		}`
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		if _, err := w.Write([]byte(response)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -706,7 +792,10 @@ func TestOllamaBackend_ListModels_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{invalid json"))
+		if _, err := w.Write([]byte("{invalid json")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -773,7 +862,10 @@ func TestOllamaBackend_Generate_WithOptions(t *testing.T) {
 		}`
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		if _, err := w.Write([]byte(response)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -816,7 +908,10 @@ func TestOllamaBackend_Generate_WithOptions(t *testing.T) {
 func TestOllamaBackend_Generate_ServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		if _, err := w.Write([]byte("Internal server error")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -847,7 +942,10 @@ func TestOllamaBackend_Generate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("invalid json"))
+		if _, err := w.Write([]byte("invalid json")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -877,7 +975,7 @@ func TestOllamaBackend_Generate_InvalidJSON(t *testing.T) {
 func TestOllamaBackend_SupportsModel_Patterns(t *testing.T) {
 	// Use valid patterns: *llama* and *qwen* to match any model with those strings
 	patterns := []string{"*llama*", "*qwen*"}
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -886,6 +984,9 @@ func TestOllamaBackend_SupportsModel_Patterns(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		model    string
@@ -911,7 +1012,7 @@ func TestOllamaBackend_SupportsModel_Patterns(t *testing.T) {
 // TestOllamaBackend_SupportsModel_PreferredFallback is part of the public API.
 func TestOllamaBackend_SupportsModel_PreferredFallback(t *testing.T) {
 	// Test case where model doesn't match supported patterns but is in preferred models
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -921,6 +1022,9 @@ func TestOllamaBackend_SupportsModel_PreferredFallback(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		model    string
@@ -945,7 +1049,7 @@ func TestOllamaBackend_SupportsModel_PreferredFallback(t *testing.T) {
 
 // TestOllamaBackend_GetMaxModelSizeGB_WithCapability is part of the public API.
 func TestOllamaBackend_GetMaxModelSizeGB_WithCapability(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			ModelCapability: &backends.ModelCapability{
@@ -954,6 +1058,9 @@ func TestOllamaBackend_GetMaxModelSizeGB_WithCapability(t *testing.T) {
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	size := backend.GetMaxModelSizeGB()
 	if size != 32 {
@@ -963,12 +1070,15 @@ func TestOllamaBackend_GetMaxModelSizeGB_WithCapability(t *testing.T) {
 
 // TestOllamaBackend_GetMaxModelSizeGB_WithoutCapability is part of the public API.
 func TestOllamaBackend_GetMaxModelSizeGB_WithoutCapability(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	size := backend.GetMaxModelSizeGB()
 	if size == 0 {
@@ -984,16 +1094,19 @@ func TestOllamaBackend_Generate_ContextCanceled(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
 	req := &backends.GenerateRequest{Model: strTest, Prompt: strTest}
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 
 	if err == nil {
 		t.Error("Expected error from canceled context")
@@ -1014,7 +1127,10 @@ func TestOllamaBackend_GenerateStream_Success(t *testing.T) {
 		}
 
 		for _, chunk := range chunks {
-			fmt.Fprintf(w, "%s\n", chunk)
+			if _, err := fmt.Fprintf(w, "%s\n", chunk); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
@@ -1022,10 +1138,13 @@ func TestOllamaBackend_GenerateStream_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{Model: strTest, Prompt: strTest}
@@ -1034,7 +1153,11 @@ func TestOllamaBackend_GenerateStream_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Read chunks
 	chunkCount := 0
@@ -1061,15 +1184,18 @@ func TestOllamaBackend_GenerateStream_Error(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{Model: strTest, Prompt: strTest}
 
-	_, err := backend.GenerateStream(ctx, req)
+	_, err = backend.GenerateStream(ctx, req)
 	if err == nil {
 		t.Error("Expected error from server error")
 	}
@@ -1081,20 +1207,32 @@ func TestOllamaBackend_StreamReader_Recv(t *testing.T) {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.WriteHeader(http.StatusOK)
 
-		fmt.Fprintf(w, `{"response":"test","done":false}`+"\n")
-		fmt.Fprintf(w, `{"response":"data","done":true}`+"\n")
+		if _, err := fmt.Fprintf(w, `{"response":"test","done":false}`+"\n"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := fmt.Fprintf(w, `{"response":"data","done":true}`+"\n"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	reader, _ := backend.GenerateStream(context.Background(), &backends.GenerateRequest{
+	reader, err := backend.GenerateStream(context.Background(), &backends.GenerateRequest{
 		Model:  strTest,
 		Prompt: strTest,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Test multiple Recv calls
 	chunk1, err := reader.Recv()
@@ -1116,15 +1254,20 @@ func TestOllamaBackend_StreamReader_Recv(t *testing.T) {
 		t.Error("Expected done=true on last chunk")
 	}
 
-	reader.Close()
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestOllamaBackend_UpdateMetrics_Success is part of the public API.
 func TestOllamaBackend_UpdateMetrics_Success(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with success
 	backend.UpdateMetrics(100, true)
@@ -1147,10 +1290,13 @@ func TestOllamaBackend_UpdateMetrics_Success(t *testing.T) {
 
 // TestOllamaBackend_UpdateMetrics_Failures is part of the public API.
 func TestOllamaBackend_UpdateMetrics_Failures(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with failures
 	backend.UpdateMetrics(100, true)
@@ -1178,7 +1324,10 @@ func TestOllamaBackend_Generate_WithAllOptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse and verify request
 		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Verify options were included
 		if options, ok := reqBody["options"].(map[string]interface{}); ok {
@@ -1198,14 +1347,20 @@ func TestOllamaBackend_Generate_WithAllOptions(t *testing.T) {
 		response := `{"response":"test","done":true}`
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		if _, err := w.Write([]byte(response)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	req := &backends.GenerateRequest{
 		Model:  strTestModel,
@@ -1231,7 +1386,10 @@ func TestOllamaBackend_Generate_WithAllOptions(t *testing.T) {
 func TestOllamaBackend_Generate_WithPartialOptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Should have options with only temperature
 		if options, ok := reqBody["options"].(map[string]interface{}); ok {
@@ -1246,14 +1404,20 @@ func TestOllamaBackend_Generate_WithPartialOptions(t *testing.T) {
 		response := `{"response":"test","done":true}`
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		if _, err := w.Write([]byte(response)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	req := &backends.GenerateRequest{
 		Model:  strTestModel,
@@ -1276,13 +1440,16 @@ func TestOllamaBackend_Generate_WithPartialOptions(t *testing.T) {
 
 // TestOllamaBackend_AvgLatencyMs_WithHistory is part of the public API.
 func TestOllamaBackend_AvgLatencyMs_WithHistory(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:           strTest,
 			AvgLatencyMs: 100, // Initial value
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update metrics to change latency
 	backend.UpdateMetrics(200, true)
@@ -1301,14 +1468,20 @@ func TestOllamaBackend_ListModels_EmptyResponse(t *testing.T) {
 		response := `{"models":[]}`
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		if _, err := w.Write([]byte(response)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	models, err := backend.ListModels(context.Background())
 	if err != nil {
@@ -1322,13 +1495,16 @@ func TestOllamaBackend_ListModels_EmptyResponse(t *testing.T) {
 
 // TestOllamaBackend_GetSupportedModelPatterns_Nil is part of the public API.
 func TestOllamaBackend_GetSupportedModelPatterns_Nil(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			// ModelCapability is nil
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	patterns := backend.GetSupportedModelPatterns()
 	if patterns == nil {
@@ -1338,13 +1514,16 @@ func TestOllamaBackend_GetSupportedModelPatterns_Nil(t *testing.T) {
 
 // TestOllamaBackend_GetPreferredModels_Nil is part of the public API.
 func TestOllamaBackend_GetPreferredModels_Nil(t *testing.T) {
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID: strTest,
 			// ModelCapability is nil
 		},
 		Endpoint: strHTTPLocalhost11434,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	models := backend.GetPreferredModels()
 	if models == nil {
@@ -1357,7 +1536,10 @@ func TestOllamaBackend_GenerateStream_WithOptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse request to verify options were included
 		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Verify options were included
 		if options, ok := reqBody["options"].(map[string]interface{}); ok {
@@ -1383,7 +1565,10 @@ func TestOllamaBackend_GenerateStream_WithOptions(t *testing.T) {
 		}
 
 		for _, chunk := range chunks {
-			fmt.Fprintf(w, "%s\n", chunk)
+			if _, err := fmt.Fprintf(w, "%s\n", chunk); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
@@ -1391,10 +1576,13 @@ func TestOllamaBackend_GenerateStream_WithOptions(t *testing.T) {
 	}))
 	defer server.Close()
 
-	backend, _ := NewOllamaBackend(Config{
+	backend, err := NewOllamaBackend(Config{
 		BackendConfig: backends.BackendConfig{ID: strTest},
 		Endpoint:      server.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -1411,7 +1599,11 @@ func TestOllamaBackend_GenerateStream_WithOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateStream failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Read chunks
 	chunkCount := 0

@@ -18,7 +18,7 @@ func TestEfficiencyMode_String(t *testing.T) {
 		{mode: ModeQuiet, expected: strQuiet},
 		{mode: ModeAuto, expected: strAuto},
 		{mode: ModeUltraEfficiency, expected: strUltraEfficiency2},
-		{mode: Mode(999), expected: "Unknown"},
+		{mode: Mode(999), expected: strUnknown},
 	}
 
 	for _, tt := range tests {
@@ -1090,7 +1090,7 @@ func TestEfficiencyMode_String_EdgeCases(t *testing.T) {
 	// Test unknown mode values
 	unknownModes := []Mode{-1, 100, 999, 1000}
 	for _, mode := range unknownModes {
-		if got := mode.String(); got != "Unknown" {
+		if got := mode.String(); got != strUnknown {
 			t.Errorf("String() for unknown mode %d = %q, expected 'Unknown'", mode, got)
 		}
 	}

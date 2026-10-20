@@ -682,8 +682,10 @@ func TestRecordCacheMiss(t *testing.T) {
 }
 
 // TestMetricsCollectionNoPanic is part of the public API.
-func TestMetricsCollectionNoPanic(_ *testing.T) {
+func TestMetricsCollectionNoPanic(t *testing.T) {
 	// Test that all metric collectors are properly registered
 	// This ensures they can be collected by Prometheus without panic
-	prometheus.DefaultGatherer.Gather()
+	if _, err := prometheus.DefaultGatherer.Gather(); err != nil {
+		t.Fatal(err)
+	}
 }

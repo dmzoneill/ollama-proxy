@@ -266,7 +266,7 @@ func TestExecuteTextToAudio(t *testing.T) {
 	stage := &Stage{
 		ID:               "text-to-audio",
 		Type:             StageTypeTextToAudio,
-		Model:            "piper-tts",
+		Model:            strPiperTts,
 		PreferredBackend: strTestBackend,
 	}
 
@@ -367,7 +367,7 @@ func TestVoiceAssistantMultimediaPipeline(t *testing.T) {
 	executor := NewPipelineExecutor([]backends.Backend{backend})
 
 	pipeline := &Pipeline{
-		ID:   "voice-assistant",
+		ID:   strVoiceAssistant2,
 		Name: "Voice Assistant Test",
 		Stages: []*Stage{
 			{
@@ -385,7 +385,7 @@ func TestVoiceAssistantMultimediaPipeline(t *testing.T) {
 			{
 				ID:               "text-to-audio",
 				Type:             StageTypeTextToAudio,
-				Model:            "piper-tts",
+				Model:            strPiperTts,
 				PreferredBackend: strTestBackend,
 			},
 		},

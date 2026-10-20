@@ -41,7 +41,7 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 			name: "Keyboard input",
 			event: UdevEvent{
 				Subsystem: SubsystemInput,
-				DevType:   "keyboard",
+				DevType:   string(DeviceTypeKeyboard),
 			},
 			expected: DeviceTypeKeyboard,
 		},
@@ -49,7 +49,7 @@ func TestUdevEvent_GetDeviceType(t *testing.T) {
 			name: "Mouse input",
 			event: UdevEvent{
 				Subsystem: SubsystemInput,
-				DevType:   "mouse",
+				DevType:   string(DeviceTypeMouse),
 			},
 			expected: DeviceTypeMouse,
 		},
@@ -70,7 +70,7 @@ func TestUdevEvent_String(t *testing.T) {
 	event := UdevEvent{
 		Action:    strAdd,
 		DevPath:   "/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/video4linux/video0",
-		Subsystem: "video4linux",
+		Subsystem: SubsystemVideo4linux,
 		DevName:   strDevVideo0,
 		DevType:   "video_device",
 	}
@@ -81,7 +81,7 @@ func TestUdevEvent_String(t *testing.T) {
 		t.Error("String should contain action")
 	}
 
-	if !strings.Contains(str, "video4linux") {
+	if !strings.Contains(str, SubsystemVideo4linux) {
 		t.Error("String should contain subsystem")
 	}
 
@@ -121,7 +121,7 @@ func TestParseUevent(t *testing.T) {
 		t.Errorf("DevPath mismatch: %s", event.DevPath)
 	}
 
-	if event.Subsystem != "video4linux" {
+	if event.Subsystem != SubsystemVideo4linux {
 		t.Errorf("Expected subsystem 'video4linux', got '%s'", event.Subsystem)
 	}
 
@@ -272,7 +272,11 @@ func TestUdevMonitor_Creation(t *testing.T) {
 		}
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
-	defer um.Stop()
+	defer func() {
+		if err := um.Stop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	if um.socket == 0 {
 		t.Error("Socket should be initialized")
@@ -338,7 +342,11 @@ func TestUdevMonitor_EventChannel(t *testing.T) {
 		}
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
-	defer um.Stop()
+	defer func() {
+		if err := um.Stop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	um.Start()
 
@@ -372,7 +380,11 @@ func TestUdevMonitor_Integration(t *testing.T) {
 		}
 		t.Fatalf("NewUdevMonitor failed: %v", err)
 	}
-	defer um.Stop()
+	defer func() {
+		if err := um.Stop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	um.Start()
 
@@ -411,7 +423,9 @@ func BenchmarkParseUevent(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		um.parseUevent(rawEvent)
+		if _, err := um.parseUevent(rawEvent); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Target: <1μs per parse, 0-1 allocations

@@ -256,7 +256,9 @@ func createTestRouter() *router.Router {
 func TestWebSocketConnectionEstablishment(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{id: strMock1, healthy: true}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -267,12 +269,18 @@ func TestWebSocketConnectionEstablishment(t *testing.T) {
 	// Attempt to upgrade connection
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Verify connection is established
 	if conn.RemoteAddr() == nil {
@@ -292,7 +300,9 @@ func TestWebSocketStreamingMessageHandling(t *testing.T) {
 			{Token: "world", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -300,12 +310,18 @@ func TestWebSocketStreamingMessageHandling(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send streaming request
 	req := Request{
@@ -357,7 +373,9 @@ func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: "full response"},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -365,12 +383,18 @@ func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send non-streaming request
 	req := Request{
@@ -405,7 +429,9 @@ func TestWebSocketNonStreamingMessageHandling(t *testing.T) {
 func TestWebSocketErrorHandlingInvalidRequest(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{id: strMock1, healthy: true}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -413,12 +439,18 @@ func TestWebSocketErrorHandlingInvalidRequest(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send invalid JSON
 	if err := conn.WriteMessage(websocket.TextMessage, []byte("invalid json")); err != nil {
@@ -444,7 +476,9 @@ func TestWebSocketErrorHandlingBackendError(t *testing.T) {
 		healthy:     true,
 		generateErr: fmt.Errorf("backend error"),
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -452,12 +486,18 @@ func TestWebSocketErrorHandlingBackendError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send non-streaming request
 	req := Request{
@@ -489,7 +529,9 @@ func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 		healthy:   true,
 		streamErr: fmt.Errorf("stream error"),
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -497,12 +539,18 @@ func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send streaming request
 	req := Request{
@@ -530,7 +578,9 @@ func TestWebSocketErrorHandlingStreamError(t *testing.T) {
 func TestWebSocketConnectionClose(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{id: strMock1, healthy: true}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -538,7 +588,9 @@ func TestWebSocketConnectionClose(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
@@ -566,7 +618,9 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 			{Token: strResponse, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -586,13 +640,19 @@ func TestWebSocketConcurrentConnections(t *testing.T) {
 
 			conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 			if dialResp != nil && dialResp.Body != nil {
-				dialResp.Body.Close()
+				if err := dialResp.Body.Close(); err != nil {
+					t.Error(err)
+				}
 			}
 			if err != nil {
 				errorCount.Add(1)
 				return
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
 
 			// Send request
 			req := Request{
@@ -641,7 +701,9 @@ func TestWebSocketContextCancellation(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -649,12 +711,18 @@ func TestWebSocketContextCancellation(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send request
 	req := Request{
@@ -685,13 +753,13 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 		priority string
 		expected backends.Priority
 	}{
-		{name: "best-effort", priority: "best-effort", expected: backends.PriorityBestEffort},
-		{name: "low", priority: "low", expected: backends.PriorityBestEffort},
+		{name: strBestEffort, priority: strBestEffort, expected: backends.PriorityBestEffort},
+		{name: strLow, priority: strLow, expected: backends.PriorityBestEffort},
 		{name: "normal", priority: "normal", expected: backends.PriorityNormal},
 		{name: "", priority: "", expected: backends.PriorityNormal},
 		{name: strHigh, priority: strHigh, expected: backends.PriorityHigh},
-		{name: "critical", priority: "critical", expected: backends.PriorityCritical},
-		{name: "realtime", priority: "realtime", expected: backends.PriorityCritical},
+		{name: strCritical, priority: strCritical, expected: backends.PriorityCritical},
+		{name: strRealtime, priority: strRealtime, expected: backends.PriorityCritical},
 		{name: "unknown", priority: "unknown", expected: backends.PriorityNormal},
 	}
 
@@ -703,7 +771,9 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -713,12 +783,18 @@ func TestWebSocketPriorityParsing(t *testing.T) {
 			wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 			conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 			if dialResp != nil && dialResp.Body != nil {
-				dialResp.Body.Close()
+				if err := dialResp.Body.Close(); err != nil {
+					t.Error(err)
+				}
 			}
 			if err != nil {
 				t.Fatalf("Failed to establish WebSocket connection: %v", err)
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
 
 			req := Request{
 				RequestID: "test-priority",
@@ -747,7 +823,9 @@ func TestWebSocketOptionsConversion(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -755,12 +833,18 @@ func TestWebSocketOptionsConversion(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-options",
@@ -799,7 +883,9 @@ func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 			{Token: "chunk2", Done: false},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -807,12 +893,18 @@ func TestWebSocketStreamErrorDuringTransmission(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-stream-error",
@@ -857,7 +949,9 @@ func TestWebSocketMetricsCalculation(t *testing.T) {
 			{Token: "t3", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -865,12 +959,18 @@ func TestWebSocketMetricsCalculation(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-metrics",
@@ -914,7 +1014,9 @@ func TestWebSocketTTFTCalculation(t *testing.T) {
 			{Token: "second", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -922,12 +1024,18 @@ func TestWebSocketTTFTCalculation(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-ttft",
@@ -962,7 +1070,9 @@ func TestWebSocketEmptyOptionsHandling(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -970,12 +1080,18 @@ func TestWebSocketEmptyOptionsHandling(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-no-options",
@@ -1005,7 +1121,9 @@ func TestWebSocketBackendNotHealthy(t *testing.T) {
 		id:      strMock1,
 		healthy: false, // Not healthy
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1013,12 +1131,18 @@ func TestWebSocketBackendNotHealthy(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-unhealthy",
@@ -1054,8 +1178,12 @@ func TestWebSocketMultipleBackends(t *testing.T) {
 		},
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1063,12 +1191,18 @@ func TestWebSocketMultipleBackends(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-multi-backend",
@@ -1101,7 +1235,9 @@ func TestWebSocketStressRapidRequests(t *testing.T) {
 			{Token: strResponse, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1112,7 +1248,9 @@ func TestWebSocketStressRapidRequests(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 		if dialResp != nil && dialResp.Body != nil {
-			dialResp.Body.Close()
+			if err := dialResp.Body.Close(); err != nil {
+				t.Error(err)
+			}
 		}
 		if err != nil {
 			t.Fatalf("Failed to establish WebSocket connection %d: %v", i, err)
@@ -1125,20 +1263,26 @@ func TestWebSocketStressRapidRequests(t *testing.T) {
 			Stream:    true,
 		}
 		if err := conn.WriteJSON(req); err != nil {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				t.Error(err)
+			}
 			t.Fatalf("Failed to send request %d: %v", i, err)
 		}
 
 		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				t.Error(err)
+			}
 			t.Fatalf("Failed to read response %d: %v", i, err)
 		}
 
 		if chunk.RequestID != req.RequestID {
 			t.Errorf("Request %d: RequestID mismatch", i)
 		}
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 }
 
@@ -1163,8 +1307,12 @@ func TestWebSocketMaxLatencyConstraint(t *testing.T) {
 		},
 	}
 
-	r.RegisterBackend(slowBackend)
-	r.RegisterBackend(fastBackend)
+	if err := r.RegisterBackend(slowBackend); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(fastBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1172,12 +1320,18 @@ func TestWebSocketMaxLatencyConstraint(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID:  "test-max-latency",
@@ -1210,7 +1364,9 @@ func TestWebSocketWriteDeadline(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1218,12 +1374,18 @@ func TestWebSocketWriteDeadline(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-deadline",
@@ -1236,7 +1398,9 @@ func TestWebSocketWriteDeadline(t *testing.T) {
 	}
 
 	// Read response with reasonable timeout
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	var chunk Chunk
 	if err := conn.ReadJSON(&chunk); err != nil {
 		t.Fatalf("Failed to read response: %v", err)
@@ -1255,7 +1419,9 @@ func TestWebSocketBackendCalledMetrics(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1263,12 +1429,18 @@ func TestWebSocketBackendCalledMetrics(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-metrics-backend",
@@ -1302,7 +1474,9 @@ func TestWebSocketStreamingBackendCalledMetrics(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1310,12 +1484,18 @@ func TestWebSocketStreamingBackendCalledMetrics(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-stream-metrics-backend",
@@ -1349,7 +1529,9 @@ func BenchmarkWebSocketMessageThroughput(b *testing.B) {
 			{Token: "x", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		b.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1357,12 +1539,18 @@ func BenchmarkWebSocketMessageThroughput(b *testing.B) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			b.Error(err)
+		}
 	}
 	if err != nil {
 		b.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			b.Error(err)
+		}
+	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1389,7 +1577,9 @@ func TestSendErrorHelper(t *testing.T) {
 	// by checking the output through the mock backend
 	r := createTestRouter()
 	backend := &MockBackend{id: strMock1, healthy: true}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1397,12 +1587,18 @@ func TestSendErrorHelper(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Send invalid request to trigger sendError
 	if err := conn.WriteMessage(websocket.TextMessage, []byte("not json")); err != nil {
@@ -1509,7 +1705,9 @@ func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: strTest},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1521,7 +1719,9 @@ func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 	for _, requestID := range testCases {
 		conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 		if dialResp != nil && dialResp.Body != nil {
-			dialResp.Body.Close()
+			if err := dialResp.Body.Close(); err != nil {
+				t.Error(err)
+			}
 		}
 		if err != nil {
 			t.Fatalf("Failed to establish WebSocket connection: %v", err)
@@ -1534,20 +1734,26 @@ func TestWebSocketResponseRequestIDVerification(t *testing.T) {
 			Stream:    false,
 		}
 		if err := conn.WriteJSON(req); err != nil {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				t.Error(err)
+			}
 			t.Fatalf("Failed to send request: %v", err)
 		}
 
 		var chunk Chunk
 		if err := conn.ReadJSON(&chunk); err != nil {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				t.Error(err)
+			}
 			t.Fatalf("Failed to read response: %v", err)
 		}
 
 		if chunk.RequestID != requestID {
 			t.Errorf("Expected RequestID '%s', got '%s'", requestID, chunk.RequestID)
 		}
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 }
 
@@ -1559,7 +1765,9 @@ func TestWebSocketNonStreamingResponseFormat(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: "complete response"},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1567,12 +1775,18 @@ func TestWebSocketNonStreamingResponseFormat(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-format",
@@ -1619,7 +1833,9 @@ func TestWebSocketStreamingCompleteResponseFormat(t *testing.T) {
 			{Token: "world", Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1627,12 +1843,18 @@ func TestWebSocketStreamingCompleteResponseFormat(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-format-stream",
@@ -1729,7 +1951,9 @@ func TestWebSocketConcurrentWriteSafety(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1749,7 +1973,9 @@ func TestWebSocketConcurrentWriteSafety(t *testing.T) {
 			for j := 0; j < numRequestsPerConnection; j++ {
 				conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 				if dialResp != nil && dialResp.Body != nil {
-					dialResp.Body.Close()
+					if err := dialResp.Body.Close(); err != nil {
+						t.Error(err)
+					}
 				}
 				if err != nil {
 					t.Errorf("Failed to connect: %v", err)
@@ -1763,18 +1989,24 @@ func TestWebSocketConcurrentWriteSafety(t *testing.T) {
 					Stream:    true,
 				}
 				if err := conn.WriteJSON(req); err != nil {
-					conn.Close()
+					if err := conn.Close(); err != nil {
+						t.Error(err)
+					}
 					t.Errorf("Failed to write: %v", err)
 					return
 				}
 
 				var chunk Chunk
 				if err := conn.ReadJSON(&chunk); err != nil {
-					conn.Close()
+					if err := conn.Close(); err != nil {
+						t.Error(err)
+					}
 					t.Errorf("Failed to read: %v", err)
 					return
 				}
-				conn.Close()
+				if err := conn.Close(); err != nil {
+					t.Error(err)
+				}
 			}
 		}(i)
 	}
@@ -1804,7 +2036,9 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 		healthy:      true,
 		streamChunks: chunks,
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1812,12 +2046,18 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-large-stream",
@@ -1846,7 +2086,9 @@ func TestWebSocketLargeTokenStream(t *testing.T) {
 func TestWebSocketUpgradeFailure(t *testing.T) {
 	r := createTestRouter()
 	backend := &MockBackend{id: strMock1, healthy: true}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1856,7 +2098,11 @@ func TestWebSocketUpgradeFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make HTTP request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Should fail because it's not a WebSocket upgrade request
 	if resp.StatusCode == http.StatusOK {
@@ -1872,7 +2118,9 @@ func TestWebSocketEmptyPrompt(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: "response to empty"},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1880,12 +2128,18 @@ func TestWebSocketEmptyPrompt(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-empty-prompt",
@@ -1915,7 +2169,9 @@ func TestWebSocketSpecialCharactersInRequest(t *testing.T) {
 		healthy:          true,
 		generateResponse: &backends.GenerateResponse{Response: strResponse},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1923,12 +2179,18 @@ func TestWebSocketSpecialCharactersInRequest(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	req := Request{
 		RequestID: "test-special-chars",
@@ -1960,7 +2222,9 @@ func TestWebSocketReadDeadlineEnforcement(t *testing.T) {
 			{Token: strTest, Done: true},
 		},
 	}
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := createTestServer(r)
 	defer server.Close()
@@ -1968,15 +2232,23 @@ func TestWebSocketReadDeadlineEnforcement(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 	conn, dialResp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if dialResp != nil && dialResp.Body != nil {
-		dialResp.Body.Close()
+		if err := dialResp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Fatalf("Failed to establish WebSocket connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Set a read deadline
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 
 	req := Request{
 		RequestID: "test-deadline",

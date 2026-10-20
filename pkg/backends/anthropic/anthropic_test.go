@@ -67,7 +67,7 @@ func TestNewAnthropicBackend(t *testing.T) {
 				if backend.ID() != tt.cfg.ID {
 					t.Errorf("ID() = %v, want %v", backend.ID(), tt.cfg.ID)
 				}
-				if backend.Type() != "anthropic" {
+				if backend.Type() != strAnthropic {
 					t.Errorf("Type() = %v, want anthropic", backend.Type())
 				}
 				if tt.cfg.Endpoint != "" && backend.endpoint != tt.cfg.Endpoint {
@@ -126,7 +126,7 @@ func TestAnthropicBackend_Getters(t *testing.T) {
 	if backend.ID() != "test-anthropic" {
 		t.Errorf("ID() = %v, want test-anthropic", backend.ID())
 	}
-	if backend.Type() != "anthropic" {
+	if backend.Type() != strAnthropic {
 		t.Errorf("Type() = %v, want anthropic", backend.Type())
 	}
 	if backend.Name() != "Test Claude" {
@@ -145,13 +145,16 @@ func TestAnthropicBackend_Getters(t *testing.T) {
 
 // TestAnthropicBackend_Capabilities is part of the public API.
 func TestAnthropicBackend_Capabilities(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !backend.SupportsGenerate() {
 		t.Error("SupportsGenerate() should return true")
@@ -166,16 +169,19 @@ func TestAnthropicBackend_Capabilities(t *testing.T) {
 
 // TestAnthropicBackend_HealthCheck is part of the public API.
 func TestAnthropicBackend_HealthCheck(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	err := backend.HealthCheck(ctx)
+	err = backend.HealthCheck(ctx)
 	if err != nil {
 		t.Errorf("HealthCheck() error = %v", err)
 	}
@@ -207,13 +213,16 @@ func TestAnthropicBackend_HealthCheckNoAPIKey(t *testing.T) {
 
 // TestAnthropicBackend_ListModels is part of the public API.
 func TestAnthropicBackend_ListModels(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	models, err := backend.ListModels(ctx)
@@ -294,7 +303,7 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -302,6 +311,9 @@ func TestAnthropicBackend_SupportsModel(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if got := backend.SupportsModel(tt.modelName); got != tt.want {
 				t.Errorf("SupportsModel(%v) = %v, want %v", tt.modelName, got, tt.want)
@@ -327,7 +339,7 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 
 		// Send mock response
 		response := map[string]interface{}{
-			"content": []map[string]string{
+			strContent: []map[string]string{
 				{"text": "Hello! This is a test response."},
 			},
 			"usage": map[string]int{
@@ -335,11 +347,14 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 				"output_tokens": 20,
 			},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -347,6 +362,9 @@ func TestAnthropicBackend_Generate(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -380,11 +398,14 @@ func TestAnthropicBackend_GenerateError(t *testing.T) {
 	// Create mock server that returns error
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": {"message": "Invalid request"}}`))
+		if _, err := w.Write([]byte(`{"error": {"message": "Invalid request"}}`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -392,6 +413,9 @@ func TestAnthropicBackend_GenerateError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -399,7 +423,7 @@ func TestAnthropicBackend_GenerateError(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
 		t.Error("Generate() should return error for bad request")
 	}
@@ -407,13 +431,16 @@ func TestAnthropicBackend_GenerateError(t *testing.T) {
 
 // TestAnthropicBackend_UpdateMetrics is part of the public API.
 func TestAnthropicBackend_UpdateMetrics(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with successful request
 	backend.UpdateMetrics(100, true)
@@ -446,16 +473,19 @@ func TestAnthropicBackend_UpdateMetrics(t *testing.T) {
 
 // TestAnthropicBackend_Embed is part of the public API.
 func TestAnthropicBackend_Embed(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	_, err := backend.Embed(ctx, &backends.EmbedRequest{})
+	_, err = backend.Embed(ctx, &backends.EmbedRequest{})
 	if err == nil {
 		t.Error("Embed() should return error as it's not supported")
 	}
@@ -463,13 +493,16 @@ func TestAnthropicBackend_Embed(t *testing.T) {
 
 // TestAnthropicBackend_StartStop is part of the public API.
 func TestAnthropicBackend_StartStop(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 
@@ -491,7 +524,7 @@ func TestMatchesPattern(t *testing.T) {
 	}{
 		{modelName: strClaude3Opus, pattern: "*", want: true},
 		{modelName: strClaude3Opus, pattern: strClaude3Opus, want: true},
-		{modelName: strClaude3Opus, pattern: "claude-*", want: true},
+		{modelName: strClaude3Opus, pattern: strClaude, want: true},
 		{modelName: strClaude3Opus, pattern: "*-opus", want: true},
 		{modelName: strClaude3Opus, pattern: "*-3-*", want: true},
 		{modelName: strClaude3Opus, pattern: "gpt-*", want: false},
@@ -509,13 +542,16 @@ func TestMatchesPattern(t *testing.T) {
 
 // TestAnthropicBackend_GetMaxModelSizeGB is part of the public API.
 func TestAnthropicBackend_GetMaxModelSizeGB(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if size := backend.GetMaxModelSizeGB(); size != 999 {
 		t.Errorf("GetMaxModelSizeGB() = %v, want 999", size)
@@ -532,7 +568,7 @@ func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 		{
 			name:     "default patterns",
 			modelCap: nil,
-			want:     []string{"claude-*"},
+			want:     []string{strClaude},
 		},
 		{
 			name: "custom patterns",
@@ -545,7 +581,7 @@ func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -553,6 +589,9 @@ func TestAnthropicBackend_GetSupportedModelPatterns(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			patterns := backend.GetSupportedModelPatterns()
 			if len(patterns) != len(tt.want) {
@@ -585,7 +624,7 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewAnthropicBackend(Config{
+			backend, err := NewAnthropicBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -593,6 +632,9 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			models := backend.GetPreferredModels()
 			if len(models) != tt.wantLen {
@@ -604,7 +646,7 @@ func TestAnthropicBackend_GetPreferredModels(t *testing.T) {
 
 // TestAnthropicBackend_AvgLatencyMs is part of the public API.
 func TestAnthropicBackend_AvgLatencyMs(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:           strTest,
 			Name:         strTest2,
@@ -612,6 +654,9 @@ func TestAnthropicBackend_AvgLatencyMs(t *testing.T) {
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Before any requests, should return configured average
 	if lat := backend.AvgLatencyMs(); lat != 500 {
@@ -627,13 +672,16 @@ func TestAnthropicBackend_AvgLatencyMs(t *testing.T) {
 
 // TestAnthropicBackend_ConcurrentMetricsUpdate is part of the public API.
 func TestAnthropicBackend_ConcurrentMetricsUpdate(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Simulate concurrent metric updates
 	done := make(chan bool)
@@ -662,13 +710,16 @@ func TestAnthropicBackend_ContextCancellation(t *testing.T) {
 	// Create a slow mock server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"content": []map[string]string{{"text": "response"}},
-		})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			strContent: []map[string]string{{"text": "response"}},
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -676,6 +727,9 @@ func TestAnthropicBackend_ContextCancellation(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -685,7 +739,7 @@ func TestAnthropicBackend_ContextCancellation(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
 		t.Error("Generate() should return error when context is canceled")
 	}
@@ -693,13 +747,16 @@ func TestAnthropicBackend_ContextCancellation(t *testing.T) {
 
 // TestAnthropicBackend_GenerateStream_NotImplemented is part of the public API.
 func TestAnthropicBackend_GenerateStream_NotImplemented(t *testing.T) {
-	backend, _ := NewAnthropicBackend(Config{
+	backend, err := NewAnthropicBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -707,7 +764,7 @@ func TestAnthropicBackend_GenerateStream_NotImplemented(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.GenerateStream(ctx, req)
+	_, err = backend.GenerateStream(ctx, req)
 	if err == nil {
 		t.Error("GenerateStream should return error (not implemented)")
 	}

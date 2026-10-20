@@ -88,7 +88,7 @@ func (ss *SystemService) Start() error {
 					{
 						Name: "IsQuietHours",
 						Args: []introspect.Arg{
-							{Name: "quiet_hours", Type: "b", Direction: strOut},
+							{Name: strQuietHours, Type: "b", Direction: strOut},
 						},
 					},
 				},
@@ -113,7 +113,7 @@ func (ss *SystemService) Start() error {
 					{
 						Name: "PowerSourceChanged",
 						Args: []introspect.Arg{
-							{Name: "on_battery", Type: "b"},
+							{Name: strOnBattery, Type: "b"},
 						},
 					},
 					{
@@ -156,10 +156,10 @@ func (ss *SystemService) GetSystemState() (map[string]dbus.Variant, *dbus.Error)
 
 	result := map[string]dbus.Variant{
 		"battery_percent": dbus.MakeVariant(safeconv.Int32FromInt(state.BatteryPercent)),
-		"on_battery":      dbus.MakeVariant(state.OnBattery),
+		strOnBattery:      dbus.MakeVariant(state.OnBattery),
 		"avg_temp":        dbus.MakeVariant(state.AvgTemp),
 		"avg_fan_speed":   dbus.MakeVariant(safeconv.Int32FromInt(state.AvgFanSpeed)),
-		"quiet_hours":     dbus.MakeVariant(state.QuietHours),
+		strQuietHours:     dbus.MakeVariant(state.QuietHours),
 	}
 
 	return result, nil

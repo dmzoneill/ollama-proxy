@@ -74,7 +74,7 @@ func OpenALSADevice(deviceName string, sampleRate, channels uint32, logger *zap.
 		zap.String(strDevice, deviceName),
 		zap.String("path", pcmPath),
 		zap.Uint32(strSampleRate, sampleRate),
-		zap.Uint32("channels", channels),
+		zap.Uint32(strChannels, channels),
 	)
 
 	return device, nil
@@ -88,7 +88,7 @@ func (d *ALSADevice) SetHardwareParams() error {
 
 	d.logger.Info("ALSA hardware parameters set",
 		zap.Uint32(strSampleRate, d.sampleRate),
-		zap.Uint32("channels", d.channels),
+		zap.Uint32(strChannels, d.channels),
 		zap.Uint32("period_size", d.periodSize),
 		zap.Uint32("buffer_size", d.bufferSize),
 	)
@@ -230,8 +230,8 @@ func (d *ALSADevice) GetCapabilities() map[string]interface{} {
 	return map[string]interface{}{
 		strDevice:     d.deviceName,
 		strSampleRate: d.sampleRate,
-		"channels":    d.channels,
-		"format":      "S16_LE",
+		strChannels:   d.channels,
+		strFormat:     strS16LE,
 		"period_size": d.periodSize,
 		"buffer_size": d.bufferSize,
 	}
@@ -269,7 +269,7 @@ func NewSimplifiedALSACapture(deviceName string, sampleRate, channels uint32, lo
 	logger.Info("Created simplified ALSA capture",
 		zap.String(strDevice, deviceName),
 		zap.Uint32(strSampleRate, sampleRate),
-		zap.Uint32("channels", channels),
+		zap.Uint32(strChannels, channels),
 		zap.Uint32("buffer_size", bufferSize),
 	)
 
@@ -322,8 +322,8 @@ func (s *SimplifiedALSACapture) GetCapabilities() map[string]interface{} {
 	return map[string]interface{}{
 		strDevice:     s.deviceName,
 		strSampleRate: s.sampleRate,
-		"channels":    s.channels,
-		"format":      "S16_LE",
+		strChannels:   s.channels,
+		strFormat:     strS16LE,
 		"api":         "simplified",
 	}
 }

@@ -241,8 +241,8 @@ func TestGetProfile(t *testing.T) {
 		{mediaType: backends.MediaTypeRealtime, expected: "qwen2.5:0.5b"},
 		{mediaType: backends.MediaTypeAudio, expected: "qwen2.5:1.5b"},
 		{mediaType: backends.MediaTypeCode, expected: "llama3:70b"},
-		{mediaType: backends.MediaTypeImage, expected: "llama3:7b"},
-		{mediaType: backends.MediaTypeText, expected: "llama3:7b"},
+		{mediaType: backends.MediaTypeImage, expected: strLlama37b},
+		{mediaType: backends.MediaTypeText, expected: strLlama37b},
 	}
 
 	for _, tt := range tests {
@@ -397,8 +397,8 @@ func TestIsRealtime_AllRealtimeKeywords(t *testing.T) {
 		"immediate",
 		"continuous",
 		"ongoing",
-		"transcribe",
-		"transcription",
+		strTranscribe,
+		strTranscription,
 		"dictate",
 		"dictation",
 	}
@@ -433,8 +433,8 @@ func TestIsAudio_AllAudioKeywords(t *testing.T) {
 		"stt",
 		"speech to text",
 		"speech-to-text",
-		"transcribe",
-		"transcription",
+		strTranscribe,
+		strTranscription,
 	}
 
 	for _, keyword := range keywords {

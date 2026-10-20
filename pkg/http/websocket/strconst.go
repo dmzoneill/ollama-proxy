@@ -10,4 +10,8 @@ const (
 	strTest123     = "test-123"
 	strTestModel   = "test-model"
 	strTopP        = "top_p"
+	strBestEffort  = "best-effort"
+	strCritical    = "critical"
+	strLow         = "low"
+	strRealtime    = "realtime"
 )

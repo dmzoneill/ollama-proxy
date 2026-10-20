@@ -94,7 +94,7 @@ func (b *Backend) ID() string {
 
 // Type returns backend type
 func (b *Backend) Type() string {
-	return "openai"
+	return strOpenai
 }
 
 // Name returns human-readable name
@@ -259,7 +259,7 @@ func (b *Backend) GetMaxModelSizeGB() int {
 // GetSupportedModelPatterns returns patterns of supported models
 func (b *Backend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
-		return []string{strGpt, "o1-*"}
+		return []string{strGpt, strO1}
 	}
 	return b.modelCapability.SupportedModelPatterns
 }

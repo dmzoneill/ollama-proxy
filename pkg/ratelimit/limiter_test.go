@@ -83,7 +83,10 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 
 	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	// Create test server
@@ -99,7 +102,9 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected status 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 
 	// 3rd request should be rate limited
@@ -107,7 +112,11 @@ func TestIPRateLimiter_Middleware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request 3 failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: expected status 429, got %d", resp.StatusCode)
@@ -769,7 +778,10 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 
 	handler := rl.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	server := httptest.NewServer(handler)
@@ -784,7 +796,9 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 
 	// 6th request should be rate limited
@@ -795,7 +809,9 @@ func TestIPRateLimiter_Middleware_MultipleRequests(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 6: expected 429, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Error(err)
+	}
 }
 
 // TestIPRateLimiter_Middleware_CustomIP tests middleware with custom IP headers
@@ -826,7 +842,9 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			t.Error(err)
+		}
 	}
 
 	// 3rd request should be rate limited
@@ -843,7 +861,9 @@ func TestIPRateLimiter_Middleware_CustomIP(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: expected 429, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Error(err)
+	}
 }
 
 // TestIPRateLimiter_VerySmallRate tests with very small rate (< 1 req/sec)

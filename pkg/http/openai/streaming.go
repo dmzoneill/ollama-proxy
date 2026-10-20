@@ -58,7 +58,7 @@ func StreamChatCompletion(w http.ResponseWriter, reader backends.StreamReader, m
 
 		// Populate chunk fields
 		openaiChunk.ID = completionID
-		openaiChunk.Object = "chat.completion.chunk"
+		openaiChunk.Object = strChatCompletionChunk
 		openaiChunk.Created = timestamp
 		openaiChunk.Model = model
 
@@ -223,7 +223,7 @@ func writeStreamError(w http.ResponseWriter, streamErr error) error {
 		"error": map[string]interface{}{
 			"message": streamErr.Error(),
 			"type":    "stream_error",
-			"code":    "backend_error",
+			strCode:   "backend_error",
 		},
 	}
 	errorJSON, err := json.Marshal(errorEvent)

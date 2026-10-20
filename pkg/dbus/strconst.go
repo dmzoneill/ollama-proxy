@@ -16,4 +16,6 @@ const (
 	strThrottling   = "throttling"
 	strMistral7b    = "mistral:7b"
 	strState        = "state"
+	strOnBattery    = "on_battery"
+	strQuietHours   = "quiet_hours"
 )

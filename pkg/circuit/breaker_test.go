@@ -40,9 +40,11 @@ func TestCircuitBreaker_OpenAfterFailures(t *testing.T) {
 
 	// Fail 3 times
 	for i := 0; i < 3; i++ {
-		cb.Call(func() error {
+		if err := cb.Call(func() error {
 			return testErr
-		})
+		}); err == nil {
+			t.Fatal("expected error")
+		}
 	}
 
 	if cb.GetState() != StateOpen {
@@ -68,9 +70,11 @@ func TestCircuitBreaker_HalfOpenAfterTimeout(t *testing.T) {
 
 	// Fail to open the circuit
 	for i := 0; i < 2; i++ {
-		cb.Call(func() error {
+		if err := cb.Call(func() error {
 			return testErr
-		})
+		}); err == nil {
+			t.Fatal("expected error")
+		}
 	}
 
 	if cb.GetState() != StateOpen {
@@ -82,10 +86,12 @@ func TestCircuitBreaker_HalfOpenAfterTimeout(t *testing.T) {
 
 	// Next call should transition to half-open
 	called := false
-	cb.Call(func() error {
+	if err := cb.Call(func() error {
 		called = true
 		return nil // Success
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	if !called {
 		t.Error("Function should be called in half-open state")
@@ -100,9 +106,11 @@ func TestCircuitBreaker_CloseAfterHalfOpenSuccesses(t *testing.T) {
 
 	// Open the circuit
 	for i := 0; i < 2; i++ {
-		cb.Call(func() error {
+		if err := cb.Call(func() error {
 			return testErr
-		})
+		}); err == nil {
+			t.Fatal("expected error")
+		}
 	}
 
 	// Wait for timeout
@@ -131,18 +139,22 @@ func TestCircuitBreaker_FailureInHalfOpenGoesBackToOpen(t *testing.T) {
 
 	// Open the circuit
 	for i := 0; i < 2; i++ {
-		cb.Call(func() error {
+		if err := cb.Call(func() error {
 			return testErr
-		})
+		}); err == nil {
+			t.Fatal("expected error")
+		}
 	}
 
 	// Wait for timeout
 	time.Sleep(150 * time.Millisecond)
 
 	// Fail in half-open state
-	cb.Call(func() error {
+	if err := cb.Call(func() error {
 		return testErr
-	})
+	}); err == nil {
+		t.Fatal("expected error")
+	}
 
 	if cb.GetState() != StateOpen {
 		t.Errorf("Expected state to be Open after half-open failure, got %v", cb.GetState())
@@ -157,9 +169,11 @@ func TestCircuitBreaker_Reset(t *testing.T) {
 
 	// Open the circuit
 	for i := 0; i < 2; i++ {
-		cb.Call(func() error {
+		if err := cb.Call(func() error {
 			return testErr
-		})
+		}); err == nil {
+			t.Fatal("expected error")
+		}
 	}
 
 	if cb.GetState() != StateOpen {

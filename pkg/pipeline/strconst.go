@@ -41,4 +41,10 @@ const (
 	strTts                  = "tts"
 	strVoiceAssistant       = "VoiceAssistant"
 	strWhisperTiny          = "whisper-tiny"
+	strDeepseekCoder67b     = "deepseek-coder:6.7b"
+	strGenerateText         = "generate-text"
+	strPiperTts             = "piper-tts"
+	strProcessText          = "process-text"
+	strVoiceAssistant2      = "voice-assistant"
+	strVoiceToText          = "voice-to-text"
 )

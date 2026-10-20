@@ -299,8 +299,8 @@ func TestIntrospectionInterface_Methods(t *testing.T) {
 	}
 
 	expectedProperties := []string{
-		"CurrentMode",
-		"EffectiveMode",
+		strCurrentMode,
+		strEffectiveMode,
 	}
 
 	t.Logf("Expected D-Bus methods: %v", expectedMethods)
@@ -375,7 +375,10 @@ func TestDBusSetMode(t *testing.T) {
 			}
 			if !tt.wantErr {
 				// Verify mode was actually set
-				currentMode, _ := svc.GetMode()
+				currentMode, err := svc.GetMode()
+				if err != nil {
+					t.Fatal(err)
+				}
 				if currentMode != tt.expectedGet {
 					t.Errorf("Mode not set correctly: got %s, want %s", currentMode, tt.expectedGet)
 				}
@@ -538,7 +541,7 @@ func TestDBusMakePropertyMap(t *testing.T) {
 	props := propMap[dbusInterface]
 
 	// Check CurrentMode property
-	if currentModeProp, ok := props["CurrentMode"]; ok {
+	if currentModeProp, ok := props[strCurrentMode]; ok {
 		if currentModeProp.Value.(string) != strBalanced {
 			t.Errorf("CurrentMode = %v, want Balanced", currentModeProp.Value)
 		}
@@ -550,7 +553,7 @@ func TestDBusMakePropertyMap(t *testing.T) {
 	}
 
 	// Check EffectiveMode property
-	if effectiveModeProp, ok := props["EffectiveMode"]; ok {
+	if effectiveModeProp, ok := props[strEffectiveMode]; ok {
 		if effectiveModeProp.Value.(string) == "" {
 			t.Error("EffectiveMode should not be empty")
 		}
@@ -572,7 +575,10 @@ func TestDBusModeSwitching(t *testing.T) {
 	}
 
 	// Get initial mode
-	initialMode, _ := svc.GetMode()
+	initialMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if initialMode != strPerformance {
 		t.Errorf("Initial mode = %s, want Performance", initialMode)
 	}
@@ -583,7 +589,10 @@ func TestDBusModeSwitching(t *testing.T) {
 	}
 
 	// Verify mode changed
-	newMode, _ := svc.GetMode()
+	newMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if newMode != strEfficiency {
 		t.Errorf("Mode after SetMode = %s, want Efficiency", newMode)
 	}
@@ -594,7 +603,10 @@ func TestDBusModeSwitching(t *testing.T) {
 	}
 
 	// Verify mode changed
-	autoMode, _ := svc.GetMode()
+	autoMode, err := svc.GetMode()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if autoMode != strAuto {
 		t.Errorf("Mode after SetMode(Auto) = %s, want Auto", autoMode)
 	}

@@ -47,7 +47,7 @@ func (m Mode) String() string {
 	case ModeUltraEfficiency:
 		return strUltraEfficiency2
 	default:
-		return "Unknown"
+		return strUnknown
 	}
 }
 

@@ -83,11 +83,11 @@ func HandleWebSocketStream(r *router.Router) http.HandlerFunc {
 		// Parse priority
 		priority := backends.PriorityNormal
 		switch streamReq.Priority {
-		case "best-effort", "low":
+		case strBestEffort, strLow:
 			priority = backends.PriorityBestEffort
 		case strHigh:
 			priority = backends.PriorityHigh
-		case "critical", "realtime":
+		case strCritical, strRealtime:
 			priority = backends.PriorityCritical
 		}
 

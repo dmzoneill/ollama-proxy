@@ -106,7 +106,7 @@ func (b *Backend) ID() string {
 
 // Type returns backend type
 func (b *Backend) Type() string {
-	return "ollama"
+	return strOllama
 }
 
 // Name returns human-readable name
@@ -749,7 +749,7 @@ func (b *Backend) TranscribeAudio(ctx context.Context, req *backends.TranscribeR
 	switch b.hardware {
 	case "npu":
 		args = append(args, "-oved", "NPU") // Intel Neural Processor for 300ms target
-	case "cpu":
+	case strCPU:
 		args = append(args, "-oved", "CPU") // CPU with OpenVINO optimizations
 	}
 

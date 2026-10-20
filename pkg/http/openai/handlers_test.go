@@ -237,7 +237,10 @@ func TestHandleChatCompletion_MissingModel(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -257,7 +260,10 @@ func TestHandleChatCompletion_MissingMessages(t *testing.T) {
 		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -276,7 +282,9 @@ func TestHandleChatCompletion_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -287,7 +295,10 @@ func TestHandleChatCompletion_Success(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -315,7 +326,9 @@ func TestHandleCompletion_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -324,7 +337,10 @@ func TestHandleCompletion_Success(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -343,7 +359,9 @@ func TestHandleEmbedding_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -352,7 +370,10 @@ func TestHandleEmbedding_Success(t *testing.T) {
 		Input: "Hello world",
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -379,7 +400,9 @@ func TestHandleModels_Success(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleModels(r)
 
@@ -397,8 +420,8 @@ func TestHandleModels_Success(t *testing.T) {
 func TestParseRoutingHeaders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Target-Backend", strTestBackend)
-	req.Header.Set("X-Priority", "high")
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Priority", strHigh)
+	req.Header.Set("X-Latency-Critical", strTrue)
 
 	annotations := ParseRoutingHeaders(req)
 
@@ -415,13 +438,13 @@ func TestParseRoutingHeaders(t *testing.T) {
 func TestParseRoutingHeaders_AllHeaders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Target-Backend", "ollama-nvidia")
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Latency-Critical", strTrue)
 	req.Header.Set("X-Power-Efficient", "false")
 	req.Header.Set("X-Max-Latency-Ms", "100")
 	req.Header.Set("X-Max-Power-Watts", "50")
-	req.Header.Set("X-Cache-Enabled", "yes")
-	req.Header.Set("X-Media-Type", "code")
-	req.Header.Set("X-Priority", "critical")
+	req.Header.Set("X-Cache-Enabled", strYes)
+	req.Header.Set("X-Media-Type", strCode)
+	req.Header.Set("X-Priority", strCritical)
 	req.Header.Set("X-Request-ID", "req-12345")
 	req.Header.Set("X-Deadline-Ms", "1234567890")
 	req.Header.Set("X-Custom-Key1", "value1")
@@ -474,12 +497,12 @@ func TestParseRoutingHeaders_MediaTypes(t *testing.T) {
 		value    string
 		expected backends.MediaType
 	}{
-		{name: "text", value: "text", expected: backends.MediaTypeText},
-		{name: "code", value: "code", expected: backends.MediaTypeCode},
-		{name: "image", value: "image", expected: backends.MediaTypeImage},
-		{name: "audio", value: "audio", expected: backends.MediaTypeAudio},
+		{name: strText, value: strText, expected: backends.MediaTypeText},
+		{name: strCode, value: strCode, expected: backends.MediaTypeCode},
+		{name: strImage, value: strImage, expected: backends.MediaTypeImage},
+		{name: strAudio, value: strAudio, expected: backends.MediaTypeAudio},
 		{name: strRealtime, value: strRealtime, expected: backends.MediaTypeRealtime},
-		{name: "auto", value: "auto", expected: backends.MediaTypeAuto},
+		{name: strAuto, value: strAuto, expected: backends.MediaTypeAuto},
 		{name: strUppercase, value: "TEXT", expected: backends.MediaTypeText},
 	}
 
@@ -504,11 +527,11 @@ func TestParseRoutingHeaders_Priorities(t *testing.T) {
 		value    string
 		expected backends.Priority
 	}{
-		{name: "best-effort", value: "best-effort", expected: backends.PriorityBestEffort},
-		{name: "low", value: "low", expected: backends.PriorityBestEffort},
-		{name: "normal", value: "normal", expected: backends.PriorityNormal},
-		{name: "high", value: "high", expected: backends.PriorityHigh},
-		{name: "critical", value: "critical", expected: backends.PriorityCritical},
+		{name: strBestEffort, value: strBestEffort, expected: backends.PriorityBestEffort},
+		{name: strLow, value: strLow, expected: backends.PriorityBestEffort},
+		{name: strNormal, value: strNormal, expected: backends.PriorityNormal},
+		{name: strHigh, value: strHigh, expected: backends.PriorityHigh},
+		{name: strCritical, value: strCritical, expected: backends.PriorityCritical},
 		{name: strRealtime, value: strRealtime, expected: backends.PriorityCritical},
 		{name: strUppercase, value: "HIGH", expected: backends.PriorityHigh},
 	}
@@ -531,7 +554,7 @@ func TestParseRoutingHeaders_Priorities(t *testing.T) {
 func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 	// Latency-critical should set critical priority
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Latency-Critical", "true")
+	req.Header.Set("X-Latency-Critical", strTrue)
 
 	annotations := ParseRoutingHeaders(req)
 
@@ -551,7 +574,7 @@ func TestParseRoutingHeaders_AutoPriority(t *testing.T) {
 
 	// Audio media should set high priority
 	req = httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Media-Type", "audio")
+	req.Header.Set("X-Media-Type", strAudio)
 
 	annotations = ParseRoutingHeaders(req)
 
@@ -576,9 +599,9 @@ func TestParseRoutingHeaders_BoolParsing(t *testing.T) {
 		value    string
 		expected bool
 	}{
-		{name: "true", value: "true", expected: true},
+		{name: strTrue, value: strTrue, expected: true},
 		{name: "1", value: "1", expected: true},
-		{name: "yes", value: "yes", expected: true},
+		{name: strYes, value: strYes, expected: true},
 		{name: "on", value: "on", expected: true},
 		{name: "false", value: "false", expected: false},
 		{name: "0", value: "0", expected: false},
@@ -634,7 +657,9 @@ func TestHandleChatCompletion_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -645,7 +670,10 @@ func TestHandleChatCompletion_ModelNotSupported(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -665,7 +693,9 @@ func TestHandleChatCompletion_GenerationError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -676,7 +706,10 @@ func TestHandleChatCompletion_GenerationError(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -696,7 +729,9 @@ func TestHandleChatCompletion_StreamingNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -708,7 +743,10 @@ func TestHandleChatCompletion_StreamingNotSupported(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -729,7 +767,9 @@ func TestHandleChatCompletion_StreamingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -741,7 +781,10 @@ func TestHandleChatCompletion_StreamingError(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -791,7 +834,10 @@ func TestHandleCompletion_MissingModel(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -811,7 +857,10 @@ func TestHandleCompletion_MissingPrompt(t *testing.T) {
 		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -830,7 +879,9 @@ func TestHandleCompletion_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -839,7 +890,10 @@ func TestHandleCompletion_ModelNotSupported(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -859,7 +913,9 @@ func TestHandleCompletion_GenerationError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -868,7 +924,10 @@ func TestHandleCompletion_GenerationError(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -888,7 +947,9 @@ func TestHandleCompletion_StreamingNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -898,7 +959,10 @@ func TestHandleCompletion_StreamingNotSupported(t *testing.T) {
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -919,7 +983,9 @@ func TestHandleCompletion_StreamingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -929,7 +995,10 @@ func TestHandleCompletion_StreamingError(t *testing.T) {
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -979,7 +1048,10 @@ func TestHandleEmbedding_MissingModel(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -999,7 +1071,10 @@ func TestHandleEmbedding_MissingInput(t *testing.T) {
 		Model: strTestModel,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1018,7 +1093,9 @@ func TestHandleEmbedding_ModelNotSupported(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -1027,7 +1104,10 @@ func TestHandleEmbedding_ModelNotSupported(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1136,7 +1216,9 @@ func TestHandleEmbedding_BackendSupportsEmbed(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -1145,7 +1227,10 @@ func TestHandleEmbedding_BackendSupportsEmbed(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1165,7 +1250,9 @@ func TestHandleEmbedding_EmbeddingError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -1174,7 +1261,10 @@ func TestHandleEmbedding_EmbeddingError(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1199,7 +1289,10 @@ func TestHandleChatCompletion_RoutingError(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1222,7 +1315,10 @@ func TestHandleCompletion_RoutingError(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1245,7 +1341,10 @@ func TestHandleEmbedding_RoutingError(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1302,7 +1401,9 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1314,7 +1415,10 @@ func TestHandleChatCompletion_StreamingSuccess(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1348,7 +1452,9 @@ func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -1358,7 +1464,10 @@ func TestHandleCompletion_StreamingSuccess(t *testing.T) {
 		Stream: true,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1440,7 +1549,9 @@ func TestHandleChatCompletion_ResponseHeaders(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1451,7 +1562,10 @@ func TestHandleChatCompletion_ResponseHeaders(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1478,7 +1592,10 @@ func TestHandleCompletion_NoBackends(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1500,7 +1617,10 @@ func TestHandleChatCompletion_EmptyMessageList(t *testing.T) {
 		Messages: []ChatCompletionMessage{},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1521,7 +1641,10 @@ func TestHandleEmbedding_NoBackends(t *testing.T) {
 		Input: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1541,7 +1664,9 @@ func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1552,7 +1677,10 @@ func TestHandleChatCompletion_ResponseStructure(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1596,7 +1724,9 @@ func TestHandleCompletion_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -1605,7 +1735,10 @@ func TestHandleCompletion_ResponseStructure(t *testing.T) {
 		Prompt: strHello2,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1637,7 +1770,9 @@ func TestHandleEmbedding_ResponseStructure(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -1646,7 +1781,10 @@ func TestHandleEmbedding_ResponseStructure(t *testing.T) {
 		Input: "Hello world",
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1716,7 +1854,9 @@ func TestHandleChatCompletion_ModelNotFound(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1727,7 +1867,10 @@ func TestHandleChatCompletion_ModelNotFound(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1752,7 +1895,9 @@ func TestHandleChatCompletion_ReadBodyError(t *testing.T) {
 
 	// Use a reader that returns an error
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-	req.Body.Close() // Close body to cause read error
+	if err := req.Body.Close(); err != nil { // Close body to cause read error
+		t.Fatal(err)
+	}
 	w := httptest.NewRecorder()
 
 	handler(w, req)
@@ -1802,7 +1947,9 @@ func TestHandleChatCompletion_MultipleMessages(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1816,7 +1963,10 @@ func TestHandleChatCompletion_MultipleMessages(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1844,7 +1994,9 @@ func TestHandleCompletion_ArrayPrompt(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -1854,7 +2006,10 @@ func TestHandleCompletion_ArrayPrompt(t *testing.T) {
 		"prompt": []string{strHello2, "Hi"},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1873,7 +2028,9 @@ func TestHandleEmbedding_ArrayInput(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleEmbedding(r)
 
@@ -1883,7 +2040,10 @@ func TestHandleEmbedding_ArrayInput(t *testing.T) {
 		"input":  []string{strHello2, "World"},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1904,8 +2064,12 @@ func TestHandleModels_MultipleBackends(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleModels(r)
 
@@ -1936,7 +2100,9 @@ func TestHandleChatCompletion_WithParameters(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleChatCompletion(r)
 
@@ -1954,7 +2120,10 @@ func TestHandleChatCompletion_WithParameters(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -1973,7 +2142,9 @@ func TestHandleCompletion_WithParameters(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	handler := HandleCompletion(r)
 
@@ -1987,7 +2158,10 @@ func TestHandleCompletion_WithParameters(t *testing.T) {
 		TopP:        &topP,
 	}
 
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/completions", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 

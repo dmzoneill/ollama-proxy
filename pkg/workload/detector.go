@@ -58,7 +58,7 @@ func NewDetector() *Detector {
 				MediaType:        backends.MediaTypeImage,
 				PreferLowLatency: false,
 				PreferLowPower:   false,
-				PreferredModel:   "llama3:7b",
+				PreferredModel:   strLlama37b,
 				MaxModelSizeGB:   10,
 				MinTokensPerSec:  10,
 				Description:      "Image analysis - medium models",
@@ -67,7 +67,7 @@ func NewDetector() *Detector {
 				MediaType:        backends.MediaTypeText,
 				PreferLowLatency: false,
 				PreferLowPower:   false,
-				PreferredModel:   "llama3:7b",
+				PreferredModel:   strLlama37b,
 				MaxModelSizeGB:   10,
 				MinTokensPerSec:  15,
 				Description:      "General text - balanced approach",
@@ -126,7 +126,7 @@ func (d *Detector) isRealtime(prompt string, annotations *backends.Annotations) 
 		"interactive chat", "voice chat",
 		"instant", "immediate",
 		"continuous", "ongoing",
-		"transcribe", "transcription",
+		strTranscribe, strTranscription,
 		"dictate", "dictation",
 	}
 
@@ -152,7 +152,7 @@ func (d *Detector) isAudio(prompt string) bool {
 		"podcast", "recording",
 		"tts", "text to speech", "text-to-speech",
 		"stt", "speech to text", "speech-to-text",
-		"transcribe", "transcription",
+		strTranscribe, strTranscription,
 	}
 
 	for _, keyword := range audioKeywords {

@@ -22,7 +22,7 @@ func getChatChunk() *ChatCompletionChunk {
 	}
 	// Reset fields to default state
 	chunk.ID = ""
-	chunk.Object = "chat.completion.chunk"
+	chunk.Object = strChatCompletionChunk
 	chunk.Created = 0
 	chunk.Model = ""
 	if len(chunk.Choices) > 0 {

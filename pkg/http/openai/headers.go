@@ -111,17 +111,17 @@ func WriteRoutingHeaders(w http.ResponseWriter, decision *router.RoutingDecision
 
 func mediaTypeFromHeader(mediaType string) backends.MediaType {
 	switch strings.ToLower(mediaType) {
-	case "text":
+	case strText:
 		return backends.MediaTypeText
-	case "code":
+	case strCode:
 		return backends.MediaTypeCode
-	case "image":
+	case strImage:
 		return backends.MediaTypeImage
-	case "audio":
+	case strAudio:
 		return backends.MediaTypeAudio
 	case strRealtime:
 		return backends.MediaTypeRealtime
-	case "auto":
+	case strAuto:
 		return backends.MediaTypeAuto
 	default:
 		return ""
@@ -138,13 +138,13 @@ func priorityFromHeaders(priority string, annotations *backends.Annotations) bac
 			return backends.PriorityHigh
 		}
 		return backends.PriorityNormal
-	case "best-effort", "low":
+	case strBestEffort, strLow:
 		return backends.PriorityBestEffort
-	case "normal":
+	case strNormal:
 		return backends.PriorityNormal
-	case "high":
+	case strHigh:
 		return backends.PriorityHigh
-	case "critical", strRealtime:
+	case strCritical, strRealtime:
 		return backends.PriorityCritical
 	default:
 		return 0
@@ -154,5 +154,5 @@ func priorityFromHeaders(priority string, annotations *backends.Annotations) bac
 // parseBool converts string to bool, accepting various formats
 func parseBool(s string) bool {
 	s = strings.ToLower(strings.TrimSpace(s))
-	return s == "true" || s == "1" || s == "yes" || s == "on"
+	return s == strTrue || s == "1" || s == strYes || s == "on"
 }

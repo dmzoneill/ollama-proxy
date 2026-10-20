@@ -292,8 +292,12 @@ func TestListBackendsMethod(t *testing.T) {
 		avgLatencyMs: 200,
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create service without D-Bus connection (just for method testing)
 	svc := &BackendsService{
@@ -372,7 +376,9 @@ func TestGetBackendDetailsMethod(t *testing.T) {
 		preferredModels:   []string{strLlama38b, strMistral7b},
 	}
 
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,
@@ -450,7 +456,9 @@ func TestGetBackendMetricsMethod(t *testing.T) {
 		metrics: metrics,
 	}
 
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,
@@ -505,7 +513,9 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 		preferredModels: []string{strLlama38b},
 	}
 
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,
@@ -540,7 +550,9 @@ func TestGetSupportedModelsMethod(t *testing.T) {
 		modelsErr:       io.ErrUnexpectedEOF,
 		preferredModels: []string{"fallback:model"},
 	}
-	r.RegisterBackend(backendWithError)
+	if err := r.RegisterBackend(backendWithError); err != nil {
+		t.Fatal(err)
+	}
 
 	models, dbusErr = svc.GetSupportedModels("error-backend")
 	if dbusErr == nil {
@@ -571,8 +583,12 @@ func TestRefreshBackendStatusMethod(t *testing.T) {
 		healthy: false,
 	}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,
@@ -597,9 +613,15 @@ func TestMakePropertyMap(t *testing.T) {
 	backend2 := &mockBackend{id: strBackend2, healthy: false}
 	backend3 := &mockBackend{id: strBackend3, healthy: true}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
-	r.RegisterBackend(backend3)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend3); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,
@@ -643,14 +665,18 @@ func TestMakePropertyMap(t *testing.T) {
 }
 
 // TestUpdateProperties tests the property update functionality
-func TestUpdateProperties(_ *testing.T) {
+func TestUpdateProperties(t *testing.T) {
 	r := router.NewRouter(router.Config{})
 
 	backend1 := &mockBackend{id: strBackend1, healthy: true}
 	backend2 := &mockBackend{id: strBackend2, healthy: true}
 
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	svc := &BackendsService{
 		router: r,

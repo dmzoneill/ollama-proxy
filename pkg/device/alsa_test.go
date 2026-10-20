@@ -18,7 +18,11 @@ func TestALSADevice_OpenClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		if err := device.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	if device.fd < 0 {
 		t.Error("Expected valid file descriptor")
@@ -43,7 +47,11 @@ func TestALSADevice_GetCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		if err := device.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	caps := device.GetCapabilities()
 
@@ -51,12 +59,12 @@ func TestALSADevice_GetCapabilities(t *testing.T) {
 		t.Errorf("Expected sample rate 44100 in caps, got %v", caps[strSampleRate])
 	}
 
-	if caps["channels"] != uint32(1) {
-		t.Errorf("Expected 1 channel in caps, got %v", caps["channels"])
+	if caps[strChannels] != uint32(1) {
+		t.Errorf("Expected 1 channel in caps, got %v", caps[strChannels])
 	}
 
-	if caps["format"] != "S16_LE" {
-		t.Errorf("Expected format S16_LE, got %v", caps["format"])
+	if caps[strFormat] != strS16LE {
+		t.Errorf("Expected format S16_LE, got %v", caps[strFormat])
 	}
 
 	t.Logf("ALSA Device Capabilities: %+v", caps)
@@ -72,7 +80,11 @@ func TestALSADevice_Prepare(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		if err := device.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	err = device.Prepare()
 	if err != nil {
@@ -90,7 +102,11 @@ func TestALSADevice_StartStopCapture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open ALSA device: %v", err)
 	}
-	defer device.Close()
+	defer func() {
+		if err := device.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Start capture
 	err = device.StartCapture()
@@ -119,7 +135,11 @@ func TestSimplifiedALSACapture_Create(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
-	defer capture.Close()
+	defer func() {
+		if err := capture.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	if capture.sampleRate != 48000 {
 		t.Errorf("Expected sample rate 48000, got %d", capture.sampleRate)
@@ -140,7 +160,11 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
-	defer capture.Close()
+	defer func() {
+		if err := capture.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	caps := capture.GetCapabilities()
 
@@ -148,8 +172,8 @@ func TestSimplifiedALSACapture_GetCapabilities(t *testing.T) {
 		t.Errorf("Expected sample rate 44100, got %v", caps[strSampleRate])
 	}
 
-	if caps["channels"] != uint32(1) {
-		t.Errorf("Expected 1 channel, got %v", caps["channels"])
+	if caps[strChannels] != uint32(1) {
+		t.Errorf("Expected 1 channel, got %v", caps[strChannels])
 	}
 
 	if caps["api"] != "simplified" {
@@ -173,14 +197,22 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create shared memory ring: %v", err)
 	}
-	defer shmRing.Destroy()
+	defer func() {
+		if err := shmRing.Destroy(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Use simplified capture (doesn't require actual hardware)
 	capture, err := NewSimplifiedALSACapture("default", 48000, 2, logging.Logger)
 	if err != nil {
 		t.Fatalf("Failed to create simplified capture: %v", err)
 	}
-	defer capture.Close()
+	defer func() {
+		if err := capture.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Test that we can write audio data to SHM
 	testData := make([]byte, frameSize)
@@ -202,7 +234,11 @@ func TestALSADevice_IntegrationWithSHM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open SHM as reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	readData, idx, err := reader.Read()
 	if err != nil {
@@ -234,7 +270,11 @@ func BenchmarkSimplifiedALSACapture_Write(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create SHM: %v", err)
 	}
-	defer shmRing.Destroy()
+	defer func() {
+		if err := shmRing.Destroy(); err != nil {
+			b.Error(err)
+		}
+	}()
 
 	data := make([]byte, 1920)
 
@@ -242,6 +282,8 @@ func BenchmarkSimplifiedALSACapture_Write(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		shmRing.Write(data)
+		if _, err := shmRing.Write(data); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

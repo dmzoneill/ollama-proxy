@@ -15,8 +15,8 @@ import (
 // TestNewOpenAIBackend is part of the public API.
 func TestNewOpenAIBackend(t *testing.T) {
 	tests := []struct {
-		setup   func()
-		cleanup func()
+		setup   func(*testing.T)
+		cleanup func(*testing.T)
 		name    string
 		cfg     Config
 		wantErr bool
@@ -41,11 +41,15 @@ func TestNewOpenAIBackend(t *testing.T) {
 				},
 				APIKeyEnv: "TEST_OPENAI_KEY",
 			},
-			setup: func() {
-				os.Setenv("TEST_OPENAI_KEY", "env-api-key")
+			setup: func(t *testing.T) {
+				if err := os.Setenv("TEST_OPENAI_KEY", "env-api-key"); err != nil {
+					t.Fatal(err)
+				}
 			},
-			cleanup: func() {
-				os.Unsetenv("TEST_OPENAI_KEY")
+			cleanup: func(t *testing.T) {
+				if err := os.Unsetenv("TEST_OPENAI_KEY"); err != nil {
+					t.Fatal(err)
+				}
 			},
 			wantErr: false,
 		},
@@ -105,10 +109,10 @@ func TestNewOpenAIBackend(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
-				tt.setup()
+				tt.setup(t)
 			}
 			if tt.cleanup != nil {
-				defer tt.cleanup()
+				defer tt.cleanup(t)
 			}
 
 			backend, err := NewOpenAIBackend(tt.cfg)
@@ -123,7 +127,7 @@ func TestNewOpenAIBackend(t *testing.T) {
 				if backend.ID() != tt.cfg.ID {
 					t.Errorf("ID() = %v, want %v", backend.ID(), tt.cfg.ID)
 				}
-				if backend.Type() != "openai" {
+				if backend.Type() != strOpenai {
 					t.Errorf("Type() = %v, want openai", backend.Type())
 				}
 				if tt.cfg.Endpoint != "" && backend.endpoint != tt.cfg.Endpoint {
@@ -159,7 +163,7 @@ func TestOpenAIBackend_Getters(t *testing.T) {
 	if backend.ID() != "test-openai" {
 		t.Errorf("ID() = %v, want test-openai", backend.ID())
 	}
-	if backend.Type() != "openai" {
+	if backend.Type() != strOpenai {
 		t.Errorf("Type() = %v, want openai", backend.Type())
 	}
 	if backend.Name() != "Test GPT" {
@@ -181,13 +185,16 @@ func TestOpenAIBackend_Getters(t *testing.T) {
 
 // TestOpenAIBackend_Capabilities is part of the public API.
 func TestOpenAIBackend_Capabilities(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !backend.SupportsGenerate() {
 		t.Error("SupportsGenerate() should return true")
@@ -239,14 +246,17 @@ func TestOpenAIBackend_HealthCheck(t *testing.T) {
 				}
 				w.WriteHeader(tt.statusCode)
 				if tt.statusCode == http.StatusOK {
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					if err := json.NewEncoder(w).Encode(map[string]interface{}{
 						strData: []map[string]string{},
-					})
+					}); err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
 				}
 			}))
 			defer mockServer.Close()
 
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:   strTest,
 					Name: strTest2,
@@ -254,9 +264,12 @@ func TestOpenAIBackend_HealthCheck(t *testing.T) {
 				APIKey:   strTestKey,
 				Endpoint: mockServer.URL,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			ctx := context.Background()
-			err := backend.HealthCheck(ctx)
+			err = backend.HealthCheck(ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HealthCheck() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -280,11 +293,14 @@ func TestOpenAIBackend_ListModels(t *testing.T) {
 				{"id": strGpt35Turbo},
 			},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -292,6 +308,9 @@ func TestOpenAIBackend_ListModels(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	models, err := backend.ListModels(ctx)
@@ -400,7 +419,7 @@ func TestOpenAIBackend_SupportsModel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -408,6 +427,9 @@ func TestOpenAIBackend_SupportsModel(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if got := backend.SupportsModel(tt.modelName); got != tt.want {
 				t.Errorf("SupportsModel(%v) = %v, want %v", tt.modelName, got, tt.want)
@@ -526,7 +548,12 @@ func TestOpenAIBackend_Generate(t *testing.T) {
 					if tt.request.Options.Temperature > 0 {
 						temp, ok := reqBody["temperature"].(float64)
 						if !ok {
-							temp = float64(reqBody["temperature"].(float32))
+							tempAsserted, ok := reqBody["temperature"].(float32)
+							if !ok {
+								t.Errorf("type assertion to float32 failed")
+								return
+							}
+							temp = float64(tempAsserted)
 						}
 						expectedTemp := float64(tt.request.Options.Temperature)
 						if temp < expectedTemp-0.01 || temp > expectedTemp+0.01 {
@@ -536,7 +563,12 @@ func TestOpenAIBackend_Generate(t *testing.T) {
 					if tt.request.Options.TopP > 0 {
 						topP, ok := reqBody["top_p"].(float64)
 						if !ok {
-							topP = float64(reqBody["top_p"].(float32))
+							topPAsserted, ok := reqBody["top_p"].(float32)
+							if !ok {
+								t.Errorf("type assertion to float32 failed")
+								return
+							}
+							topP = float64(topPAsserted)
 						}
 						expectedTopP := float64(tt.request.Options.TopP)
 						if topP < expectedTopP-0.01 || topP > expectedTopP+0.01 {
@@ -544,17 +576,25 @@ func TestOpenAIBackend_Generate(t *testing.T) {
 						}
 					}
 					if tt.request.Options.MaxTokens > 0 {
-						if int32(reqBody["max_tokens"].(float64)) != tt.request.Options.MaxTokens {
+						asserted, ok := reqBody["max_tokens"].(float64)
+						if !ok {
+							t.Errorf("type assertion to float64 failed")
+							return
+						}
+						if int32(asserted) != tt.request.Options.MaxTokens {
 							t.Errorf("Request max_tokens = %v, want %v", reqBody["max_tokens"], tt.request.Options.MaxTokens)
 						}
 					}
 				}
 
-				json.NewEncoder(w).Encode(tt.mockResponse)
+				if err := json.NewEncoder(w).Encode(tt.mockResponse); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}))
 			defer mockServer.Close()
 
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:   strTest,
 					Name: strTest2,
@@ -562,6 +602,9 @@ func TestOpenAIBackend_Generate(t *testing.T) {
 				APIKey:   strTestKey,
 				Endpoint: mockServer.URL,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			ctx := context.Background()
 			resp, err := backend.Generate(ctx, tt.request)
@@ -626,11 +669,14 @@ func TestOpenAIBackend_GenerateError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				if _, err := w.Write([]byte(tt.responseBody)); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}))
 			defer mockServer.Close()
 
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:   strTest,
 					Name: strTest2,
@@ -638,6 +684,9 @@ func TestOpenAIBackend_GenerateError(t *testing.T) {
 				APIKey:   strTestKey,
 				Endpoint: mockServer.URL,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			ctx := context.Background()
 			req := &backends.GenerateRequest{
@@ -645,7 +694,7 @@ func TestOpenAIBackend_GenerateError(t *testing.T) {
 				Prompt: strHello,
 			}
 
-			_, err := backend.Generate(ctx, req)
+			_, err = backend.Generate(ctx, req)
 			if err == nil {
 				t.Error("Generate() should return error for bad request")
 			}
@@ -667,13 +716,16 @@ func TestOpenAIBackend_GenerateError(t *testing.T) {
 
 // TestOpenAIBackend_UpdateMetrics is part of the public API.
 func TestOpenAIBackend_UpdateMetrics(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update with successful request
 	backend.UpdateMetrics(100, true)
@@ -744,11 +796,14 @@ func TestOpenAIBackend_Embed(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -756,6 +811,9 @@ func TestOpenAIBackend_Embed(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.EmbedRequest{
@@ -788,11 +846,14 @@ func TestOpenAIBackend_EmbedEmpty(t *testing.T) {
 		response := map[string]interface{}{
 			strData: []map[string]interface{}{},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -800,6 +861,9 @@ func TestOpenAIBackend_EmbedEmpty(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.EmbedRequest{
@@ -821,13 +885,16 @@ func TestOpenAIBackend_EmbedEmpty(t *testing.T) {
 func TestOpenAIBackend_StartStop(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			strData: []map[string]string{},
-		})
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -835,6 +902,9 @@ func TestOpenAIBackend_StartStop(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 
@@ -864,7 +934,7 @@ func TestMatchesPattern(t *testing.T) {
 		{modelName: strGpt4Turbo, pattern: "*-turbo", want: true},
 		{modelName: strGpt4Turbo, pattern: "*-4-*", want: true},
 		{modelName: strGpt35Turbo, pattern: strGpt, want: true},
-		{modelName: "o1-preview", pattern: "o1-*", want: true},
+		{modelName: "o1-preview", pattern: strO1, want: true},
 		{modelName: strGpt42, pattern: "claude-*", want: false},
 		{modelName: "llama3:8b", pattern: strGpt, want: false},
 		{modelName: strClaude3Opus, pattern: "*gpt*", want: false},
@@ -890,7 +960,7 @@ func TestOpenAIBackend_GetSupportedModelPatterns(t *testing.T) {
 		{
 			name:     "default patterns",
 			modelCap: nil,
-			want:     []string{strGpt, "o1-*"},
+			want:     []string{strGpt, strO1},
 		},
 		{
 			name: "custom patterns",
@@ -903,7 +973,7 @@ func TestOpenAIBackend_GetSupportedModelPatterns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -911,6 +981,9 @@ func TestOpenAIBackend_GetSupportedModelPatterns(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			patterns := backend.GetSupportedModelPatterns()
 			if len(patterns) != len(tt.want) {
@@ -949,7 +1022,7 @@ func TestOpenAIBackend_GetPreferredModels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend, _ := NewOpenAIBackend(Config{
+			backend, err := NewOpenAIBackend(Config{
 				BackendConfig: backends.BackendConfig{
 					ID:              strTest,
 					Name:            strTest2,
@@ -957,6 +1030,9 @@ func TestOpenAIBackend_GetPreferredModels(t *testing.T) {
 				},
 				APIKey: strTestKey,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			models := backend.GetPreferredModels()
 			if len(models) != tt.wantLen {
@@ -968,7 +1044,7 @@ func TestOpenAIBackend_GetPreferredModels(t *testing.T) {
 
 // TestOpenAIBackend_AvgLatencyMs is part of the public API.
 func TestOpenAIBackend_AvgLatencyMs(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:           strTest,
 			Name:         strTest2,
@@ -976,6 +1052,9 @@ func TestOpenAIBackend_AvgLatencyMs(t *testing.T) {
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Before any requests, should return configured average
 	if lat := backend.AvgLatencyMs(); lat != 300 {
@@ -997,13 +1076,16 @@ func TestOpenAIBackend_AvgLatencyMs(t *testing.T) {
 
 // TestOpenAIBackend_ConcurrentMetricsUpdate is part of the public API.
 func TestOpenAIBackend_ConcurrentMetricsUpdate(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Simulate concurrent metric updates
 	done := make(chan bool)
@@ -1039,15 +1121,18 @@ func TestOpenAIBackend_ContextCancellation(t *testing.T) {
 	// Create a slow mock server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			strChoices: []map[string]interface{}{
 				{strMessage: map[string]string{strContent: strResponse}},
 			},
-		})
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1055,6 +1140,9 @@ func TestOpenAIBackend_ContextCancellation(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -1064,7 +1152,7 @@ func TestOpenAIBackend_ContextCancellation(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
 		t.Error("Generate() should return error when context is canceled")
 	}
@@ -1085,7 +1173,7 @@ func TestOpenAIBackend_HealthCheckTimeout(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1093,10 +1181,13 @@ func TestOpenAIBackend_HealthCheckTimeout(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Health check should timeout
 	ctx := context.Background()
-	err := backend.HealthCheck(ctx)
+	err = backend.HealthCheck(ctx)
 	if err == nil {
 		t.Error("HealthCheck() should timeout")
 	}
@@ -1107,13 +1198,16 @@ func TestOpenAIBackend_HealthCheckTimeout(t *testing.T) {
 
 // TestOpenAIBackend_GenerateStream is part of the public API.
 func TestOpenAIBackend_GenerateStream(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -1121,7 +1215,7 @@ func TestOpenAIBackend_GenerateStream(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.GenerateStream(ctx, req)
+	_, err = backend.GenerateStream(ctx, req)
 	if err == nil {
 		t.Error("GenerateStream() should return error as it's not yet implemented")
 	}
@@ -1134,7 +1228,7 @@ func TestOpenAIBackend_ListModelsError(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1142,9 +1236,12 @@ func TestOpenAIBackend_ListModelsError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	_, err := backend.ListModels(ctx)
+	_, err = backend.ListModels(ctx)
 	if err == nil {
 		t.Error("ListModels() should return error for unauthorized request")
 	}
@@ -1157,7 +1254,7 @@ func TestOpenAIBackend_EmbedError(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1165,6 +1262,9 @@ func TestOpenAIBackend_EmbedError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.EmbedRequest{
@@ -1172,7 +1272,7 @@ func TestOpenAIBackend_EmbedError(t *testing.T) {
 		Text:  strTest2,
 	}
 
-	_, err := backend.Embed(ctx, req)
+	_, err = backend.Embed(ctx, req)
 	if err == nil {
 		t.Error("Embed() should return error for bad request")
 	}
@@ -1180,13 +1280,16 @@ func TestOpenAIBackend_EmbedError(t *testing.T) {
 
 // TestOpenAIBackend_MetricsAccuracy is part of the public API.
 func TestOpenAIBackend_MetricsAccuracy(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Test multiple successful and failed requests
 	backend.UpdateMetrics(100, true)
@@ -1229,7 +1332,10 @@ func TestOpenAIBackend_MetricsAccuracy(t *testing.T) {
 func TestOpenAIBackend_NoOptionsGenerate(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Verify no options set when nil
 		if _, ok := reqBody["temperature"]; ok {
@@ -1248,11 +1354,14 @@ func TestOpenAIBackend_NoOptionsGenerate(t *testing.T) {
 			},
 			strUsage: map[string]int{strTotalTokens: 10},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1260,6 +1369,9 @@ func TestOpenAIBackend_NoOptionsGenerate(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -1268,7 +1380,7 @@ func TestOpenAIBackend_NoOptionsGenerate(t *testing.T) {
 		Options: nil, // No options
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
@@ -1276,7 +1388,7 @@ func TestOpenAIBackend_NoOptionsGenerate(t *testing.T) {
 
 // TestOpenAIBackend_SupportsModelNoRestrictions is part of the public API.
 func TestOpenAIBackend_SupportsModelNoRestrictions(t *testing.T) {
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1286,6 +1398,9 @@ func TestOpenAIBackend_SupportsModelNoRestrictions(t *testing.T) {
 		},
 		APIKey: strTestKey,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Should support any model when patterns list is empty
 	if !backend.SupportsModel("any-random-model") {
@@ -1300,7 +1415,10 @@ func TestOpenAIBackend_SupportsModelNoRestrictions(t *testing.T) {
 func TestOpenAIBackend_GenerateWithZeroOptions(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Verify options with zero values are not set
 		if _, ok := reqBody["temperature"]; ok {
@@ -1319,11 +1437,14 @@ func TestOpenAIBackend_GenerateWithZeroOptions(t *testing.T) {
 			},
 			strUsage: map[string]int{strTotalTokens: 10},
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1331,6 +1452,9 @@ func TestOpenAIBackend_GenerateWithZeroOptions(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -1343,7 +1467,7 @@ func TestOpenAIBackend_GenerateWithZeroOptions(t *testing.T) {
 		},
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
@@ -1353,11 +1477,14 @@ func TestOpenAIBackend_GenerateWithZeroOptions(t *testing.T) {
 func TestOpenAIBackend_ListModelsDecodeError(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Return invalid JSON
-		w.Write([]byte("invalid json"))
+		if _, err := w.Write([]byte("invalid json")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1365,9 +1492,12 @@ func TestOpenAIBackend_ListModelsDecodeError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	_, err := backend.ListModels(ctx)
+	_, err = backend.ListModels(ctx)
 	if err == nil {
 		t.Error("ListModels() should return error when response is invalid JSON")
 	}
@@ -1378,11 +1508,14 @@ func TestOpenAIBackend_GenerateDecodeError(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Return invalid JSON
-		w.Write([]byte("invalid json"))
+		if _, err := w.Write([]byte("invalid json")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1390,6 +1523,9 @@ func TestOpenAIBackend_GenerateDecodeError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.GenerateRequest{
@@ -1397,7 +1533,7 @@ func TestOpenAIBackend_GenerateDecodeError(t *testing.T) {
 		Prompt: strHello,
 	}
 
-	_, err := backend.Generate(ctx, req)
+	_, err = backend.Generate(ctx, req)
 	if err == nil {
 		t.Error("Generate() should return error when response is invalid JSON")
 	}
@@ -1414,11 +1550,14 @@ func TestOpenAIBackend_EmbedDecodeError(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Return invalid JSON
-		w.Write([]byte("invalid json"))
+		if _, err := w.Write([]byte("invalid json")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer mockServer.Close()
 
-	backend, _ := NewOpenAIBackend(Config{
+	backend, err := NewOpenAIBackend(Config{
 		BackendConfig: backends.BackendConfig{
 			ID:   strTest,
 			Name: strTest2,
@@ -1426,6 +1565,9 @@ func TestOpenAIBackend_EmbedDecodeError(t *testing.T) {
 		APIKey:   strTestKey,
 		Endpoint: mockServer.URL,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	req := &backends.EmbedRequest{
@@ -1433,7 +1575,7 @@ func TestOpenAIBackend_EmbedDecodeError(t *testing.T) {
 		Text:  strTest2,
 	}
 
-	_, err := backend.Embed(ctx, req)
+	_, err = backend.Embed(ctx, req)
 	if err == nil {
 		t.Error("Embed() should return error when response is invalid JSON")
 	}

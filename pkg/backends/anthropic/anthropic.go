@@ -93,7 +93,7 @@ func (b *Backend) ID() string {
 
 // Type returns backend type
 func (b *Backend) Type() string {
-	return "anthropic"
+	return strAnthropic
 }
 
 // Name returns human-readable name
@@ -213,7 +213,7 @@ func (b *Backend) GetMaxModelSizeGB() int {
 // GetSupportedModelPatterns returns patterns of supported models
 func (b *Backend) GetSupportedModelPatterns() []string {
 	if b.modelCapability == nil {
-		return []string{"claude-*"}
+		return []string{strClaude}
 	}
 	return b.modelCapability.SupportedModelPatterns
 }
@@ -234,7 +234,7 @@ func (b *Backend) Generate(ctx context.Context, req *backends.GenerateRequest) (
 	anthropicReq := map[string]interface{}{
 		"model": req.Model,
 		"messages": []map[string]string{
-			{"role": "user", "content": req.Prompt},
+			{"role": "user", strContent: req.Prompt},
 		},
 		"max_tokens": 4096, // Default
 	}

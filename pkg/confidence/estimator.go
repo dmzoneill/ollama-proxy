@@ -123,8 +123,8 @@ func (ce *Estimator) scorePatterns(response string, score *Score) float64 {
 	}{
 		{pattern: "i don't know", penalty: 0.4, reason: "Explicit uncertainty: 'I don't know'"},
 		{pattern: "i'm not sure", penalty: 0.3, reason: "Explicit uncertainty: 'I'm not sure'"},
-		{pattern: "i cannot", penalty: 0.3, reason: "Inability statement"},
-		{pattern: "i can't", penalty: 0.3, reason: "Inability statement"},
+		{pattern: "i cannot", penalty: 0.3, reason: strInabilityStatement},
+		{pattern: "i can't", penalty: 0.3, reason: strInabilityStatement},
 		{pattern: "unclear", penalty: 0.2, reason: "Acknowledges lack of clarity"},
 		{pattern: "uncertain", penalty: 0.2, reason: "Explicit uncertainty"},
 		{pattern: "perhaps", penalty: 0.1, reason: strHedgingLanguage},

@@ -427,7 +427,9 @@ func TestGenerateSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -466,7 +468,9 @@ func TestGenerateWithNilAnnotations(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -493,7 +497,9 @@ func TestGenerateBackendError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -521,7 +527,9 @@ func TestGenerateWithOptions(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -564,8 +572,12 @@ func TestGenerateWithFallbackSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(primaryBackend)
-	r.RegisterBackend(fallbackBackend)
+	if err := r.RegisterBackend(primaryBackend); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(fallbackBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -593,7 +605,9 @@ func TestGenerateStreamSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -632,7 +646,9 @@ func TestGenerateStreamBackendError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -660,7 +676,9 @@ func TestGenerateStreamWithAnnotations(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -700,7 +718,9 @@ func TestEmbedSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -737,7 +757,9 @@ func TestEmbedBackendError(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -765,7 +787,9 @@ func TestEmbedWithAnnotations(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -820,8 +844,12 @@ func TestListBackendsSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -892,8 +920,12 @@ func TestHealthCheckAllHealthy(t *testing.T) {
 	backend2 := &MockBackend{id: strBackend2, healthy: true}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -919,8 +951,12 @@ func TestHealthCheckDegraded(t *testing.T) {
 	backend2 := &MockBackend{id: strBackend2, healthy: false}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend1)
-	r.RegisterBackend(backend2)
+	if err := r.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -960,7 +996,9 @@ func TestExecutePipelineNotEnabled(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 	// Don't set pipeline executor
@@ -988,7 +1026,9 @@ func TestExecutePipelineSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -1024,7 +1064,9 @@ func TestExecutePipelineWithInput(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -1064,7 +1106,9 @@ func TestExecutePipelineFullSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backendsList := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
@@ -1127,7 +1171,9 @@ func TestExecutePipelineWithMetadata(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backendsList := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
@@ -1204,7 +1250,9 @@ func TestExecutePipelineOutputConversion(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backendsList := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backendsList)
@@ -1268,7 +1316,9 @@ func TestExecutePipelineStreamNotEnabled(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 	// Don't set pipeline executor
@@ -1296,7 +1346,9 @@ func TestExecutePipelineStreamSuccess(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	backends := []backends.Backend{backend}
 	pipelineExecutor := pipeline.NewPipelineExecutor(backends)
@@ -1335,7 +1387,9 @@ func TestConcurrentGenerateRequests(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -1381,7 +1435,9 @@ func TestConcurrentEmbedAndGenerate(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{DefaultBackendID: strBackend1})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -1438,7 +1494,9 @@ func TestConcurrentListBackendsAndHealthCheck(t *testing.T) {
 	}
 
 	r := router.NewRouter(router.Config{})
-	r.RegisterBackend(backend)
+	if err := r.RegisterBackend(backend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(r)
 
@@ -1701,7 +1759,9 @@ func TestGenerateWithForwardingRouter(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	if err := baseRouter.RegisterBackend(mockBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create forwarding router
 	forwardingCfg := &router.ForwardingConfig{
@@ -1845,8 +1905,12 @@ func TestGenerateWithActualForwarding(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(backend1)
-	baseRouter.RegisterBackend(backend2)
+	if err := baseRouter.RegisterBackend(backend1); err != nil {
+		t.Fatal(err)
+	}
+	if err := baseRouter.RegisterBackend(backend2); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create forwarding router with very high confidence threshold
 	// to trigger forwarding
@@ -1929,7 +1993,9 @@ func TestEmbedWithPowerPreference(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	if err := baseRouter.RegisterBackend(mockBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(baseRouter)
 
@@ -2005,7 +2071,9 @@ func TestGenerateStreamBackendStreamError(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	if err := baseRouter.RegisterBackend(mockBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(baseRouter)
 
@@ -2094,8 +2162,12 @@ func TestGenerateFallbackOnBackendFailure(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(failingBackend)
-	baseRouter.RegisterBackend(fallbackBackend)
+	if err := baseRouter.RegisterBackend(failingBackend); err != nil {
+		t.Fatal(err)
+	}
+	if err := baseRouter.RegisterBackend(fallbackBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(baseRouter)
 
@@ -2137,7 +2209,9 @@ func TestGenerateStreamEOFHandling(t *testing.T) {
 		PowerAware:       true,
 	}
 	baseRouter := router.NewRouter(routerCfg)
-	baseRouter.RegisterBackend(mockBackend)
+	if err := baseRouter.RegisterBackend(mockBackend); err != nil {
+		t.Fatal(err)
+	}
 
 	server := NewComputeServer(baseRouter)
 

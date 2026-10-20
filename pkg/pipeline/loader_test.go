@@ -676,6 +676,10 @@ func TestStageYAMLStructure(t *testing.T) {
 		t.Error("Expected stage ID")
 	}
 
+	if stage.Description != "Test description" {
+		t.Error("Expected stage description")
+	}
+
 	if stage.Type != string(StageTypeTextGen) {
 		t.Error("Expected stage type")
 	}

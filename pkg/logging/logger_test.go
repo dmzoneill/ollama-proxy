@@ -29,13 +29,13 @@ func TestInitLogger(t *testing.T) {
 		},
 		{
 			name:       "warn level production",
-			level:      "warn",
+			level:      strWarn,
 			production: true,
 			wantErr:    false,
 		},
 		{
 			name:       "error level production",
-			level:      "error",
+			level:      strError,
 			production: true,
 			wantErr:    false,
 		},
@@ -204,8 +204,8 @@ func TestLogLevels(t *testing.T) {
 	}{
 		{level: strDebug, expectedLevel: zapcore.DebugLevel},
 		{level: strInfo, expectedLevel: zapcore.InfoLevel},
-		{level: "warn", expectedLevel: zapcore.WarnLevel},
-		{level: "error", expectedLevel: zapcore.ErrorLevel},
+		{level: strWarn, expectedLevel: zapcore.WarnLevel},
+		{level: strError, expectedLevel: zapcore.ErrorLevel},
 		{level: "invalid", expectedLevel: zapcore.InfoLevel}, // defaults to info
 	}
 

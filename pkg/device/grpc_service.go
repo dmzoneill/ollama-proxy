@@ -296,11 +296,11 @@ func deviceTypeToString(dt devicev1.DeviceType) string {
 	case devicev1.DeviceType_DEVICE_TYPE_SCREEN:
 		return "screen"
 	case devicev1.DeviceType_DEVICE_TYPE_SPEAKER:
-		return "speaker"
+		return string(DeviceTypeSpeaker)
 	case devicev1.DeviceType_DEVICE_TYPE_KEYBOARD:
-		return "keyboard"
+		return string(DeviceTypeKeyboard)
 	case devicev1.DeviceType_DEVICE_TYPE_MOUSE:
-		return "mouse"
+		return string(DeviceTypeMouse)
 	default:
 		return ""
 	}
@@ -315,11 +315,11 @@ func stringToDeviceType(s string) devicev1.DeviceType {
 		return devicev1.DeviceType_DEVICE_TYPE_CAMERA
 	case "screen":
 		return devicev1.DeviceType_DEVICE_TYPE_SCREEN
-	case "speaker":
+	case string(DeviceTypeSpeaker):
 		return devicev1.DeviceType_DEVICE_TYPE_SPEAKER
-	case "keyboard":
+	case string(DeviceTypeKeyboard):
 		return devicev1.DeviceType_DEVICE_TYPE_KEYBOARD
-	case "mouse":
+	case string(DeviceTypeMouse):
 		return devicev1.DeviceType_DEVICE_TYPE_MOUSE
 	default:
 		return devicev1.DeviceType_DEVICE_TYPE_UNSPECIFIED

@@ -13,6 +13,8 @@ const (
 	strGpt4Turbo           = "gpt-4-turbo"
 	strHello               = "Hello"
 	strMessage             = "message"
+	strO1                  = "o1-*"
+	strOpenai              = "openai"
 	strOpenaiTest          = "openai-test"
 	strResponse            = "response"
 	strTest                = "test"

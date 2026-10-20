@@ -239,10 +239,10 @@ func (e UdevEvent) GetDeviceType() Type {
 		return DeviceTypeSpeaker
 	case SubsystemInput:
 		// Check device type
-		if strings.Contains(strings.ToLower(e.DevType), "keyboard") {
+		if strings.Contains(strings.ToLower(e.DevType), string(DeviceTypeKeyboard)) {
 			return DeviceTypeKeyboard
 		}
-		if strings.Contains(strings.ToLower(e.DevType), "mouse") {
+		if strings.Contains(strings.ToLower(e.DevType), string(DeviceTypeMouse)) {
 			return DeviceTypeMouse
 		}
 		return DeviceTypeKeyboard // Default for input devices

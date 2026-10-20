@@ -554,7 +554,7 @@ func TestStreamCompletion_TokenIntegrity(t *testing.T) {
 		if choices, ok := msg["choices"]; ok {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
-				if text, ok := choice["text"]; ok {
+				if text, ok := choice[strText]; ok {
 					receivedTokens = append(receivedTokens, text.(string))
 				}
 			}
@@ -1026,17 +1026,21 @@ func TestStreamChat_vs_Completion_ObjectTypes(t *testing.T) {
 	// Test chat completion
 	reader1 := NewMockStreamReader(chunks)
 	recorder1 := httptest.NewRecorder()
-	StreamChatCompletion(recorder1, reader1, "gpt-4", "id1")
+	if err := StreamChatCompletion(recorder1, reader1, "gpt-4", "id1"); err != nil {
+		t.Fatal(err)
+	}
 	body1 := recorder1.Body.String()
 
 	// Test completion
 	reader2 := NewMockStreamReader(chunks)
 	recorder2 := httptest.NewRecorder()
-	StreamCompletion(recorder2, reader2, "text-davinci-003", "id2")
+	if err := StreamCompletion(recorder2, reader2, "text-davinci-003", "id2"); err != nil {
+		t.Fatal(err)
+	}
 	body2 := recorder2.Body.String()
 
 	// Chat should have "chat.completion.chunk"
-	if !strings.Contains(body1, "chat.completion.chunk") {
+	if !strings.Contains(body1, strChatCompletionChunk) {
 		t.Error("Expected 'chat.completion.chunk' in chat response")
 	}
 
@@ -1245,7 +1249,7 @@ func TestStreamCompletion_TextField(t *testing.T) {
 		if choices, ok := msg["choices"]; ok {
 			if choiceList, ok := choices.([]interface{}); ok && len(choiceList) > 0 {
 				choice := choiceList[0].(map[string]interface{})
-				if text, ok := choice["text"]; ok {
+				if text, ok := choice[strText]; ok {
 					if text != "completion" {
 						t.Errorf("Expected text 'completion', got %v", text)
 					}
@@ -1360,7 +1364,7 @@ func TestStreamChatCompletion_AllFields(t *testing.T) {
 
 		// Verify object is correct
 		if obj, ok := msg["object"]; ok {
-			if obj != "chat.completion.chunk" {
+			if obj != strChatCompletionChunk {
 				t.Errorf("Expected object 'chat.completion.chunk', got %v", obj)
 			}
 		}

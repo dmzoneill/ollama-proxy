@@ -8,12 +8,12 @@ import "fmt"
 // VoiceAssistantPipeline creates a voice → text → LLM → text → voice pipeline
 func VoiceAssistantPipeline() *Pipeline {
 	return &Pipeline{
-		ID:          "voice-assistant",
+		ID:          strVoiceAssistant2,
 		Name:        "Voice Assistant",
 		Description: "Voice input → Speech-to-text (NPU) → LLM processing (iGPU/GPU) → Text-to-speech (NPU)",
 		Stages: []*Stage{
 			{
-				ID:                "voice-to-text",
+				ID:                strVoiceToText,
 				Type:              StageTypeAudioToText,
 				Description:       "Convert voice to text using NPU",
 				PreferredHardware: strNpu,
@@ -25,7 +25,7 @@ func VoiceAssistantPipeline() *Pipeline {
 				},
 			},
 			{
-				ID:                "process-text",
+				ID:                strProcessText,
 				Type:              StageTypeTextGen,
 				Description:       "Process text with LLM on iGPU or GPU",
 				PreferredHardware: strIgpu, // Prefer iGPU (balanced), fallback to GPU if needed
@@ -43,7 +43,7 @@ func VoiceAssistantPipeline() *Pipeline {
 				Type:              StageTypeTextToAudio,
 				Description:       "Convert response to voice using NPU",
 				PreferredHardware: strNpu,
-				Model:             "piper-tts", // Fast TTS on NPU
+				Model:             strPiperTts, // Fast TTS on NPU
 				ForwardingPolicy: &ForwardingPolicy{
 					EnableConfidenceCheck: false, // TTS is deterministic
 				},
@@ -66,7 +66,7 @@ func AdaptiveTextPipeline() *Pipeline {
 		Description: "Start with NPU, escalate to iGPU or GPU based on quality",
 		Stages: []*Stage{
 			{
-				ID:                "generate-text",
+				ID:                strGenerateText,
 				Type:              StageTypeTextGen,
 				Description:       "Generate text with automatic quality escalation",
 				PreferredHardware: strNpu, // Start cheap
@@ -104,7 +104,7 @@ func CodeGenerationPipeline() *Pipeline {
 				Type:              StageTypeTextGen,
 				Description:       "Generate initial code draft",
 				PreferredHardware: strIgpu,
-				Model:             "deepseek-coder:6.7b",
+				Model:             strDeepseekCoder67b,
 				ForwardingPolicy: &ForwardingPolicy{
 					EnableQualityCheck: true,
 					QualityThreshold:   0.8,
@@ -268,7 +268,7 @@ func BudgetAwarePipeline() *Pipeline {
 		Description: "Adapt backend selection based on power budget",
 		Stages: []*Stage{
 			{
-				ID:          "generate-text",
+				ID:          strGenerateText,
 				Type:        StageTypeTextGen,
 				Description: "Generate text within power budget",
 				Model:       strLlama37b,

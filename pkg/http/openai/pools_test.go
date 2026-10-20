@@ -12,7 +12,7 @@ func TestChatChunkPool(t *testing.T) {
 		t.Fatal("getChatChunk returned nil")
 	}
 
-	if chunk.Object != "chat.completion.chunk" {
+	if chunk.Object != strChatCompletionChunk {
 		t.Errorf("Expected Object='chat.completion.chunk', got %s", chunk.Object)
 	}
 

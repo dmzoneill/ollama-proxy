@@ -509,7 +509,7 @@ func TestEstimateEnergy_Nvidia(t *testing.T) {
 
 // TestEstimateEnergy_CPU is part of the public API.
 func TestEstimateEnergy_CPU(t *testing.T) {
-	energy := estimateEnergy("ollama-cpu", 60)
+	energy := estimateEnergy(strOllamaCPU, 60)
 
 	// CPU: 6 tokens/sec, 28W
 	// Time: 60/6 = 10 seconds
@@ -631,7 +631,7 @@ func TestCheckAndDeduct_CPU(t *testing.T) {
 	p := NewPolicy()
 	budget := p.GetOrCreateBudget("user1", TierBasic)
 
-	err := budget.CheckAndDeduct("ollama-cpu", 1.0)
+	err := budget.CheckAndDeduct(strOllamaCPU, 1.0)
 	if err != nil {
 		t.Errorf("CheckAndDeduct CPU should succeed, got: %v", err)
 	}
@@ -897,16 +897,24 @@ func TestCheckAndDeduct_MixedBackends(t *testing.T) {
 	budget := p.GetOrCreateBudget("user1", TierFree) // 5 NVIDIA/hour
 
 	// Use non-NVIDIA backends - should not affect NVIDIA quota
-	_ = budget.CheckAndDeduct(strOllamaNpu, 1.0)
-	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
-	_ = budget.CheckAndDeduct("ollama-cpu", 1.0)
+	if err := budget.CheckAndDeduct(strOllamaNpu, 1.0); err != nil {
+		t.Fatal(err)
+	}
+	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
+		t.Fatal(err)
+	}
+	if err := budget.CheckAndDeduct(strOllamaCPU, 1.0); err != nil {
+		t.Fatal(err)
+	}
 
 	if budget.nvidiaUsedThisHour != 0 {
 		t.Error("Non-NVIDIA backends should not affect NVIDIA quota")
 	}
 
 	// Now use NVIDIA - should count
-	_ = budget.CheckAndDeduct(strOllamaNvidia, 1.0)
+	if err := budget.CheckAndDeduct(strOllamaNvidia, 1.0); err != nil {
+		t.Fatal(err)
+	}
 	if budget.nvidiaUsedThisHour != 1 {
 		t.Error("NVIDIA deduction should increment NVIDIA quota")
 	}
@@ -937,7 +945,7 @@ func TestGetRecommendedBackend_AllBackends(t *testing.T) {
 	p := NewPolicy()
 	p.SetBatteryMode(false, 100)
 
-	backends := []string{strOllamaNpu, strOllamaIgpu, "ollama-cpu", strOllamaNvidia}
+	backends := []string{strOllamaNpu, strOllamaIgpu, strOllamaCPU, strOllamaNvidia}
 
 	for i, backend := range backends {
 		userID := fmt.Sprintf("user%d", i)
@@ -977,7 +985,7 @@ func TestEstimateEnergy_AllBackends(t *testing.T) {
 		strOllamaNpu:    {tokens: 100, minWh: 0.008, maxWh: 0.009},
 		strOllamaIgpu:   {tokens: 220, minWh: 0.033, maxWh: 0.034},
 		strOllamaNvidia: {tokens: 650, minWh: 0.15, maxWh: 0.16},
-		"ollama-cpu":    {tokens: 60, minWh: 0.077, maxWh: 0.078},
+		strOllamaCPU:    {tokens: 60, minWh: 0.077, maxWh: 0.078},
 	}
 
 	for backend, test := range backends {
@@ -1019,12 +1027,16 @@ func TestCheckAndDeduct_MultipleDailyResets(t *testing.T) {
 	budget.usedTodayWh = 5.0
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
 
-	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
+	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
+		t.Fatal(err)
+	}
 	firstUsed := budget.usedTodayWh
 
 	// Second reset simulation
 	budget.lastResetTime = time.Now().Add(-25 * time.Hour)
-	_ = budget.CheckAndDeduct(strOllamaIgpu, 1.0)
+	if err := budget.CheckAndDeduct(strOllamaIgpu, 1.0); err != nil {
+		t.Fatal(err)
+	}
 	secondUsed := budget.usedTodayWh
 
 	if firstUsed != 1.0 || secondUsed != 1.0 {
@@ -1041,12 +1053,16 @@ func TestCheckAndDeduct_MultipleHourlyResets(t *testing.T) {
 	budget.nvidiaUsedThisHour = 10
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
 
-	_ = budget.CheckAndDeduct(strOllamaNvidia, 0.5)
+	if err := budget.CheckAndDeduct(strOllamaNvidia, 0.5); err != nil {
+		t.Fatal(err)
+	}
 	firstCount := budget.nvidiaUsedThisHour
 
 	// Second reset simulation
 	budget.lastNvidiaResetTime = time.Now().Add(-61 * time.Minute)
-	_ = budget.CheckAndDeduct(strOllamaNvidia, 0.5)
+	if err := budget.CheckAndDeduct(strOllamaNvidia, 0.5); err != nil {
+		t.Fatal(err)
+	}
 	secondCount := budget.nvidiaUsedThisHour
 
 	if firstCount != 1 || secondCount != 1 {

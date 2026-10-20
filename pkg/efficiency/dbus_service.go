@@ -111,12 +111,12 @@ func (ds *DBusService) Start() error {
 				},
 				Properties: []introspect.Property{
 					{
-						Name:   "CurrentMode",
+						Name:   strCurrentMode,
 						Type:   "s",
 						Access: "readwrite",
 					},
 					{
-						Name:   "EffectiveMode",
+						Name:   strEffectiveMode,
 						Type:   "s",
 						Access: "read",
 					},
@@ -170,7 +170,7 @@ func (ds *DBusService) SetMode(mode string) *dbus.Error {
 
 	// Update property
 	if ds.props != nil {
-		ds.props.SetMust(dbusInterface, "CurrentMode", newMode.String())
+		ds.props.SetMust(dbusInterface, strCurrentMode, newMode.String())
 	}
 
 	logging.Logger.Info("Efficiency mode changed",
@@ -242,7 +242,7 @@ func (ds *DBusService) GetModeInfo(modeName string) (map[string]dbus.Variant, *d
 func (ds *DBusService) makePropertyMap() map[string]map[string]*prop.Prop {
 	return map[string]map[string]*prop.Prop{
 		dbusInterface: {
-			"CurrentMode": {
+			strCurrentMode: {
 				Value:    ds.manager.GetMode().String(),
 				Writable: true,
 				Emit:     prop.EmitTrue,
@@ -254,7 +254,7 @@ func (ds *DBusService) makePropertyMap() map[string]map[string]*prop.Prop {
 					return ds.SetMode(mode)
 				},
 			},
-			"EffectiveMode": {
+			strEffectiveMode: {
 				Value:    ds.manager.GetEffectiveMode().String(),
 				Writable: false,
 				Emit:     prop.EmitTrue,

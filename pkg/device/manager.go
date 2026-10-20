@@ -495,7 +495,7 @@ func (dm *Manager) handleUdevEvent(event UdevEvent) {
 		zap.String("devname", event.DevName))
 
 	// Auto-register video devices
-	if event.Subsystem == "video4linux" && event.Action == strAdd {
+	if event.Subsystem == SubsystemVideo4linux && event.Action == strAdd {
 		capabilities := map[string]dbus.Variant{
 			"subsystem": dbus.MakeVariant(event.Subsystem),
 			"devtype":   dbus.MakeVariant(event.DevType),

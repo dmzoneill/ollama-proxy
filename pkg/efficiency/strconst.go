@@ -13,4 +13,7 @@ const (
 	strUltraEfficiency  = "UltraEfficiency"
 	strUltraEfficiency2 = "Ultra Efficiency"
 	strOllamaNvidia     = "ollama-nvidia"
+	strCurrentMode      = "CurrentMode"
+	strEffectiveMode    = "EffectiveMode"
+	strUnknown          = "Unknown"
 )
