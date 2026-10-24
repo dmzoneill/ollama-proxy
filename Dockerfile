@@ -25,7 +25,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM alpine:3.24.2
 
 # Install CA certificates, then create the unprivileged user and config directory.
-RUN apk --no-cache add ca-certificates=20260909-r0 \
+RUN apk --no-cache add ca-certificates=20261020-r0 \
     && addgroup -S ollama \
     && adduser -S ollama -G ollama \
     && mkdir -p /etc/ollama-proxy/config \
