@@ -317,7 +317,7 @@ The proxy implements **10 critical optimizations** for ultra-low latency streami
 
 ### Benchmark Results
 
-```
+```text
 Voice Processing (20 tokens):
   NPU Backend: 400ms total (20ms/token)
   Proxy Overhead: 8ms (2% of total) ✅
@@ -396,7 +396,7 @@ See [docs/features/priority-queuing.md](docs/features/priority-queuing.md)
 
 ### Endpoints
 
-```
+```text
 GET  /health                    # Health check
 GET  /backends                  # List backends
 GET  /thermal                   # Thermal status
@@ -415,7 +415,7 @@ WS   /v1/stream/ws              # WebSocket streaming
 
 Control routing behavior with HTTP headers:
 
-```
+```text
 X-Target-Backend: ollama-npu          # Explicit backend selection
 X-Latency-Critical: true              # Route to fastest backend
 X-Power-Efficient: true               # Route to lowest power backend
@@ -430,7 +430,7 @@ X-Media-Type: realtime                # Workload type hint
 
 Routing metadata returned in responses:
 
-```
+```text
 X-Backend-Used: ollama-npu            # Backend that processed request
 X-Estimated-Latency-Ms: 800           # Estimated latency
 X-Estimated-Power-W: 3.0              # Estimated power consumption
@@ -446,7 +446,7 @@ System-wide monitoring and control via D-Bus:
 
 ### Available Services
 
-```
+```text
 ie.fio.OllamaProxy.Efficiency      # Efficiency mode control
 ie.fio.OllamaProxy.Backends        # Backend monitoring
 ie.fio.OllamaProxy.Routing         # Routing statistics
