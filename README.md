@@ -1,5 +1,9 @@
 # Ollama Proxy
 
+<p align="center">
+  <img src=".github/logo.png" alt="ollama-proxy logo" width="128" />
+</p>
+
 **Intelligent multi-backend AI inference router with power-aware routing, thermal monitoring, and GNOME desktop integration.**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,6 +17,7 @@
 Ollama Proxy is a high-performance inference router that intelligently distributes AI workloads across multiple compute backends (NPU, GPU, CPU) with real-time power monitoring, thermal management, and desktop integration.
 
 **Key Features:**
+
 - 🔀 **Multi-Backend Routing** - NPU, iGPU, NVIDIA GPU, CPU support
 - ⚡ **Power-Aware Routing** - Route based on power consumption (3W-55W range)
 - 🌡️ **Thermal Monitoring** - Real-time temperature and fan speed tracking
@@ -239,17 +244,19 @@ curl http://localhost:8080/v1/chat/completions \
 ### WebSocket Streaming (Ultra-Low Latency)
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/v1/stream/ws');
+const ws = new WebSocket("ws://localhost:8080/v1/stream/ws");
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({
-    request_id: "voice-001",
-    model: "qwen2.5:0.5b",
-    prompt: "Transcribe: Hello world",
-    stream: true,
-    priority: "critical",
-    max_latency_ms: 50
-  }));
+  ws.send(
+    JSON.stringify({
+      request_id: "voice-001",
+      model: "qwen2.5:0.5b",
+      prompt: "Transcribe: Hello world",
+      stream: true,
+      priority: "critical",
+      max_latency_ms: 50,
+    }),
+  );
 };
 
 ws.onmessage = (event) => {
@@ -278,13 +285,16 @@ After installing the GNOME extension and restarting GNOME Shell:
 
 1. Click the **Quick Settings** panel (top-right)
 2. Find **"AI Efficiency"** toggle
-3. Select efficiency mode:
-   - **Performance** - Fastest (NVIDIA GPU preferred)
-   - **Balanced** - Balanced power/performance
-   - **Efficiency** - Lowest power (NPU preferred)
-   - **Quiet** - Minimize fan noise
-   - **Auto** - Automatic based on battery/temperature
-   - **Ultra Efficiency** - Maximum battery saving
+3. Select an efficiency mode from the list below.
+
+Efficiency modes:
+
+- **Performance** - Fastest (NVIDIA GPU preferred)
+- **Balanced** - Balanced power/performance
+- **Efficiency** - Lowest power (NPU preferred)
+- **Quiet** - Minimize fan noise
+- **Auto** - Automatic based on battery/temperature
+- **Ultra Efficiency** - Maximum battery saving
 
 ---
 
@@ -294,22 +304,23 @@ After installing the GNOME extension and restarting GNOME Shell:
 
 The proxy implements **10 critical optimizations** for ultra-low latency streaming:
 
-| Optimization | Latency Saved | Benefit |
-|-------------|---------------|---------|
-| Connection pooling | -1-10ms per request | Reuses TCP connections |
-| Optimized buffers (4KB) | -10-500μs per token | Smaller buffer, lower latency |
-| Object pooling | -30-150μs per token | Eliminates allocations |
-| Priority queuing | N/A | Critical requests bypass queue |
-| Backpressure control | N/A | Prevents memory buildup |
-| WebSocket passthrough | -100-400μs per token | Zero-copy streaming |
+| Optimization            | Latency Saved        | Benefit                        |
+| ----------------------- | -------------------- | ------------------------------ |
+| Connection pooling      | -1-10ms per request  | Reuses TCP connections         |
+| Optimized buffers (4KB) | -10-500μs per token  | Smaller buffer, lower latency  |
+| Object pooling          | -30-150μs per token  | Eliminates allocations         |
+| Priority queuing        | N/A                  | Critical requests bypass queue |
+| Backpressure control    | N/A                  | Prevents memory buildup        |
+| WebSocket passthrough   | -100-400μs per token | Zero-copy streaming            |
 
 **Total Proxy Overhead:**
+
 - Before optimizations: 1.2-9.6ms per token (9-18% of total)
 - After optimizations: **0.05-0.5ms per token (<1% of total)**
 
 ### Benchmark Results
 
-```
+```text
 Voice Processing (20 tokens):
   NPU Backend: 400ms total (20ms/token)
   Proxy Overhead: 8ms (2% of total) ✅
@@ -327,6 +338,7 @@ High-Throughput Batch:
 ### Multi-Backend Routing
 
 Automatically routes requests to the best backend based on:
+
 - **Latency requirements** - Fast requests to NVIDIA GPU
 - **Power constraints** - Battery-powered to NPU (3W)
 - **Thermal state** - High temperature to lower power backends
@@ -338,6 +350,7 @@ See [docs/features/routing.md](docs/features/routing.md)
 ### Power-Aware Routing
 
 Optimize for power consumption based on:
+
 - Battery level (Auto mode)
 - AC vs battery power
 - Maximum power budget (X-Max-Power-Watts header)
@@ -348,6 +361,7 @@ See [docs/features/power-management.md](docs/features/power-management.md)
 ### Thermal Monitoring
 
 Real-time monitoring of:
+
 - CPU/GPU temperatures
 - Fan speeds
 - Thermal throttling detection
@@ -358,6 +372,7 @@ See [docs/features/thermal-monitoring.md](docs/features/thermal-monitoring.md)
 ### Efficiency Modes
 
 Six efficiency modes for different scenarios:
+
 - **Performance** - Maximum performance, ignore power
 - **Balanced** - Balance between power and latency
 - **Efficiency** - Minimize power consumption
@@ -370,6 +385,7 @@ See [docs/features/efficiency-modes.md](docs/features/efficiency-modes.md)
 ### Priority Queuing
 
 Four priority levels:
+
 - **Best Effort** (0) - Batch jobs, non-critical
 - **Normal** (1) - Default priority
 - **High** (2) - Important workloads
@@ -383,7 +399,7 @@ See [docs/features/priority-queuing.md](docs/features/priority-queuing.md)
 
 ### Endpoints
 
-```
+```text
 GET  /health                    # Health check
 GET  /backends                  # List backends
 GET  /thermal                   # Thermal status
@@ -402,7 +418,7 @@ WS   /v1/stream/ws              # WebSocket streaming
 
 Control routing behavior with HTTP headers:
 
-```
+```text
 X-Target-Backend: ollama-npu          # Explicit backend selection
 X-Latency-Critical: true              # Route to fastest backend
 X-Power-Efficient: true               # Route to lowest power backend
@@ -417,7 +433,7 @@ X-Media-Type: realtime                # Workload type hint
 
 Routing metadata returned in responses:
 
-```
+```text
 X-Backend-Used: ollama-npu            # Backend that processed request
 X-Estimated-Latency-Ms: 800           # Estimated latency
 X-Estimated-Power-W: 3.0              # Estimated power consumption
@@ -433,7 +449,7 @@ System-wide monitoring and control via D-Bus:
 
 ### Available Services
 
-```
+```text
 ie.fio.OllamaProxy.Efficiency      # Efficiency mode control
 ie.fio.OllamaProxy.Backends        # Backend monitoring
 ie.fio.OllamaProxy.Routing         # Routing statistics
