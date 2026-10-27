@@ -285,13 +285,16 @@ After installing the GNOME extension and restarting GNOME Shell:
 
 1. Click the **Quick Settings** panel (top-right)
 2. Find **"AI Efficiency"** toggle
-3. Select efficiency mode:
-   - **Performance** - Fastest (NVIDIA GPU preferred)
-   - **Balanced** - Balanced power/performance
-   - **Efficiency** - Lowest power (NPU preferred)
-   - **Quiet** - Minimize fan noise
-   - **Auto** - Automatic based on battery/temperature
-   - **Ultra Efficiency** - Maximum battery saving
+3. Select an efficiency mode from the list below.
+
+Efficiency modes:
+
+- **Performance** - Fastest (NVIDIA GPU preferred)
+- **Balanced** - Balanced power/performance
+- **Efficiency** - Lowest power (NPU preferred)
+- **Quiet** - Minimize fan noise
+- **Auto** - Automatic based on battery/temperature
+- **Ultra Efficiency** - Maximum battery saving
 
 ---
 
