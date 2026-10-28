@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # Final stage - minimal image. Pin the release tag and apk package
 # versions so image rebuilds do not float.
-FROM alpine:3.24.2
+FROM alpine:3.24.3
 
 # Install CA certificates, then create the unprivileged user and config directory.
 RUN apk --no-cache add ca-certificates=20261020-r0 \
