@@ -34,7 +34,7 @@ check_backend 11437 "CPU Backend" || all_running=false
 
 echo ""
 
-if [ "$all_running" = false ]; then
+if [[ "$all_running" = false ]]; then
     echo "⚠️  Not all backends are running!"
     echo ""
     echo "Please start all Ollama instances first:"

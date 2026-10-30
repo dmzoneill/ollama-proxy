@@ -191,7 +191,7 @@ files_with_mockbackend=(
 )
 
 for file in "${files_with_mockbackend[@]}"; do
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         if ! grep -q "SupportsAudioToText" "$file"; then
             # Find line with "// Tests" or similar and insert before it
             if grep -q "^\/\/ Test" "$file"; then
@@ -209,7 +209,7 @@ for file in "${files_with_mockbackend[@]}"; do
 done
 
 # Fix websocket tests (also uses MockBackend)
-if [ -f "pkg/http/websocket/handler_test.go" ]; then
+if [[ -f "pkg/http/websocket/handler_test.go" ]]; then
     if ! grep -q "SupportsAudioToText" "pkg/http/websocket/handler_test.go"; then
         sed -i '/^func Test/i\
 '"$(cat /tmp/multimedia_methods.txt)"'
