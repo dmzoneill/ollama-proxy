@@ -22,7 +22,7 @@ echo -e "${BLUE}============================================${NC}"
 echo ""
 
 # Check if running on GNOME
-if [ "$XDG_CURRENT_DESKTOP" != "GNOME" ]; then
+if [[ "$XDG_CURRENT_DESKTOP" != "GNOME" ]]; then
     echo -e "${YELLOW}Warning: Not running GNOME desktop environment${NC}"
     echo -e "${YELLOW}Current desktop: ${XDG_CURRENT_DESKTOP}${NC}"
     echo ""
@@ -39,7 +39,7 @@ install_gsettings_schema() {
 
     SCHEMA_FILE="$PROJECT_DIR/data/ie.fio.ollamaproxy.gschema.xml"
 
-    if [ ! -f "$SCHEMA_FILE" ]; then
+    if [[ ! -f "$SCHEMA_FILE" ]]; then
         echo -e "${RED}Error: Schema file not found: $SCHEMA_FILE${NC}"
         exit 1
     fi
@@ -64,7 +64,7 @@ install_desktop_entry() {
 
     DESKTOP_FILE="$PROJECT_DIR/data/ie.fio.ollamaproxy.desktop"
 
-    if [ ! -f "$DESKTOP_FILE" ]; then
+    if [[ ! -f "$DESKTOP_FILE" ]]; then
         echo -e "${RED}Error: Desktop file not found: $DESKTOP_FILE${NC}"
         exit 1
     fi
@@ -90,7 +90,7 @@ install_systemd_service() {
 
     SERVICE_FILE="$PROJECT_DIR/data/ie.fio.ollamaproxy.service"
 
-    if [ ! -f "$SERVICE_FILE" ]; then
+    if [[ ! -f "$SERVICE_FILE" ]]; then
         echo -e "${RED}Error: Service file not found: $SERVICE_FILE${NC}"
         exit 1
     fi
@@ -137,7 +137,7 @@ install_gnome_extension() {
 
     EXT_SOURCE="$PROJECT_DIR/gnome-shell-extension"
 
-    if [ ! -d "$EXT_SOURCE" ]; then
+    if [[ ! -d "$EXT_SOURCE" ]]; then
         echo -e "${RED}Error: Extension directory not found: $EXT_SOURCE${NC}"
         exit 1
     fi
@@ -145,7 +145,7 @@ install_gnome_extension() {
     # Check required files
     REQUIRED_FILES=("metadata.json" "extension.js" "prefs.js" "stylesheet.css")
     for file in "${REQUIRED_FILES[@]}"; do
-        if [ ! -f "$EXT_SOURCE/$file" ]; then
+        if [[ ! -f "$EXT_SOURCE/$file" ]]; then
             echo -e "${RED}Error: Missing extension file: $file${NC}"
             exit 1
         fi
@@ -197,21 +197,21 @@ verify_installation() {
     fi
 
     # Check desktop entry
-    if [ -f "$HOME/.local/share/applications/ie.fio.ollamaproxy.desktop" ]; then
+    if [[ -f "$HOME/.local/share/applications/ie.fio.ollamaproxy.desktop" ]]; then
         echo -e "${GREEN}  ✓ Desktop entry: OK${NC}"
     else
         echo -e "${RED}  ✗ Desktop entry: NOT FOUND${NC}"
     fi
 
     # Check systemd service
-    if [ -f "$HOME/.config/systemd/user/ie.fio.ollamaproxy.service" ]; then
+    if [[ -f "$HOME/.config/systemd/user/ie.fio.ollamaproxy.service" ]]; then
         echo -e "${GREEN}  ✓ Systemd service: OK${NC}"
     else
         echo -e "${RED}  ✗ Systemd service: NOT FOUND${NC}"
     fi
 
     # Check extension
-    if [ -d "$HOME/.local/share/gnome-shell/extensions/ollamaproxy@anthropic.com" ]; then
+    if [[ -d "$HOME/.local/share/gnome-shell/extensions/ollamaproxy@anthropic.com" ]]; then
         echo -e "${GREEN}  ✓ GNOME extension: OK${NC}"
     else
         echo -e "${RED}  ✗ GNOME extension: NOT FOUND${NC}"
