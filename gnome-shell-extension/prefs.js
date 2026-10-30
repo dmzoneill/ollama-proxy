@@ -10,6 +10,10 @@
 const { Gtk } = imports.gi;
 const ExtensionUtils = imports.misc.extensionUtils;
 
+// Section headings use GTK's "heading" style class (bold) instead of
+// Pango markup, so label text stays plain text.
+const HEADING_CLASSES = ["heading"];
+
 function init() {}
 
 function buildPrefsWidget() {
@@ -28,8 +32,8 @@ function buildPrefsWidget() {
 
   // Title
   let title = new Gtk.Label({
-    label: "<b>Ollama Proxy Settings</b>",
-    use_markup: true,
+    label: "Ollama Proxy Settings",
+    css_classes: HEADING_CLASSES,
     halign: Gtk.Align.START,
   });
   prefsWidget.append(title);
@@ -41,8 +45,8 @@ function buildPrefsWidget() {
 
   // Display Settings Section
   let displayLabel = new Gtk.Label({
-    label: "<b>Display</b>",
-    use_markup: true,
+    label: "Display",
+    css_classes: HEADING_CLASSES,
     halign: Gtk.Align.START,
     margin_top: 10,
   });
@@ -82,8 +86,8 @@ function buildPrefsWidget() {
 
   // Notification Settings Section
   let notifLabel = new Gtk.Label({
-    label: "<b>Notifications</b>",
-    use_markup: true,
+    label: "Notifications",
+    css_classes: HEADING_CLASSES,
     halign: Gtk.Align.START,
     margin_top: 10,
   });
@@ -123,8 +127,8 @@ function buildPrefsWidget() {
 
   // Mode Settings Section
   let modeLabel = new Gtk.Label({
-    label: "<b>Mode Settings</b>",
-    use_markup: true,
+    label: "Mode Settings",
+    css_classes: HEADING_CLASSES,
     halign: Gtk.Align.START,
     margin_top: 10,
   });
@@ -154,8 +158,8 @@ function buildPrefsWidget() {
 
   // Auto Mode Settings Section
   let autoLabel = new Gtk.Label({
-    label: "<b>Auto Mode</b>",
-    use_markup: true,
+    label: "Auto Mode",
+    css_classes: HEADING_CLASSES,
     halign: Gtk.Align.START,
     margin_top: 10,
   });

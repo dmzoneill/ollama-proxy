@@ -2,11 +2,13 @@
  * Adds AI Efficiency mode to Quick Settings menu
  */
 
-/* global imports, log, _ */
+/* global imports, log */
 /* exported init */
 
 const { GObject, Gio } = imports.gi;
 const QuickSettings = imports.ui.quickSettings;
+// The extension never set up `_`; bind gettext explicitly.
+const gettext = imports.gettext.gettext;
 const QuickSettingsMenu = imports.ui.main.panel.statusArea.quickSettings;
 
 // D-Bus interface
@@ -41,7 +43,7 @@ const AIEfficiencyToggle = GObject.registerClass(
   class AIEfficiencyToggle extends QuickSettings.QuickMenuToggle {
     _init() {
       super._init({
-        title: _("AI Efficiency"),
+        title: gettext("AI Efficiency"),
         iconName: "ai-efficiency-symbolic",
         toggleMode: false,
       });
@@ -55,7 +57,7 @@ const AIEfficiencyToggle = GObject.registerClass(
       );
 
       // Create menu
-      this.menu.setHeader("ai-efficiency-symbolic", _("AI Efficiency"));
+      this.menu.setHeader("ai-efficiency-symbolic", gettext("AI Efficiency"));
       this._addMenuItems();
     }
 
@@ -114,7 +116,7 @@ const AIEfficiencyToggle = GObject.registerClass(
       this.menu.addMenuItem(new imports.ui.popupMenu.PopupSeparatorMenuItem());
 
       // Add settings button
-      this.menu.addAction(_("Settings"), () => {
+      this.menu.addAction(gettext("Settings"), () => {
         imports.misc.util.spawn(["gnome-control-center", "power"]);
       });
     }
