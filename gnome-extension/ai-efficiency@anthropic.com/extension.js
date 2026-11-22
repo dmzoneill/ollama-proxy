@@ -86,21 +86,23 @@ const AIEfficiencyToggle = GObject.registerClass(
         "UltraEfficiency",
       ];
 
-      const descriptions = {
-        Performance: "Maximum speed",
-        Balanced: "Smart routing",
-        Efficiency: "Low power",
-        Quiet: "Minimal noise",
-        Auto: "Automatic",
-        UltraEfficiency: "Max battery",
-      };
+      const descriptions = new Map(
+        Object.entries({
+          Performance: "Maximum speed",
+          Balanced: "Smart routing",
+          Efficiency: "Low power",
+          Quiet: "Minimal noise",
+          Auto: "Automatic",
+          UltraEfficiency: "Max battery",
+        }),
+      );
 
-      this._modeItems = {};
+      this._modeItems = new Map();
 
       modes.forEach((mode) => {
         const item = new QuickSettings.QuickMenuToggle({
           title: mode,
-          subtitle: descriptions[mode],
+          subtitle: descriptions.get(mode),
           iconName: "object-select-symbolic",
         });
 
@@ -109,7 +111,7 @@ const AIEfficiencyToggle = GObject.registerClass(
         });
 
         this.menu.addMenuItem(item);
-        this._modeItems[mode] = item;
+        this._modeItems.set(mode, item);
       });
 
       // Add separator
@@ -136,8 +138,7 @@ const AIEfficiencyToggle = GObject.registerClass(
         this.subtitle = subtitle;
 
         // Update menu items
-        Object.keys(this._modeItems).forEach((mode) => {
-          const item = this._modeItems[mode];
+        this._modeItems.forEach((item, mode) => {
           item.checked = mode === currentMode;
         });
       } catch (e) {

@@ -51,23 +51,25 @@ const SystemInterface = `
 `;
 
 // Mode icons matching the system style
-const MODE_INFO = {
-  Performance: {
-    icon: "power-profile-performance-symbolic",
-    label: "Performance",
-  },
-  Balanced: { icon: "power-profile-balanced-symbolic", label: "Balanced" },
-  Efficiency: {
-    icon: "power-profile-power-saver-symbolic",
-    label: "Efficiency",
-  },
-  Quiet: { icon: "audio-volume-muted-symbolic", label: "Quiet" },
-  Auto: { icon: "emblem-system-symbolic", label: "Auto" },
-  "Ultra Efficiency": {
-    icon: "battery-level-10-symbolic",
-    label: "Ultra Efficiency",
-  },
-};
+const MODE_INFO = new Map(
+  Object.entries({
+    Performance: {
+      icon: "power-profile-performance-symbolic",
+      label: "Performance",
+    },
+    Balanced: { icon: "power-profile-balanced-symbolic", label: "Balanced" },
+    Efficiency: {
+      icon: "power-profile-power-saver-symbolic",
+      label: "Efficiency",
+    },
+    Quiet: { icon: "audio-volume-muted-symbolic", label: "Quiet" },
+    Auto: { icon: "emblem-system-symbolic", label: "Auto" },
+    "Ultra Efficiency": {
+      icon: "battery-level-10-symbolic",
+      label: "Ultra Efficiency",
+    },
+  }),
+);
 
 // D-Bus proxy wrapper
 const EfficiencyProxy = Gio.DBusProxy.makeProxyWrapper(EfficiencyInterface);
@@ -173,10 +175,10 @@ const OllamaProxyToggle = GObject.registerClass(
         "Ultra Efficiency",
       ];
 
-      this._modeItems = {};
+      this._modeItems = new Map();
 
       modes.forEach((mode) => {
-        const info = MODE_INFO[mode];
+        const info = MODE_INFO.get(mode);
         const item = new PopupMenu.PopupImageMenuItem(info.label, info.icon);
 
         item.connect("activate", () => {
@@ -184,7 +186,7 @@ const OllamaProxyToggle = GObject.registerClass(
         });
 
         this.menu.addMenuItem(item);
-        this._modeItems[mode] = item;
+        this._modeItems.set(mode, item);
       });
 
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
@@ -261,7 +263,7 @@ const OllamaProxyToggle = GObject.registerClass(
     _updateDisplay() {
       if (!this._currentMode) return;
 
-      const info = MODE_INFO[this._currentMode];
+      const info = MODE_INFO.get(this._currentMode);
       if (!info) return;
 
       // Update toggle title and icon
@@ -276,8 +278,7 @@ const OllamaProxyToggle = GObject.registerClass(
       }
 
       // Update checkmarks
-      Object.keys(this._modeItems).forEach((mode) => {
-        const item = this._modeItems[mode];
+      this._modeItems.forEach((item, mode) => {
         if (mode === this._currentMode) {
           item.setOrnament(PopupMenu.Ornament.CHECK);
         } else {
@@ -310,7 +311,7 @@ const OllamaProxyToggle = GObject.registerClass(
       this._updateState();
 
       // Show notification
-      const info = MODE_INFO[mode];
+      const info = MODE_INFO.get(mode);
       if (info) {
         Main.notify("Ollama Proxy", `Efficiency mode: ${info.label}`);
       }
