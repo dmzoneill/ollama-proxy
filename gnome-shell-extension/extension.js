@@ -51,23 +51,25 @@ const SystemInterface = `
 `;
 
 // Mode icons matching the system style
-const MODE_INFO = new Map(Object.entries({
-  Performance: {
-    icon: "power-profile-performance-symbolic",
-    label: "Performance",
-  },
-  Balanced: { icon: "power-profile-balanced-symbolic", label: "Balanced" },
-  Efficiency: {
-    icon: "power-profile-power-saver-symbolic",
-    label: "Efficiency",
-  },
-  Quiet: { icon: "audio-volume-muted-symbolic", label: "Quiet" },
-  Auto: { icon: "emblem-system-symbolic", label: "Auto" },
-  "Ultra Efficiency": {
-    icon: "battery-level-10-symbolic",
-    label: "Ultra Efficiency",
-  },
-}));
+const MODE_INFO = new Map(
+  Object.entries({
+    Performance: {
+      icon: "power-profile-performance-symbolic",
+      label: "Performance",
+    },
+    Balanced: { icon: "power-profile-balanced-symbolic", label: "Balanced" },
+    Efficiency: {
+      icon: "power-profile-power-saver-symbolic",
+      label: "Efficiency",
+    },
+    Quiet: { icon: "audio-volume-muted-symbolic", label: "Quiet" },
+    Auto: { icon: "emblem-system-symbolic", label: "Auto" },
+    "Ultra Efficiency": {
+      icon: "battery-level-10-symbolic",
+      label: "Ultra Efficiency",
+    },
+  }),
+);
 
 // D-Bus proxy wrapper
 const EfficiencyProxy = Gio.DBusProxy.makeProxyWrapper(EfficiencyInterface);

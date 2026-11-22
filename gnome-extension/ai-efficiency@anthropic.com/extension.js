@@ -86,14 +86,16 @@ const AIEfficiencyToggle = GObject.registerClass(
         "UltraEfficiency",
       ];
 
-      const descriptions = new Map(Object.entries({
-        Performance: "Maximum speed",
-        Balanced: "Smart routing",
-        Efficiency: "Low power",
-        Quiet: "Minimal noise",
-        Auto: "Automatic",
-        UltraEfficiency: "Max battery",
-      }));
+      const descriptions = new Map(
+        Object.entries({
+          Performance: "Maximum speed",
+          Balanced: "Smart routing",
+          Efficiency: "Low power",
+          Quiet: "Minimal noise",
+          Auto: "Automatic",
+          UltraEfficiency: "Max battery",
+        }),
+      );
 
       this._modeItems = new Map();
 
