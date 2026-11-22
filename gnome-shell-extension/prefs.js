@@ -268,7 +268,7 @@ function createModeDropdown(label, key, settings) {
   dropdown.connect("changed", (widget) => {
     let index = widget.get_active();
     if (index >= 0) {
-      settings.set_string(key, modes[index]);
+      settings.set_string(key, modes.at(index));
     }
   });
 
